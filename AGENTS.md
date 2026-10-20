@@ -9,3 +9,6 @@ Safety: no ADS/MC writes, PLC activation/download, TwinCAT Run/Stop, servo motio
 Never permanently delete or force-move other projects or live TwinCAT directories. Legacy archive relocation is already completed and documented; do not repeat. If cleanup targets are access-denied or in use, record them and defer. No fake SCARA connected state, PLC tags or camera measurements. Preserve existing camera/track-ID overlays and video-only/no-encoder behavior.
 
 Before each write make a restorable backup; record checkpoint/log and changed paths under Docs. Build/test C# offline, output to a versioned release-candidate directory, do not overwrite active Release. Summarize verified changes, test results and pending commissioning prerequisites.
+
+## Active source location 2026-10-20 (user update)
+The user moved the currently edited Git project to C:\Users\aml\orca\DATN. This overrides the older Desktop\DATN workspace path above for all current Orca / VS / ChatGPT source edits. All existing safety and backup rules remain binding. Preserve files in Desktop\DATN as historical reference only; do not propagate changes there automatically.

@@ -26,20 +26,20 @@ public partial class MainWindow
         _lastSensorSnapshot = now;
         if (now is null)
         {
-            if (old is not null) SensorHistory("ADS 851 MẤT KẾT NỐI / dữ liệu PLC chưa xác nhận");
+            if (old is not null) SensorHistory("ADS 851 DISCONNECTED / PLC signals unavailable");
             return;
         }
         if (old is null)
         {
-            SensorHistory("ADS 851 LIVE / bắt đầu giám sát các tín hiệu hiện hữu");
+            SensorHistory("ADS 851 LIVE / signal monitoring started");
             return;
         }
         void Edge(string label,bool oldValue,bool newValue)
         {
             if (oldValue!=newValue) SensorHistory(label + ": " + (newValue ? "ON" : "OFF"));
         }
-        Edge("EStop AUX DI0 (không phải Safety)",old.EstopOk,now.EstopOk);
-        Edge("STOP mềm PLC",old.GlobalStop,now.GlobalStop);
+        Edge("E-STOP AUX DI0 (non safety-rated)",old.EstopOk,now.EstopOk);
+        Edge("PLC SOFTWARE STOP",old.GlobalStop,now.GlobalStop);
         Edge("PLC-Q TCP",old.PlcQConnected,now.PlcQConnected);
         Edge("Gantry Busy",old.GantryBusy,now.GantryBusy);
         Edge("Gantry Alarm",old.GantryError,now.GantryError);
@@ -63,7 +63,7 @@ public partial class MainWindow
         OverviewGantryLog.ItemsSource = _auditRows;
         OverviewSensorLog.ItemsSource = _stationSensorEvents;
         UpdateStationOverviewVision();
-        OverviewGlobalAuthority.Text = "CHƯA TÍCH HỢP LỆNH START / STOP TỔNG; E-STOP LÀ MẠCH CỨNG";
+        OverviewGlobalAuthority.Text = "Global START/STOP not commissioned; use the physical E-Stop circuit";
     }
 
     private void UpdateStationOverviewVision()
@@ -73,7 +73,7 @@ public partial class MainWindow
             && DateTime.UtcNow - _stationLastFrameUtc <= TimeSpan.FromSeconds(3);
         bool sourceVideo = _video != null;
         string source = sourceVideo ? "VIDEO TEST" :
-            (_directHik?.IsOpen == true || _sessions.Count > 0) ? "CAMERA 1" : "CHƯA KẾT NỐI";
+            (_directHik?.IsOpen == true || _sessions.Count > 0) ? "CAMERA 1" : "DISCONNECTED";
         string freshness = sourceFresh ? "FRAME LIVE" : "NO FRAME / STALE";
         OverviewCam1Quality.Text = source + " • " + freshness +
             (_trackingEnabled ? " • TRACKING" : " • DETECT OFF");
@@ -92,7 +92,7 @@ public partial class MainWindow
             ? $"X {_lastBelt.Xmm:F1}  Y {_lastBelt.Ymm:F1}  θ {_last.AngleDeg:F1}°"
             : "X --  Y --  θ --";
         StationCam1Status.Text = source + " | " + freshness + (_trackingEnabled ? " | DETECT ON" : " | DETECT OFF")
-            + (sourceVideo ? " | Không có encoder đồng bộ" : "");
+            + (sourceVideo ? " | No synchronized physical encoder" : "");
         StationCam1Coords.Text = validPose
             ? $"Track {track} | X {_lastBelt.Xmm:F2} mm | Y {_lastBelt.Ymm:F2} mm | θ {_last.AngleDeg:F2}°"
             : "Track -- | X -- / Y -- / θ --";
@@ -100,19 +100,60 @@ public partial class MainWindow
             OverviewRecentEvent.Text = "CAMERA 1 / " + _events[0];
     }
 
+    private void UpdateStationOverviewIoIndicators(LineStatus? status)
+    {
+        // ADS port 851 diagnostic snapshot. These are NOT safety-rated I/O indicators.
+        void Pin(System.Windows.Controls.TextBlock element, string label, bool? value, string high="ON",string low="OFF",bool alarmOn=false,bool criticalOff=false)
+        {
+            element.Text = label + "  |  " + (value == null ? "UNAVAILABLE" : value.Value ? high : low);
+            bool fault = value.HasValue && ((alarmOn && value.Value) || (criticalOff && !value.Value));
+            element.Foreground = DashBrush(value == null ? "#E4C47A" : fault ? "#FF8A85" : value.Value ? "#7FDBC4" : "#B9CAD6");
+        }
+        if (status is null)
+        {
+            Pin(OverviewIoEstop,"ST-1228 DI0 AUX",null);
+            Pin(OverviewIoServo,"SERVO READY",null);
+            Pin(OverviewIoPlcQ,"PLC-Q LINK",null);
+            Pin(OverviewIoGantryBusy,"GANTRY BUSY",null);
+            Pin(OverviewIoGantryAlarm,"GANTRY ALARM",null);
+            Pin(OverviewIoVision,"VISION BRIDGE",null);
+            Pin(OverviewIoBeltDO,"ST-2318 DO0",null);
+            Pin(OverviewIoMd200Cmd,"MD200 START REQ",null);
+            Pin(OverviewIoEncoder,"ST-5114 ENCODER",null);
+            Pin(OverviewIoAo,"ST-4424 AO1",null);
+            return;
+        }
+        bool? Optional(string symbol, bool value) =>
+            status.SymbolPresence.TryGetValue(symbol,out var ok) && ok ? value : null;
+        bool? Encoder = status.SymbolPresence.TryGetValue("MAIN.rConveyorSpeed",out var okSpeed)
+            && okSpeed ? Math.Abs(status.BeltSpeed)>0.01 : null;
+        Pin(OverviewIoEstop,"ST-1228 DI0 AUX",status.EstopOk,"ON","OFF",criticalOff:true);
+        Pin(OverviewIoServo,"SERVO READY",Optional("MAIN.bServo_Ready",status.ServoReady));
+        Pin(OverviewIoPlcQ,"PLC-Q LINK",Optional("MAIN.bPlcQConnected",status.PlcQConnected),"CONNECTED","DISCONNECTED",criticalOff:true);
+        Pin(OverviewIoGantryBusy,"GANTRY BUSY",Optional("MAIN.bGlueCycleBusy",status.GantryBusy));
+        Pin(OverviewIoGantryAlarm,"GANTRY ALARM",Optional("MAIN.bGlueCycleError",status.GantryError),alarmOn:true);
+        Pin(OverviewIoVision,"VISION BRIDGE",Optional("MAIN.bVisionFeedVerified",status.VisionBridgeVerified));
+        Pin(OverviewIoBeltDO,"ST-2318 DO0",status.BeltRun);
+        Pin(OverviewIoMd200Cmd,"MD200 START REQ",status.BeltRequest);
+        Pin(OverviewIoEncoder,"ST-5114 ENCODER",Encoder,"MOVING","STATIONARY");
+        OverviewIoAo.Text=$"ST-4424 AO1  |  {status.AoRaw} RAW";
+        OverviewIoAo.Foreground=DashBrush("#B9CAD6");
+    }
+
     private void UpdateStationOverviewPlc(LineStatus? status)
     {
         RecordSensorEdges(status);
+        UpdateStationOverviewIoIndicators(status);
         if (status is null)
         {
-            OverviewSensors.Text = "ADS OFFLINE / không có phản hồi cảm biến. Không xác nhận máy an toàn.";
+            OverviewSensors.Text = "ADS OFFLINE / input feedback unavailable; machine safety is unverified.";
             OverviewGantrySensors.Text = "PLC-Q / Gantry / Encoder: OFFLINE";
-            OverviewGlobalAuthority.Text = "ADS OFFLINE · START/STOP TỔNG KHÔNG ĐƯỢC LIÊN KẾT PLC";
+            OverviewGlobalAuthority.Text = "ADS OFFLINE · GLOBAL START/STOP NOT WIRED TO PLC";
             UpdateStationOverviewVision();
             return;
         }
         string BoolState(bool v) => v ? "ON" : "OFF";
-        string Quality(string tag) => status.SymbolPresence.TryGetValue(tag, out var q) && !q ? "READ_FAIL" : BoolState(true);
+        string Quality(string tag) => status.SymbolPresence.TryGetValue(tag, out var q) && q ? "LIVE" : "READ_FAIL";
         string servo = Quality("MAIN.bServo_Ready") == "READ_FAIL" ? "READ_FAIL" : BoolState(status.ServoReady);
         OverviewSensors.Text =
             $"E-STOP AUX DI0: {BoolState(status.EstopOk)}  |  TwinCAT STOP REQUEST: {BoolState(status.GlobalStop)}  |  " +
@@ -122,8 +163,8 @@ public partial class MainWindow
             $"VISION BRIDGE: {BoolState(status.VisionBridgeVerified)}  |  GANTRY BUSY: {BoolState(status.GantryBusy)}" +
             $"  |  ALARM: {BoolState(status.GantryError)}";
         OverviewGlobalAuthority.Text = status.EstopOk && !status.GlobalStop
-            ? "ADS CÓ DỮ LIỆU · LỆNH START/STOP TỔNG CHƯA TÍCH HỢP; E-STOP PHẢI LÀ MẠCH CỨNG"
-            : "PLC BÁO DỪNG / E-STOP AUX KHÔNG OK · TUYỆT ĐỐI KHÔNG CHẠY MÁY";
+            ? "ADS LIVE · GLOBAL START/STOP NOT COMMISSIONED; PHYSICAL E-STOP REQUIRED"
+            : "PLC STOP REQUESTED / E-STOP AUX NOT OK · DO NOT START EQUIPMENT";
         UpdateStationOverviewVision();
     }
 
@@ -132,14 +173,14 @@ public partial class MainWindow
         var action = (sender as Button)?.Tag?.ToString() ?? "UNKNOWN";
         string details = action switch
         {
-            "START" => "START TỔNG chưa được kết nối đến TwinCAT. Cần tag Cmd + Ack, kiểm tra chế độ Auto, tất cả interlock Gantry, SCARA, băng tải và mạch E-Stop được nghiệm thu. KHÔNG có lệnh nào được gửi.",
-            "STOP" => "STOP TỔNG phải có hợp đồng dừng tuần tự, hủy các tác vụ robot và băng tải ở PLC. Hiện chưa có tag lệnh tổng đã nghiệm thu. KHÔNG có lệnh nào được gửi.",
-            "ESTOP" => "ĐÂY KHÔNG PHẢI NÚT E-STOP THẬT. Khi nguy hiểm, dùng nút E-Stop VẬT LÝ trên tủ máy. Phần mềm chỉ giám sát phản hồi DI0 của mạch phụ trợ, không cắt nguồn nguy hiểm.",
-            _ => "Chưa có lệnh."
+            "START" => "GLOBAL START is not connected to TwinCAT. A commissioned Cmd/Ack handshake and validated interlocks are required for Gantry, SCARA, conveyor and the physical emergency stop. NO PLC COMMAND WAS SENT.",
+            "STOP" => "GLOBAL STOP requires a validated PLC sequence, robot cancellation and conveyor stop acknowledgement. No commissioned global stop tag exists. NO PLC COMMAND WAS SENT.",
+            "ESTOP" => "THIS IS NOT AN EMERGENCY-STOP CONTROL. In danger, use the PHYSICAL E-STOP button on the machine. This UI only monitors auxiliary DI0 feedback and cannot remove hazardous energy.",
+            _ => "No command."
         };
         var stamp = DateTime.Now.ToString("HH:mm:ss");
-        OverviewRecentEvent.Text = $"{stamp} · YÊU CẦU HMI {action}: KHÔNG GỬI PLC";
-        MessageBox.Show(details, "DATN / Trạng thái lệnh hệ thống",
+        OverviewRecentEvent.Text = $"{stamp} · HMI REQUEST {action}: NOT SENT TO PLC";
+        MessageBox.Show(details, "DATN / Global Command Information",
             MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 

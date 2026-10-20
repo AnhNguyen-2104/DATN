@@ -1,7 +1,7 @@
 # DATN / LINE CONTROL — DU AN CHINH AML-IPC
 
 ## MOT THU MUC CHINH
-Root: C:\Users\aml\Desktop\DATN
+Root: C:\Users\aml\orca\DATN
 Double-click: START_DATN.cmd
 C# source: App\Vision\PlateVision50.csproj
 Third-party Camera wrappers: Dependencies\BaslerCamera, Dependencies\Devices
@@ -88,3 +88,13 @@ GitHub: https://github.com/AnhNguyen-2104/DATN
 - START_DATN_PREVIEW.cmd now forwards to START_DATN_STATION_PREVIEW.cmd (newest preserved SensorLog preview). START_DATN.cmd retains original release.
 - The old Desktop/PlateVision50_V2 source was archived to D after verifying Visual Studio is currently using DATN/App/PlateVision50.sln; DATN/App remains the source of truth.
 - PLC/TwinCAT_Original_20261015 and PLC/Backups were archived to D; do not blindly activate or deploy the Git version.
+
+## ACTIVE SOURCE LOCATION / 2026-10-20
+Use C:\Users\aml\orca\DATN for current source editing and Orca session. This Git checkout is source-only; build the camera/I-O English preview locally with installed .NET SDK, do not assume historical Desktop runtime paths exist here. Previous source location Desktop\DATN is archived context, not the active working tree.
+
+## CAMERA-FIRST ENGLISH OVERVIEW / AML 2026-10-20
+- Current source and Orca workspace: `C:\Users\aml\orca\DATN`.
+- Run newest validated camera-first English preview with `START_DATN_OVERVIEW_EN.cmd`; this builds/runs separately from the older Release/START_DATN.cmd.
+- Dual camera panels and I/O are read-only by default. SCARA/Cam2 remains NOT COMMISSIONED.
+- Global START/STOP buttons are NOT connected to PLC; the E-STOP / Safety Info button is NOT a hardware emergency-stop control.
+- See `Docs\CAMERA_IO_ENGLISH_OVERVIEW_CHECKPOINT_20261020.md` for safety limits, build and Orca audit state.

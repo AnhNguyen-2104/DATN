@@ -66,7 +66,7 @@ internal static class LineAds
         using var ads=new AdsClient();
         ads.Connect(851);
         if(ads.ReadState().AdsState!=AdsState.Run)
-            throw new InvalidOperationException("TwinCAT ADS 851 không ở RUN.");
+            throw new InvalidOperationException("TwinCAT ADS 851 is not in RUN state.");
         // Global stop and conveyor IO are REQUIRED: never infer healthy on failure.
         var presence=new Dictionary<string,bool>(StringComparer.Ordinal);
         return new LineStatus {
@@ -102,30 +102,30 @@ internal static class LineAds
     public static void StartBelt(double hz)
     {
         if(!double.IsFinite(hz) || hz<=0 || hz>25)
-            throw new ArgumentOutOfRangeException(nameof(hz),"Tần số phải lớn hơn 0 và không quá 25 Hz.");
+            throw new ArgumentOutOfRangeException(nameof(hz),"Frequency must be greater than 0 and no more than 25 Hz.");
         using var ads=new AdsClient();
         ads.Connect(851);
-        if(ads.ReadState().AdsState!=AdsState.Run)throw new InvalidOperationException("PLC không RUN.");
+        if(ads.ReadState().AdsState!=AdsState.Run)throw new InvalidOperationException("PLC is not in RUN state.");
         if(!Read<bool>(ads,"GVL_MD200_IO.bEStopFeedback")
            || Read<bool>(ads,"MAIN.bSystemStopRequested"))
-            throw new InvalidOperationException("E-Stop tổng không OK. Không thể START.");
+            throw new InvalidOperationException("Auxiliary E-Stop feedback is not OK. START blocked.");
         if(Read<bool>(ads,"MAIN.bGlueCycleBusy"))
-            throw new InvalidOperationException("Gantry đang chạy. Không cho START băng tải từ dashboard trong phiên test.");
+            throw new InvalidOperationException("Gantry is busy. Conveyor START is blocked in this test session.");
         if(Read<bool>(ads,"MAIN.bMD200_Start"))
-            throw new InvalidOperationException("Băng tải đang có yêu cầu START. Hãy STOP trước.");
+            throw new InvalidOperationException("Conveyor START is already requested. Stop it first.");
         // Direct HMI command ONLY for explicitly approved MD200 setpoint and start tags.
         // NEVER write EStop flags, motion publisher, M1000, QD75 or camera FIFO.
         Write(ads,"MAIN.rMD200_SetFrequency_Hz",hz);
         if(Math.Abs(Read<double>(ads,"MAIN.rMD200_SetFrequency_Hz")-hz)>0.000001)
-            throw new InvalidOperationException("PLC chưa nhận Hz mới, không bật START.");
+            throw new InvalidOperationException("PLC did not acknowledge the frequency setpoint. START blocked.");
         if(!Read<bool>(ads,"GVL_MD200_IO.bEStopFeedback")
            || Read<bool>(ads,"MAIN.bSystemStopRequested"))
-            throw new InvalidOperationException("E-Stop đổi trạng thái. START bị hủy.");
+            throw new InvalidOperationException("E-Stop auxiliary input changed state. START cancelled.");
         try
         {
             Write(ads,"MAIN.bMD200_Start",true);
             if(!Read<bool>(ads,"MAIN.bMD200_Start"))
-                throw new InvalidOperationException("PLC từ chối START hoặc E-Stop đang tác động.");
+                throw new InvalidOperationException("PLC rejected START or E-Stop feedback is active.");
         }
         catch
         {
@@ -139,10 +139,10 @@ internal static class LineAds
     {
         using var ads=new AdsClient();
         ads.Connect(851);
-        if(ads.ReadState().AdsState!=AdsState.Run)throw new InvalidOperationException("PLC không RUN.");
+        if(ads.ReadState().AdsState!=AdsState.Run)throw new InvalidOperationException("PLC is not in RUN state.");
         Write(ads,"MAIN.bMD200_Start",false);
         if(Read<bool>(ads,"MAIN.bMD200_Start"))
-            throw new InvalidOperationException("PLC chưa xác nhận STOP.");
+            throw new InvalidOperationException("PLC has not acknowledged the normal STOP request.");
     }
 }
 
@@ -180,36 +180,36 @@ public partial class MainWindow
             UpdateCellViews(s);
             UpdateStationOverviewPlc(s);
             DashUpdated.Text="ADS / "+s.ReceivedUtc.ToLocalTime().ToString("HH:mm:ss")+
-                "  |  Cập nhật 1 giây";
+                "  |  Updated every 1 s";
             DashPlc.Text="ONLINE";
             DashPlc.Foreground=DashBrush("#71DFC4");
-            DashEStop.Text=s.EstopOk && !s.GlobalStop?"DI OK (aux)":"DỪNG / LỖI";
+            DashEStop.Text=s.EstopOk && !s.GlobalStop?"DI OK (aux)":"STOP / FAULT";
             DashEStop.Foreground=DashBrush(s.EstopOk && !s.GlobalStop?"#71DFC4":"#FF978C");
             DashSpeed.Text=$"{s.BeltSpeed:F1} mm/s";
-            DashFrequency.Text=$"Tần số đặt: {s.HzSet:F1} Hz";
+            DashFrequency.Text=$"Setpoint: {s.HzSet:F1} Hz";
             DashQueue.Text=$"{s.QueueCount} / 8";
-            DashQueueInfo.Text=s.QueueCount>0?$"Sản phẩm #{s.QueueHead}":"Không có sản phẩm";
-            DashBeltState.Text=s.BeltRun?"RUN YÊU CẦU":"STOP";
+            DashQueueInfo.Text=s.QueueCount>0?$"Product #{s.QueueHead}":"No products";
+            DashBeltState.Text=s.BeltRun?"RUN OUTPUT ON":"STOP";
             DashBeltState.Foreground=DashBrush(s.BeltRun?"#71DFC4":"#EAC17E");
             DashDistance.Text=$"{s.BeltDistance:F1} mm";
             DashBeltMmS.Text=$"{s.BeltSpeed:F2} mm/s";
             DashHzReal.Text=$"{s.HzActualReference:F1} Hz";
-            DashAnalog.Text=$"{s.AoVoltsReference:F2} V (mã {s.AoRaw})";
-            DashGantryPlc.Text="Mitsubishi Q: "+(s.PlcQConnected?"TCP ONLINE":"MẤT KẾT NỐI");
-            DashGantryState.Text=s.GantryError?"ROBOT: LỖI, KHÔNG TIẾP TỤC"
-                :s.GantryBusy?"ROBOT: ĐANG THỰC HIỆN CHU TRÌNH"
-                :s.GantryPublisherEnabled?"PUBLISHER MỞ / CHƯA NGHIỆM THU":"ROBOT: CHƯA CHO PHÉP AUTO";
-            DashGantryVertex.Text=$"Đỉnh hiện tại: {s.GantryVertex} / 4 | Lỗi: {s.GantryErrorCode}";
+            DashAnalog.Text=$"{s.AoVoltsReference:F2} V (raw {s.AoRaw})";
+            DashGantryPlc.Text="Mitsubishi Q: "+(s.PlcQConnected?"TCP ONLINE":"DISCONNECTED");
+            DashGantryState.Text=s.GantryError?"GANTRY: FAULT / NOT READY"
+                :s.GantryBusy?"GANTRY: CYCLE IN PROGRESS"
+                :s.GantryPublisherEnabled?"PUBLISHER ENABLED / NOT COMMISSIONED":"GANTRY: AUTO NOT COMMISSIONED";
+            DashGantryVertex.Text=$"Current vertex: {s.GantryVertex} / 4 | Error: {s.GantryErrorCode}";
             DashGantryStats.Text=$"FIFO: {s.QueueCount}  |  Nhận: {s.Accepted}  |  Bỏ lỡ: {s.Missed}";
-            DashCamera1.Text=(_directHik?.IsOpen==true||_sessions.Count>0?"Camera 1: LIVE":"Camera 1: "+(_video!=null?"VIDEO DEMO":"CHƯA KẾT NỐI"))
+            DashCamera1.Text=(_directHik?.IsOpen==true||_sessions.Count>0?"Camera 1: LIVE":"Camera 1: "+(_video!=null?"VIDEO TEST":"DISCONNECTED"))
                  +(_trackingEnabled?" | DETECT ON":" | DETECT OFF");
             // Camera connection ≠ validated camera-to-PLC calibration.
             if(s.GlobalStop || !s.EstopOk)
-                DashMachineMessage.Text="DỪNG TỔNG ĐƯỢC YÊU CẦU · KHÔNG CHO PHÉP START THIẾT BỊ";
+                DashMachineMessage.Text="GLOBAL STOP REQUESTED · DEVICE START BLOCKED";
             else if(!s.PlcQConnected)
-                DashMachineMessage.Text="DI E-Stop AUX OK · PLC Mitsubishi chưa kết nối · Gantry bị khóa";
+                DashMachineMessage.Text="AUX E-STOP DI OK · MITSUBISHI PLC-Q DISCONNECTED · GANTRY BLOCKED";
             else
-                DashMachineMessage.Text="DI E-Stop AUX OK · TwinCAT RUN · Gantry vẫn cần nghiệm thu riêng trước khi Auto";
+                DashMachineMessage.Text="AUX E-STOP DI OK · TWINCAT RUN · GANTRY AUTO NOT COMMISSIONED";
             // Normal STOP is available even if command-arm switch is not selected.
             DashStopButton.IsEnabled=true;
             DashStartButton.IsEnabled=_dashControlArmed && s.EstopOk && !s.GlobalStop
@@ -218,30 +218,30 @@ public partial class MainWindow
             _dashStatus=null;
             UpdateStationOverviewPlc(null);
             TagMatrixTable.ItemsSource=null;
-            CellGantryQuality.Text="OFFLINE / không có dữ liệu PLC";
-            CellConveyorQuality.Text="OFFLINE / không có dữ liệu PLC";
-            CellGantryLink.Text="Mitsubishi Q: KHÔNG XÁC NHẬN";
-            CellConveyorRun.Text="MD200 RUN DO: KHÔNG XÁC NHẬN";
-            CellConveyorSpeed.Text="OFFLINE / không có dữ liệu encoder";
-            CellConveyorDistance.Text="OFFLINE / không có dữ liệu encoder";
-            CellConveyorHz.Text="OFFLINE / không có dữ liệu MD200";
-            CellConveyorAo.Text="OFFLINE / không có dữ liệu AO";
-            CellGantryCycle.Text="OFFLINE / chu trình không xác nhận";
-            CellGantryQueue.Text="OFFLINE / FIFO không xác nhận";
-            CellGantryVision.Text="OFFLINE / PLC bridge không xác nhận";
+            CellGantryQuality.Text="OFFLINE / PLC DATA UNAVAILABLE";
+            CellConveyorQuality.Text="OFFLINE / PLC DATA UNAVAILABLE";
+            CellGantryLink.Text="Mitsubishi Q: UNVERIFIED";
+            CellConveyorRun.Text="MD200 RUN DO: UNKNOWN";
+            CellConveyorSpeed.Text="OFFLINE / ENCODER DATA UNAVAILABLE";
+            CellConveyorDistance.Text="OFFLINE / ENCODER DATA UNAVAILABLE";
+            CellConveyorHz.Text="OFFLINE / MD200 DATA UNAVAILABLE";
+            CellConveyorAo.Text="OFFLINE / AO DATA UNAVAILABLE";
+            CellGantryCycle.Text="OFFLINE / GANTRY CYCLE UNKNOWN";
+            CellGantryQueue.Text="OFFLINE / FIFO UNAVAILABLE";
+            CellGantryVision.Text="OFFLINE / VISION BRIDGE UNKNOWN";
             DashSpeed.Text="-- / STALE";
             DashDistance.Text="-- / STALE";
             DashBeltMmS.Text="-- / STALE";
             DashHzReal.Text="-- / STALE";
             DashAnalog.Text="-- / STALE";
             DashQueue.Text="-- / STALE";
-            DashGantryState.Text="PLC OFFLINE / GANTRY KHÔNG XÁC NHẬN";
+            DashGantryState.Text="PLC OFFLINE / GANTRY STATE UNKNOWN";
             DashUpdated.Text="ADS OFFLINE / "+DateTime.Now.ToString("HH:mm:ss");
-            DashPlc.Text="MẤT KẾT NỐI";
+            DashPlc.Text="DISCONNECTED";
             DashPlc.Foreground=DashBrush("#FF978C");
-            DashEStop.Text="KHÔNG XÁC NHẬN";
+            DashEStop.Text="UNVERIFIED";
             DashEStop.Foreground=DashBrush("#FF978C");
-            DashMachineMessage.Text="MẤT DỮ LIỆU TWINCAT: "+ex.Message;
+            DashMachineMessage.Text="TWINCAT DATA LOST: "+ex.Message;
             DashStartButton.IsEnabled=false;
             DashStopButton.IsEnabled=false;
         } finally {_dashPolling=false;}
@@ -253,34 +253,34 @@ public partial class MainWindow
         var time=s.ReceivedUtc.ToLocalTime().ToString("HH:mm:ss");
         string Q(string tag) => s.SymbolPresence.TryGetValue(tag,out var ok) && !ok ? "READ_FAIL" : "LIVE";
         string V(bool v) => v ? "TRUE" : "FALSE";
-        CellGantryQuality.Text=$"ADS LIVE / {time} - chỉ giám sát, Gantry chưa cho phép lệnh từ HMI";
-        CellGantryLink.Text="Mitsubishi PLC-Q: "+(s.PlcQConnected?"KẾT NỐI":"CHƯA KẾT NỐI");
-        CellGantryCycle.Text=$"Chu trình: {(s.GantryError?"LỖI":s.GantryBusy?"ĐANG XỬ LÝ":s.GantryDone?"ĐÃ HOÀN TẤT":"IDLE")} | Vertex {s.GantryVertex}/4 | Error {s.GantryErrorCode}";
+        CellGantryQuality.Text=$"ADS LIVE / {time} - read-only monitoring; Gantry HMI commands disabled";
+        CellGantryLink.Text="Mitsubishi PLC-Q: "+(s.PlcQConnected?"CONNECTED":"DISCONNECTED");
+        CellGantryCycle.Text=$"Cycle: {(s.GantryError?"FAULT":s.GantryBusy?"BUSY":s.GantryDone?"DONE":"IDLE")} | Vertex {s.GantryVertex}/4 | Error {s.GantryErrorCode}";
         CellGantryQueue.Text=$"FIFO {s.QueueCount}/8 | Head ID {s.QueueHead} | Accepted {s.Accepted} | Missed {s.Missed}";
-        CellGantryVision.Text="Camera 1: "+(_directHik?.IsOpen==true||_sessions.Count>0?"ĐANG NHẬN ẢNH":_video!=null?"VIDEO TEST":"CHƯA KẾT NỐI")
+        CellGantryVision.Text="Camera 1: "+(_directHik?.IsOpen==true||_sessions.Count>0?"FRAME STREAMING":_video!=null?"VIDEO TEST":"DISCONNECTED")
             +" | Bridge verified "+V(s.VisionBridgeVerified);
-        CellConveyorQuality.Text=$"ADS LIVE / {time} | Encoder chung cho hai robot";
+        CellConveyorQuality.Text=$"ADS LIVE / {time} | One shared encoder for both robot stations";
         CellConveyorRun.Text="ST-2318 DO RUN="+V(s.BeltRun)+" | MD200 START request="+V(s.BeltRequest);
         CellConveyorSpeed.Text=$"Encoder velocity: {s.BeltSpeed:F2} mm/s";
         CellConveyorDistance.Text=$"Encoder distance: {s.BeltDistance:F2} mm";
-        CellConveyorHz.Text=$"MD200: set {s.HzSet:F2} Hz | ramped {s.HzActualReference:F2} Hz (không phải Hz đo)";
-        CellConveyorAo.Text=$"ST-4424 AO raw {s.AoRaw} | volts virtual {s.AoVoltsReference:F2} V (không đo thực)";
+        CellConveyorHz.Text=$"MD200: set {s.HzSet:F2} Hz | ramped {s.HzActualReference:F2} Hz (not measured motor frequency)";
+        CellConveyorAo.Text=$"ST-4424 AO raw {s.AoRaw} | volts virtual {s.AoVoltsReference:F2} V (not an electrical measurement)";
         TagValueRow T(string group,string tag,string val,string access="R")
             => new(group,tag,val,Q(tag),access,time);
         TagMatrixTable.ItemsSource=new[] {
-            T("TỔNG","GVL_MD200_IO.bEStopFeedback",V(s.EstopOk)),
-            T("TỔNG","MAIN.bSystemStopRequested",V(s.GlobalStop)),
-            T("TỔNG","MAIN.bSystemEStopOK",V(s.SystemEStopOk)),
-            T("TỔNG","MAIN.bServo_Ready",V(s.ServoReady)),
-            T("TỔNG","MAIN.bPlcQConnected",V(s.PlcQConnected)),
-            T("BĂNG TẢI","MAIN.rConveyorSpeed",$"{s.BeltSpeed:F2} mm/s"),
-            T("BĂNG TẢI","MAIN.rConveyorDist",$"{s.BeltDistance:F2} mm"),
-            T("BĂNG TẢI","MAIN.bMD200_Start",V(s.BeltRequest),"R/W*"),
-            T("BĂNG TẢI","MAIN.rMD200_SetFrequency_Hz",$"{s.HzSet:F2} Hz","R/W*"),
-            T("BĂNG TẢI","MAIN.rMD200_Ramped_Hz",$"{s.HzActualReference:F2} Hz"),
-            T("BĂNG TẢI","MAIN.rMD200_AO_VoltsVirtual",$"{s.AoVoltsReference:F2} V calc"),
-            T("BĂNG TẢI","GVL_MD200_IO.nAO1_Raw",s.AoRaw.ToString()),
-            T("BĂNG TẢI","GVL_MD200_IO.bRUN_DO",V(s.BeltRun)),
+            T("GLOBAL","GVL_MD200_IO.bEStopFeedback",V(s.EstopOk)),
+            T("GLOBAL","MAIN.bSystemStopRequested",V(s.GlobalStop)),
+            T("GLOBAL","MAIN.bSystemEStopOK",V(s.SystemEStopOk)),
+            T("GLOBAL","MAIN.bServo_Ready",V(s.ServoReady)),
+            T("GLOBAL","MAIN.bPlcQConnected",V(s.PlcQConnected)),
+            T("CONVEYOR","MAIN.rConveyorSpeed",$"{s.BeltSpeed:F2} mm/s"),
+            T("CONVEYOR","MAIN.rConveyorDist",$"{s.BeltDistance:F2} mm"),
+            T("CONVEYOR","MAIN.bMD200_Start",V(s.BeltRequest),"R/W*"),
+            T("CONVEYOR","MAIN.rMD200_SetFrequency_Hz",$"{s.HzSet:F2} Hz","R/W*"),
+            T("CONVEYOR","MAIN.rMD200_Ramped_Hz",$"{s.HzActualReference:F2} Hz"),
+            T("CONVEYOR","MAIN.rMD200_AO_VoltsVirtual",$"{s.AoVoltsReference:F2} V calc"),
+            T("CONVEYOR","GVL_MD200_IO.nAO1_Raw",s.AoRaw.ToString()),
+            T("CONVEYOR","GVL_MD200_IO.bRUN_DO",V(s.BeltRun)),
             T("GANTRY","MAIN.bVisionFeedVerified",V(s.VisionBridgeVerified)),
             T("GANTRY","MAIN.nQueueCount",s.QueueCount.ToString()),
             T("GANTRY","MAIN.nQueueHeadProductID",s.QueueHead.ToString()),
@@ -311,18 +311,18 @@ public partial class MainWindow
         if(DashControlArm.IsChecked==true)
         {
             var ans=MessageBox.Show(
-                "Chỉ mở lệnh HMI khi E-Stop PHẦN CỨNG và băng tải đã được nghiệm thu.\n"+
-                "Kích START có thể làm MD200 chuyển động thật. Lệnh STOP ở đây KHÔNG thay thế E-Stop.\n\n"+
-                "Bạn đang trực tiếp giám sát máy và muốn mở quyền điều khiển băng tải trong phiên này?",
-                "Xác nhận vận hành / DATN",MessageBoxButton.YesNo,MessageBoxImage.Warning);
+                "Enable HMI control only after the physical emergency-stop circuit and conveyor have been commissioned.\n"+
+                "START can energize the actual MD200 conveyor. This STOP is NOT an emergency stop.\n\n"+
+                "Are you supervising the machine on site and authorizing conveyor control for this session?",
+                "DATN / Operator Authorization",MessageBoxButton.YesNo,MessageBoxImage.Warning);
             if(ans!=MessageBoxResult.Yes){DashControlArm.IsChecked=false;return;}
             _dashControlArmed=true;
-            DashControlNote.Text="QUYỀN LỆNH BĂNG TẢI ĐÃ MỞ CHO PHIÊN NÀY. Gantry/SCARA vẫn không cấp lệnh từ HMI.";
+            DashControlNote.Text="CONVEYOR HMI CONTROL ARMED FOR THIS SESSION. Gantry/SCARA control remains disabled.";
         }
         else {
             _dashControlArmed=false;
             DashStartButton.IsEnabled=false;
-            DashControlNote.Text="Lệnh HMI khóa. STOP thường khả dụng khi ADS có kết nối; E-Stop phải là mạch cứng.";
+            DashControlNote.Text="HMI controls disarmed. Normal STOP requires live ADS. Emergency stop must be hardware-wired.";
         }
         UpdateControlSafetyBanner();
     }
@@ -335,19 +335,19 @@ public partial class MainWindow
                 CultureInfo.InvariantCulture,out var hz) &&
            !double.TryParse(DashHzInput.Text.Trim(),NumberStyles.Float,
                 CultureInfo.CurrentCulture,out hz))
-        {MessageBox.Show("Nhập số Hz hợp lệ (ví dụ 5.0).");return;}
-        if(hz<=0 || hz>25){MessageBox.Show("Giá trị cho phép: lớn hơn 0 đến 25 Hz.");return;}
-        if(MessageBox.Show($"Xác nhận START BĂNG TẢI THẬT ở {hz:F1} Hz?\n"+
-                "Kiểm tra người, sản phẩm, E-Stop và cơ cấu trước khi tiếp tục.",
-                "LỆNH CHUYỂN ĐỘNG / DATN",MessageBoxButton.YesNo,MessageBoxImage.Warning)
+        {MessageBox.Show("Enter a valid frequency (e.g. 5.0 Hz).");return;}
+        if(hz<=0 || hz>25){MessageBox.Show("Allowed range: greater than 0 and up to 25 Hz.");return;}
+        if(MessageBox.Show($"Confirm physical conveyor START at {hz:F1} Hz?\n"+
+                "Check personnel, workpieces, guards and the physical E-Stop before continuing.",
+                "DATN / MOTION CONFIRMATION",MessageBoxButton.YesNo,MessageBoxImage.Warning)
                 !=MessageBoxResult.Yes)return;
         DashStartButton.IsEnabled=false;
         try{
             await Task.Run(()=>LineAds.StartBelt(hz));
-            DashControlNote.Text=$"Đã gửi START {hz:F1}Hz đến PLC lúc {DateTime.Now:HH:mm:ss}; theo dõi phản hồi thực tế.";
+            DashControlNote.Text=$"START request sent: {hz:F1}Hz to PLC at {DateTime.Now:HH:mm:ss}; verify actual physical feedback.";
         } catch(Exception ex) {
-            DashControlNote.Text="START KHÔNG XÁC NHẬN: "+ex.Message;
-            MessageBox.Show(ex.Message,"DATN: lệnh START bị từ chối",MessageBoxButton.OK,MessageBoxImage.Error);
+            DashControlNote.Text="START UNVERIFIED: "+ex.Message;
+            MessageBox.Show(ex.Message,"DATN: START rejected",MessageBoxButton.OK,MessageBoxImage.Error);
         }
         await RefreshDashboardAsync();
     }
@@ -357,10 +357,10 @@ public partial class MainWindow
         DashStopButton.IsEnabled=false;
         try{
             await Task.Run(LineAds.StopBelt);
-            DashControlNote.Text=$"Đã gửi STOP thường tới PLC lúc {DateTime.Now:HH:mm:ss}; cần xác nhận băng tải đứng yên.";
+            DashControlNote.Text=$"Normal STOP request sent at {DateTime.Now:HH:mm:ss}; visually verify the conveyor has stopped.";
         }catch(Exception ex){
-            DashControlNote.Text="STOP KHÔNG XÁC NHẬN: "+ex.Message+" · Sử dụng E-Stop PHẦN CỨNG khi nguy hiểm.";
-            MessageBox.Show(ex.Message,"DATN: STOP chưa xác nhận",MessageBoxButton.OK,MessageBoxImage.Error);
+            DashControlNote.Text="STOP UNVERIFIED: "+ex.Message+" · Use the PHYSICAL E-STOP in danger.";
+            MessageBox.Show(ex.Message,"DATN: STOP not acknowledged",MessageBoxButton.OK,MessageBoxImage.Error);
         }
         await RefreshDashboardAsync();
     }

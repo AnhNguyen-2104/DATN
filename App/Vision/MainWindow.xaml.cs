@@ -75,7 +75,7 @@ public partial class MainWindow : System.Windows.Window
             try {
                 if(File.Exists(_themeFile) && File.ReadAllText(_themeFile).Trim()=="dark")
                     DarkModeBox.IsChecked=true;
-            } catch(Exception ex) {StatusText.Text="Không tải được tùy chọn giao diện: "+ex.Message;}
+            } catch(Exception ex) {StatusText.Text="Unable to load theme settings: "+ex.Message;}
         };
         PipelineTable.ItemsSource=_auditRows;
         PipelineHistoryTable.ItemsSource=_auditRows;
@@ -87,7 +87,7 @@ public partial class MainWindow : System.Windows.Window
         RefreshVideos();
         ResetDetectionHud();
         RefreshCaptureMode();
-        StatusText.Text="Chọn camera và Kết nối IP để LIVE VIEW; bấm START để nhận dạng | ADS read-only.";
+        StatusText.Text="Select a camera and CONNECT IP for LIVE VIEW; START enables detection | ADS read-only.";
         if(Environment.GetCommandLineArgs().Any(a=>a.Equals("--demo",StringComparison.OrdinalIgnoreCase)))
             Dispatcher.BeginInvoke(new Action(()=>OpenVideo(@"C:\Users\aml\Desktop\DEMO\1.avi")));
     }
@@ -95,34 +95,34 @@ public partial class MainWindow : System.Windows.Window
 
     private void ResetDetectionHud()
     {
-        _last=PlateResult.None("Tracking chưa chạy");
+        _last=PlateResult.None("Tracking not started");
         _lastBelt=new BeltCoordinate(0,0,0);
-        DetectState.Text=_trackingEnabled?"ĐANG TÌM VẬT":"LIVE VIEW • CHƯA START";
+        DetectState.Text=_trackingEnabled?"SEARCHING FOR OBJECTS":"LIVE VIEW • DETECTION OFF";
         CenterX.Text="—"; CenterY.Text="—"; AngleValue.Text="—";
         ConfidenceText.Text="Quality —"; ScaleText.Text="Scale —";
-        HoleCoordinates.Text="Chưa có vật đang theo dõi";
+        HoleCoordinates.Text="No tracked product";
     }
 
     private void UpdateControlSafetyBanner()
     {
         if(_dashControlArmed)
         {
-            ControlSafetyBanner.Text="HMI: BĂNG TẢI ĐÃ MỞ QUYỀN LỆNH | GANTRY/SCARA: KHÓA LỆNH";
+            ControlSafetyBanner.Text="HMI: CONVEYOR CONTROL ARMED | GANTRY/SCARA CONTROL DISABLED";
             return;
         }
         // Distinguish data permission from motion authorization. A live PLC
         // state alone never confers permission to operate the robot.
         ControlSafetyBanner.Text=_benchArmed
-            ?"ADS: BENCH CHỈ TỌA ĐỘ (CÓ XÁC NHẬN)  |  ROBOT: KHÔNG ĐIỀU KHIỂN"
-            :"ADS: CHỈ ĐỌC MẶC ĐỊNH  |  ROBOT: KHÔNG ĐIỀU KHIỂN";
+            ?"ADS: SUPERVISED POSE BENCH ONLY | ROBOT MOTION DISABLED"
+            :"ADS: READ ONLY BY DEFAULT | ROBOT MOTION DISABLED";
     }
     private void RefreshCaptureMode()
     {
         UpdateControlSafetyBanner();
         StartTrackingButton.IsEnabled=HasActiveSource && !_trackingEnabled;
         StopTrackingButton.IsEnabled=_trackingEnabled;
-        string src=_directHik!=null?"CAMERA LIVE":_sessions.Count>0?"CAMERA LIVE":_video!=null?"VIDEO DEMO":"CHƯA CÓ NGUỒN";
-        TrackingModeText.Text=src+" | BẮT VẬT: "+(_trackingEnabled?"ĐANG CHẠY":"TẮT");
+        string src=_directHik!=null?"CAMERA LIVE":_sessions.Count>0?"CAMERA LIVE":_video!=null?"VIDEO DEMO":"NO SOURCE";
+        TrackingModeText.Text=src+" | DETECTION: "+(_trackingEnabled?"ACTIVE":"OFF");
         bool dark=DarkModeBox.IsChecked==true;
         TrackingModeText.Foreground=new System.Windows.Media.SolidColorBrush(
             (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(
@@ -138,8 +138,8 @@ public partial class MainWindow : System.Windows.Window
             RefreshCaptureMode();
             Directory.CreateDirectory(Path.GetDirectoryName(_themeFile)!);
             File.WriteAllText(_themeFile,dark?"dark":"light");
-            StatusText.Text=(dark?"Giao diện tối":"Giao diện sáng")
-                +" • chỉ thay đổi hiển thị, ADS/robot giữ nguyên.";
+            StatusText.Text=(dark?"Dark theme":"Light theme")
+                +" • presentation only; ADS and robot settings unchanged.";
         }
         catch(Exception ex){StatusText.Text="Theme error: "+ex.Message;}
     }
@@ -149,8 +149,8 @@ public partial class MainWindow : System.Windows.Window
         _offlineSimulationEnabled=OfflinePipelineBox.IsChecked==true;
         _offlineQueue.Reset();
         PipelineMockStatus.Text=_offlineSimulationEnabled
-            ?"FIFO ẢO ĐÃ BẬT • KHÔNG ADS WRITE, mỗi Track ID chỉ nhận 1 lần."
-            :"FIFO ẢO ĐÃ TẮT • TwinCAT ADS vẫn chỉ đọc.";
+            ?"VIRTUAL FIFO ENABLED • NO ADS WRITE, each Track ID is counted once."
+            :"FIFO ẢO ĐÃ OFF • TwinCAT ADS vẫn chỉ đọc.";
         if(_offlineSimulationEnabled && BenchQueueBox.IsChecked==true)
         {
             BenchQueueBox.IsChecked=false;
@@ -159,16 +159,16 @@ public partial class MainWindow : System.Windows.Window
     }
     private async void CheckLiveReadiness_Click(object sender,RoutedEventArgs e)
     {
-        ReadinessStatus.Text="Đang kiểm tra symbols TwinCAT (READ ONLY)...";
+        ReadinessStatus.Text="Checking TwinCAT symbols (READ ONLY)...";
         try {
             var plc=await Task.Run(()=>_bridge.InspectLiveReadiness());
             bool frameReady=_directHik?.IsOpen==true && _directHik.FrameNumber>_lastHikFrame-1;
             bool scaleReady=_options.FixedMmPerPixel>0;
-            ReadinessStatus.Text=plc+" | Camera="+(frameReady?"LIVE":"CHƯA XÁC NHẬN")+
-               " | Scale mm/px="+(scaleReady?"ĐÃ NHẬP (CHƯA ĐƯỢC NGHIỆM THU)":"CHƯA CÓ")+
-               " | TRẠNG THÁI: CHƯA ỦY QUYỀN GHI PLC THẬT.";
+            ReadinessStatus.Text=plc+" | Camera="+(frameReady?"LIVE":"UNVERIFIED")+
+               " | Scale mm/px="+(scaleReady?"ENTERED (NOT COMMISSIONED)":"MISSING")+
+               " | TRẠNG THÁI: LIVE PLC WRITES NOT AUTHORIZED.";
         }
-        catch(Exception ex) {ReadinessStatus.Text="CHƯA SẴN SÀNG: "+ex.Message;}
+        catch(Exception ex) {ReadinessStatus.Text="NOT READY: "+ex.Message;}
     }
     private void TestOfflinePipeline_Click(object sender,RoutedEventArgs e)
     {
@@ -187,8 +187,8 @@ public partial class MainWindow : System.Windows.Window
             try {test.Accept("SELFTEST/1",0,0,0,100);}
             catch(InvalidOperationException){duplicateRejected=true;}
             if(!duplicateRejected)throw new InvalidOperationException("Duplicate Track ID accepted.");
-            PipelineMockStatus.Text="PASS: FIFO ACK #1, 4 góc ±20 mm, encoder +25 mm, chống trùng Track ID; chỉ trong bộ nhớ PC.";
-            StatusText.Text="SIM PASS: Camera pose → FIFO ảo → 4 góc động; không ghi PLC.";
+            PipelineMockStatus.Text="PASS: FIFO ACK #1, four corners ±20 mm, encoder +25 mm, duplicate Track ID blocked; PC memory only.";
+            StatusText.Text="SIM PASS: Camera pose → virtual FIFO → four moving points; no PLC writes.";
         }
         catch(Exception ex){PipelineMockStatus.Text="FAIL: "+ex.Message;}
     }
@@ -222,7 +222,7 @@ public partial class MainWindow : System.Windows.Window
     {
         if(!HasActiveSource)
         {
-            StatusText.Text="Hãy kết nối camera hoặc mở video trước khi START.";
+            StatusText.Text="Connect a camera or open a video before START.";
             return;
         }
         // Fresh identity/trigger state prevents phantom crossings from stale preview.
@@ -233,10 +233,10 @@ public partial class MainWindow : System.Windows.Window
         _auditByTrack.Clear();
         _events.Clear();
         _offlineQueue.Reset();
-        PipelineMockStatus.Text=_offlineSimulationEnabled?"FIFO ảo sẵn sàng theo dõi Track mới.":"FIFO ảo chưa bật.";
+        PipelineMockStatus.Text=_offlineSimulationEnabled?"Virtual FIFO is ready for new tracks.":"Virtual FIFO is disabled.";
         _triggersTotal=0;
         TriggerCounter.Text="0";
-        TriggerLog.Text="Đã START: theo dõi từng vật, trigger khi tâm vượt 50% FOV.";
+        TriggerLog.Text="Detection started: tracks trigger when centers cross the 50% FOV line.";
         DisarmBench(); // image processing only; TwinCAT ADS stays read-only
         _trackingEnabled=true;
         _paused=false;
@@ -256,7 +256,7 @@ public partial class MainWindow : System.Windows.Window
         PlateOverlay.Children.Clear();
         ResetDetectionHud();
         RefreshCaptureMode();
-        StatusText.Text="STOP: dừng nhận dạng/trigger. Camera vẫn LIVE VIEW, không ngắt kết nối.";
+        StatusText.Text="STOP: detection and triggers disabled; camera LIVE VIEW remains connected.";
     }
 
     private void PreviewOnly(Mat image,string source)
@@ -270,7 +270,7 @@ public partial class MainWindow : System.Windows.Window
             StationFrameReceived();
         PlateOverlay.Children.Clear();
         _overlayDetections=Array.Empty<PlateResult>();
-        FrameInfo.Text=source+"  |  "+image.Width+"x"+image.Height+"  |  LIVE VIEW / BẮT VẬT: TẮT";
+        FrameInfo.Text=source+"  |  "+image.Width+"x"+image.Height+"  |  LIVE VIEW / BẮT VẬT: OFF";
     }
 
     private void OpenSettingsPage_Click(object sender,RoutedEventArgs e)
@@ -320,7 +320,7 @@ public partial class MainWindow : System.Windows.Window
             using var frame=Cv2.ImRead(dialog.FileName);
             PreviewOnly(frame,Path.GetFileName(dialog.FileName));
             RefreshCaptureMode();
-            StatusText.Text="Ảnh tĩnh đang xem (không thể tracking chuyển động). Hãy chọn video hoặc camera để START.";
+            StatusText.Text="Still image loaded; motion tracking requires a camera or video.";
         }
         else OpenVideo(dialog.FileName);
     }
@@ -337,21 +337,21 @@ public partial class MainWindow : System.Windows.Window
             _timer.Start();
             RefreshCaptureMode();
             MainNavigation.SelectedIndex=1;
-            StatusText.Text="Xem VIDEO: "+Path.GetFileName(path)+" | nhấn START BẮT VẬT để bắt đầu tracking.";
+            StatusText.Text="VIDEO PLAYBACK: "+Path.GetFileName(path)+" | press START DETECTION to begin tracking.";
         }
         catch(Exception ex){StopVideo();RefreshCaptureMode();StatusText.Text="VIDEO: "+ex.Message;}
     }
     private void Pause_Click(object sender,RoutedEventArgs e)
     {
-        if(_video==null){StatusText.Text="Tạm dừng chỉ dành cho DEMO; Live View camera vẫn chạy liên tục.";return;}
+        if(_video==null){StatusText.Text="Pause is available for offline video only; live camera streaming continues.";return;}
         _paused=!_paused;
-        StatusText.Text=_paused?"DEMO: tạm dừng video":"DEMO: tiếp tục video";
+        StatusText.Text=_paused?"DEMO: video paused":"DEMO: video resumed";
     }
     private async void ScanCameras_Click(object sender,RoutedEventArgs e)
     {
         try
         {
-            StatusText.Text="Đang quét HIK/Basler và GVCP trên IP máy "+HostIpBox.Text.Trim()+"...";
+            StatusText.Text="Scanning HIK/Basler and GVCP using host IP "+HostIpBox.Text.Trim()+"...";
             var found=new List<CameraInfo>();
             foreach(var transport in new[]{CameraTransportType.GigE,CameraTransportType.Usb})
             {
@@ -380,7 +380,7 @@ public partial class MainWindow : System.Windows.Window
                 .Select(g=>g.First()).ToList();
             if(CameraPicker.Items.Count>0)CameraPicker.SelectedIndex=0;
             if(ipResults.Count>0)CameraIpBox.Text=ipResults[0];
-            StatusText.Text=$"Camera: {CameraPicker.Items.Count} mục; GVCP {ipResults.Count} IP"+(gvcpError==""?"":" | GVCP: "+gvcpError);
+            StatusText.Text=$"Camera: {CameraPicker.Items.Count} cameras; GVCP {ipResults.Count} IP"+(gvcpError==""?"":" | GVCP: "+gvcpError);
         }
         catch(Exception ex){StatusText.Text="Scan error: "+ex.Message;}
     }
@@ -393,11 +393,11 @@ public partial class MainWindow : System.Windows.Window
               ||camAddr.AddressFamily!=System.Net.Sockets.AddressFamily.InterNetwork
               ||!System.Net.IPAddress.TryParse(localIp,out var hostAddr)
               ||hostAddr.AddressFamily!=System.Net.Sockets.AddressFamily.InterNetwork)
-                throw new ArgumentException("Nhập IPv4 hợp lệ cho camera và cổng Ethernet của máy.");
+                throw new ArgumentException("Enter valid IPv4 addresses for the camera and host Ethernet adapter.");
             bool localAssigned=System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
                 .SelectMany(n=>n.GetIPProperties().UnicastAddresses)
                 .Any(a=>a.Address.Equals(hostAddr));
-            if(!localAssigned)throw new ArgumentException("IP máy "+localIp+" chưa được gán vào card mạng. Không tự đổi cấu hình IP.");
+            if(!localAssigned)throw new ArgumentException("IP máy "+localIp+" is not configured on any local network adapter. Do not change IP settings automatically.");
             StopTrackingForSourceChange();
             _directHik?.Dispose(); _directHik=null;
             var next=new HikDirectIpCamera(cameraIp,localIp);
@@ -408,9 +408,9 @@ public partial class MainWindow : System.Windows.Window
             StopVideo(); _paused=false; _timer.Start();
             ResetDetectionHud();RefreshCaptureMode();
             MainNavigation.SelectedIndex=1;
-            StatusText.Text="Đã kết nối HIKROBOT "+cameraIp+" — LIVE VIEW. Nhấn START BẮT VẬT để nhận dạng.";
+            StatusText.Text="Connected to HIKROBOT "+cameraIp+" — LIVE VIEW. Press START DETECTION.";
         }
-        catch(Exception ex) {RefreshCaptureMode();StatusText.Text="Kết nối IP thất bại: "+ex.Message;}
+        catch(Exception ex) {RefreshCaptureMode();StatusText.Text="IP connection failed: "+ex.Message;}
     }
 
     private void ConnectCamera_Click(object sender,RoutedEventArgs e)
@@ -420,7 +420,7 @@ public partial class MainWindow : System.Windows.Window
             if(info.BackendIndex<0) {CameraIpBox.Text=info.SerialNumber;ConnectCameraIp_Click(sender,e);}
             else Connect(info);
         }
-        else StatusText.Text="Chọn camera hoặc nhập IP để kết nối trực tiếp.";
+        else StatusText.Text="Select a camera or enter an IP address.";
     }
     private void ConnectAll_Click(object sender,RoutedEventArgs e)
     {
@@ -446,7 +446,7 @@ public partial class MainWindow : System.Windows.Window
             StopVideo();_paused=false;_timer.Start();
             ResetDetectionHud();RefreshCaptureMode();
             MainNavigation.SelectedIndex=1;
-            StatusText.Text="Đã kết nối "+info.Name+" — LIVE VIEW. Nhấn START BẮT VẬT.";
+            StatusText.Text="Connected: "+info.Name+" — LIVE VIEW. Press START DETECTION.";
         }
         catch(Exception ex){camera?.Dispose();RefreshCaptureMode();StatusText.Text="Camera: "+ex.Message;}
     }
@@ -461,8 +461,8 @@ public partial class MainWindow : System.Windows.Window
         if(_video==null)_timer.Stop();
         _paused=false;
         RefreshCaptureMode();
-        if(_video==null){Preview.Source=null;FrameInfo.Text="Chưa kết nối camera";}
-        StatusText.Text="Đã ngắt camera, tracking dừng.";
+        if(_video==null){Preview.Source=null;FrameInfo.Text="Camera disconnected";}
+        StatusText.Text="Camera disconnected; tracking stopped.";
     }
     private void StopVideo()
     {
@@ -617,10 +617,10 @@ public partial class MainWindow : System.Windows.Window
             Cv2.Line(image,new OpenCvSharp.Point(0,at),new OpenCvSharp.Point(image.Width-1,at),yellow,2);
         BeltDirectionInfo.Text=_beltDirection switch
         {
-            BeltDirection.XPlus=>"BĂNG TẢI → (X+)",
-            BeltDirection.XMinus=>"BĂNG TẢI ← (X−)",
-            BeltDirection.YPlus=>"BĂNG TẢI ↓ (Y+)",
-            _=>"BĂNG TẢI ↑ (Y−)"
+            BeltDirection.XPlus=>"CONVEYOR → (X+)",
+            BeltDirection.XMinus=>"CONVEYOR ← (X−)",
+            BeltDirection.YPlus=>"CONVEYOR ↓ (Y+)",
+            _=>"CONVEYOR ↑ (Y−)"
         };
     }
     private void AppendPipelineCsv(TriggerAuditRow row,string eventName,string details)
@@ -649,8 +649,8 @@ public partial class MainWindow : System.Windows.Window
             Timestamp=DateTime.Now, Source=trigger.Source,TrackId=trigger.ProductId,
             PreviousPx=trigger.PreviousProjectedPx,CurrentPx=trigger.CurrentProjectedPx,
             MidlinePx=trigger.MidlinePx,Xmm=pose.Xmm,Ymm=pose.Ymm,Theta=pose.ThetaDeg,
-            Delivery=_benchArmed?"TRIGGER → FIFO BENCH":"TRIGGER → CHƯA GỬI",
-            Plc=_benchArmed?"CHỜ AN TOÀN/ACK":"ADS CHỈ ĐỌC"
+            Delivery=_benchArmed?"TRIGGER → FIFO BENCH":"TRIGGER → NOT SENT",
+            Plc=_benchArmed?"WAITING FOR SAFETY / ACK":"ADS READ ONLY"
         };
         _auditRows.Insert(0,row);
         _auditByTrack[rowKey]=row;
@@ -664,15 +664,15 @@ public partial class MainWindow : System.Windows.Window
             try {
                 // This is in-memory PLC contract simulation, NEVER an ADS transaction.
                 var virtualAck=_offlineQueue.Accept(rowKey,pose.Xmm,pose.Ymm,pose.ThetaDeg,0);
-                row.Delivery="FIFO ẢO ACK #"+virtualAck.ProductId;
-                row.Plc="MÔ PHỎNG 4 ĐIỂM - KHÔNG GỬI PLC";
-                PipelineMockStatus.Text=$"ACK ẢO #{virtualAck.ProductId} | FIFO={virtualAck.QueueCount}/8 | 4 điểm: "+
+                row.Delivery="VIRTUAL FIFO ACK #"+virtualAck.ProductId;
+                row.Plc="SIMULATED 4 POINTS - NO PLC WRITE";
+                PipelineMockStatus.Text=$"VIRTUAL ACK #{virtualAck.ProductId} | FIFO={virtualAck.QueueCount}/8 | 4 points: "+
                     string.Join(" ; ",virtualAck.Corners.Select((p,i)=>$"P{i+1}=({p.X:F1},{p.Y:F1})"));
                 AppendPipelineCsv(row,"SIMULATED_FIFO_ACK",PipelineMockStatus.Text);
             }
             catch(Exception ex)
             {
-                row.Delivery="MÔ PHỎNG TỪ CHỐI";
+                row.Delivery="SIMULATION REJECTED";
                 row.Plc=ex.Message;
                 PipelineMockStatus.Text="SIM REJECTED: "+ex.Message;
                 AppendPipelineCsv(row,"SIMULATED_FIFO_REFUSED",ex.Message);
@@ -688,11 +688,11 @@ public partial class MainWindow : System.Windows.Window
         if(_benchArmed)
         {
             if(_pendingBench.Count>=8) {
-                row.Delivery="BỎ: FIFO BENCH ĐẦY";row.Plc="KHÔNG GỬI";
+                row.Delivery="DROPPED: BENCH FIFO FULL";row.Plc="NOT SENT";
                 AppendPipelineCsv(row,"BENCH_REJECT","FIFO pending full");
                 AdsStatus.Text="BENCH backlog 8/8; trigger dropped, not written to PLC";return;
             }
-            row.Delivery="ĐÃ ĐƯA VÀO HÀNG ĐỢI C#";
+            row.Delivery="QUEUED IN C#";
             AppendPipelineCsv(row,"C_SHARP_PENDING","Awaiting guarded ADS handshake");
             _pendingBench.Enqueue((trigger,pose));
             _=PumpBenchQueue();
@@ -712,7 +712,7 @@ public partial class MainWindow : System.Windows.Window
                 {
                     var rowKey=evt.Source+"/"+evt.ProductId;
                     if(_auditByTrack.TryGetValue(rowKey,out var before)){
-                        before.Delivery="ADS GỬI BENCH → CHỜ PLC ACK";
+                        before.Delivery="ADS BENCH SENT → WAITING FOR PLC ACK";
                         AppendPipelineCsv(before,"ADS_HANDSHAKE_START","Bench simulation only");
                     }
                     var token=_benchCts?.Token??CancellationToken.None;
@@ -720,7 +720,7 @@ public partial class MainWindow : System.Windows.Window
                     AdsStatus.Text=s;
                     if(_auditByTrack.TryGetValue(rowKey,out var okRow)){
                         var snap=await Task.Run(()=>_bridge.ReadStatus());
-                        okRow.Delivery="ĐÃ NHẬN ACK TỪ PLC";
+                        okRow.Delivery="PLC ACK RECEIVED";
                         okRow.Plc=$"Accepted={snap.Accepted}; Queue={snap.Count}; Head={snap.HeadProduct}";
                         AppendPipelineCsv(okRow,"PLC_ACK",okRow.Plc);
                     }
@@ -729,7 +729,7 @@ public partial class MainWindow : System.Windows.Window
                 {
                     AdsStatus.Text="FIFO REFUSED for #"+evt.ProductId+": "+ex.Message;
                     if(_auditByTrack.TryGetValue(evt.Source+"/"+evt.ProductId,out var failRow)){
-                        failRow.Delivery="ADS KHÔNG ĐƯỢC XÁC NHẬN";
+                        failRow.Delivery="ADS NOT ACKNOWLEDGED";
                         failRow.Plc=ex.Message;
                         AppendPipelineCsv(failRow,"ADS_REFUSED",ex.Message);
                     }
@@ -759,7 +759,7 @@ public partial class MainWindow : System.Windows.Window
         _auditByTrack.Clear();
         ResetDetectionHud();
         _events.Clear();TriggerLog.Text="Tracking reset: direction or trigger line changed";
-        TriggerSettingsSummary.Text=$"{_beltDirection}  ·  {_lineFraction*100:F0}% FOV  ·  cấu hình trong Cài đặt";
+        TriggerSettingsSummary.Text=$"{_beltDirection}  ·  {_lineFraction*100:F0}% FOV  · configure in Settings";
         StatusText.Text="Direction "+_beltDirection+" | 50% FOV line. New tracks required.";
     }
     private void ApplyLine_Click(object sender,RoutedEventArgs e)
@@ -803,7 +803,7 @@ public partial class MainWindow : System.Windows.Window
         // One frozen VIDEO pose -> safety-gated TwinCAT BENCH FIFO only.
         if(_closing)return;
         if(_singleBenchCts!=null){
-            AdsStatus.Text="Đang gửi một frame; chờ kết quả trước khi thao tác tiếp.";
+            AdsStatus.Text="One frame is being sent; wait before trying again.";
             return;
         }
         _singleBenchCts=new CancellationTokenSource();
@@ -811,24 +811,24 @@ public partial class MainWindow : System.Windows.Window
         try
         {
             if(_bridgeRunning || _benchArmed)
-                throw new InvalidOperationException("Tắt truyền tự động và chờ ADS hiện tại hoàn tất.");
+                throw new InvalidOperationException("Disable automatic transfers and wait for the current ADS request.");
             if(_video==null || !_paused)
-                throw new InvalidOperationException("Hãy nạp video, nhấn START nhận dạng rồi TẠM DỪNG video ở frame có phôi.");
+                throw new InvalidOperationException("Load video, START detection and PAUSE on a frame containing a product.");
             if(!_trackingEnabled || !_last.Found)
-                throw new InvalidOperationException("Chưa có phôi hợp lệ tại frame đang dừng.");
+                throw new InvalidOperationException("No valid product is detected in the paused frame.");
             if(_options.FixedMmPerPixel<=0)
-                throw new InvalidOperationException("Cần nhập tỷ lệ mm/pixel đã đo, không dùng auto scale từ video để gửi PLC.");
+                throw new InvalidOperationException("Enter a measured mm/pixel scale; do not use auto-estimated video scale for PLC transfer.");
             // Never block WPF UI with ~30 synchronous ADS symbol reads.
             // Safety is rechecked INSIDE EnqueueBenchAsync before any write.
             var state=await Task.Run(()=>_bridge.ReadStatus());
             oneShotToken.ThrowIfCancellationRequested();
             if(!state.SafeMode || state.ErrorCode!=0 || state.Count>=8
                 || Math.Abs(state.EncoderMmPerSec)>0.5)
-                throw new InvalidOperationException("PLC chưa ở FIFO BENCH SIM an toàn, encoder phải đứng yên và Robot permits OFF.");
+                throw new InvalidOperationException("PLC is not in safe FIFO BENCH simulation mode; encoder must be stationary and robot permits OFF.");
             var message=(
-                $"Gửi 1 vật đang dừng từ VIDEO sang TwinCAT BENCH?\nX={_lastBelt.Xmm:F2}mm, Y={_lastBelt.Ymm:F2}mm, θ={_lastBelt.ThetaDeg:F2}°\n"+
-                "TwinCAT tự tính P1–P4; không gửi lệnh cho Gantry.");
-            if(MessageBox.Show(message,"Xác nhận truyền 1 bộ tọa độ",
+                $"Send one paused VIDEO product to TwinCAT BENCH?\nX={_lastBelt.Xmm:F2}mm, Y={_lastBelt.Ymm:F2}mm, θ={_lastBelt.ThetaDeg:F2}°\n"+
+                "TwinCAT computes P1–P4; no Gantry motion command is sent.");
+            if(MessageBox.Show(message,"Confirm one-shot coordinate transfer",
                 MessageBoxButton.YesNo,MessageBoxImage.Warning)!=MessageBoxResult.Yes)
                 return;
             SendPausedVideoFrameButton.IsEnabled=false;
@@ -848,11 +848,11 @@ public partial class MainWindow : System.Windows.Window
             if(_auditRows.Count>250)_auditRows.RemoveAt(_auditRows.Count-1);
             AppendPipelineCsv(row,"PLC_ONE_SHOT_ACK",row.Plc);
             AdsStatus.Text=reply+" | "+row.Plc;
-            StatusText.Text="Đã xác nhận ADS FIFO BENCH (không điều khiển robot).";
+            StatusText.Text="ADS FIFO BENCH acknowledged (no robot command).";
         }
         catch(Exception ex)
         {
-            AdsStatus.Text="VIDEO → TWINCAT KHÔNG GỬI: "+ex.Message;
+            AdsStatus.Text="VIDEO → TWINCAT NOT SENT: "+ex.Message;
             StatusText.Text=AdsStatus.Text;
         }
         finally
@@ -870,27 +870,27 @@ public partial class MainWindow : System.Windows.Window
         try
         {
             if(_offlineSimulationEnabled)
-                throw new InvalidOperationException("Tắt FIFO ẢO trước khi thử BENCH PLC; không chạy đồng thời.");
+                throw new InvalidOperationException("Disable the virtual FIFO before testing PLC BENCH; do not run them together.");
             if(!_trackingEnabled || !HasActiveSource)
-                throw new InvalidOperationException("START nhận dạng và kết nối nguồn ảnh trước khi bật BENCH.");
+                throw new InvalidOperationException("Connect a video/camera and start detection before arming BENCH.");
             if(_directHik!=null && _lastHikFrame<=0)
-                throw new InvalidOperationException("Chưa có frame camera Hikrobot thực. BENCH bị từ chối.");
+                throw new InvalidOperationException("No valid live Hikrobot camera frame. BENCH denied.");
             if(_options.FixedMmPerPixel<=0)throw new InvalidOperationException("Set CALIBRATED mm/px (nonzero) first; 50mm auto estimate cannot drive FIFO");
             var st=_bridge.ReadStatus();
             if(!st.SafeMode || st.ErrorCode!=0 || st.Count>=8)
                 throw new InvalidOperationException("TwinCAT must have bQueueSimMode TRUE, Robot motion permits OFF, no fault and FIFO < 8");
             if(Math.Abs(st.EncoderMmPerSec)>0.5)
-                throw new InvalidOperationException("Chỉ cho phép BENCH khi encoder vật lý đứng yên cả hai chiều; chưa có FrameID đồng bộ.");
+                throw new InvalidOperationException("BENCH requires a stationary physical encoder in both directions; FrameID is not synchronized.");
             var answer=MessageBox.Show(
-                "BENCH TEST ONLY: Ảnh camera/video vượt 50% FOV sẽ ghi TỌA ĐỘ vào FIFO SIM của PLC port 851.\n" +
-                "KHÔNG được chạy băng tải/robot. FrameID-exposure và encoder CHƯA đồng bộ!\n" +
-                "Chỉ tiếp tục khi phôi được cố định và người vận hành giám sát. Xác nhận?","Enable supervised bench FIFO",MessageBoxButton.YesNo,MessageBoxImage.Warning);
+                "BENCH TEST ONLY: camera/video image crossing the 50% FOV line will send COORDINATES to PLC FIFO simulation on port 851.\n" +
+                "Do NOT run conveyor/robots. FrameID, exposure and encoder are NOT synchronized!\n" +
+                "Continue only when the workpiece is secured and an operator supervises. Confirm?","Enable supervised bench FIFO",MessageBoxButton.YesNo,MessageBoxImage.Warning);
             if(answer!=MessageBoxResult.Yes)throw new OperationCanceledException("Operator did not approve");
             _benchCts?.Dispose();
             _benchCts=new CancellationTokenSource();
             _benchArmed=true;
             UpdateControlSafetyBanner();
-            AdsStatus.Text="BENCH ARMED: chỉ camera X/Y/θ và 2 xung mô phỏng; robot bị khóa.";
+            AdsStatus.Text="BENCH ARMED: camera X/Y/θ and simulated trigger pulses only; robot motion disabled.";
         }
         catch(Exception ex){DisarmBench();AdsStatus.Text="BENCH DISARMED: "+ex.Message;}
     }
@@ -929,7 +929,7 @@ public partial class MainWindow : System.Windows.Window
             _options.OffsetYmm=offsetY;
             _options.ThresholdMode=threshold;
             ResetDetectionHud();
-            StatusText.Text="Đã áp dụng hiệu chuẩn cùng lúc; reset Track ID và khóa gửi BENCH. Chưa nghiệm thu hiệu chuẩn robot.";
+            StatusText.Text="Calibration applied atomically; Track IDs reset and BENCH disarmed. Robot calibration is NOT commissioned.";
         }
         catch(Exception ex){StatusText.Text="Calibration: "+ex.Message;}
     }
@@ -943,7 +943,7 @@ public partial class MainWindow : System.Windows.Window
         // Legacy direct write bypassed the required BENCH interlocks.
         // Deliberately fail closed even when invoked via UI automation.
         EnableWriteBox.IsChecked=false;
-        AdsStatus.Text="Ghi ADS trực tiếp đã khóa. Sử dụng PLC/TwinCAT → Gửi một frame VIDEO ở chế độ BENCH có giám sát.";
+        AdsStatus.Text="Direct ADS write is disabled. Use PLC/TwinCAT → Send one video frame in supervised BENCH mode.";
     }
     private void OpenResults_Click(object sender,RoutedEventArgs e)
     {

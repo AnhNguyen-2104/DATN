@@ -1,6 +1,6 @@
 # DATN — THƯ MỤC DỰ ÁN TẬP TRUNG
 
-**Đường dẫn chính:** C:\Users\aml\Desktop\DATN
+**Active project:** C:\Users\aml\orca\DATN (user update 2026-10-20)
 
 Đây là khu vực TẬP HỢP MÃ NGUỒN / BACKUP trên AML-IPC. Không xóa, không di chuyển bản gốc đang chạy trong Documents. Việc sao chép không nạp chương trình vào PLC.
 
