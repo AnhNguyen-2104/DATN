@@ -97,3 +97,8 @@ secrets.*
 *.tclrs
 /Docs/*PID*.txt
 /Docs/*.pid.txt
+
+# Local filesystem move / recovery state; exclude from public source Git
+/Docs/*ARCHIVE_STATUS*.json
+/Docs/*_STATUS_*.json
+/Docs/*_RELOCATION_*.json

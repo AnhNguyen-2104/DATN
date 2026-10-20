@@ -79,3 +79,13 @@ GitHub: https://github.com/AnhNguyen-2104/DATN
 - Clone of repository is SOURCE ONLY: START_DATN*.cmd require locally built Release/ReleaseCandidate and .NET runtime.
 - Do not download/activate TwinCAT PLC or write to physical devices merely to verify the repository.
 - Old historical code and archives preserved on D: D:/DATN_ARCHIVE_20261020 after hash verification.
+
+## DATN CONSOLIDATION / 2026-10-20
+- Canonical source: App/Vision/PlateVision50.csproj and App/PlateVision50.sln.
+- Regression test source is now App/Tests/Tests.csproj, linked to App/Vision sources; dotnet build was successful offline.
+- Current TwinCAT master PLC source: PLC/TwinCAT/DATN.sln; 43 core project/source files matched the former Documents stage.
+- Current Mitsubishi PLC-Q candidates: PLC/Mitsubishi/Sources_20261019/GXWorks2/Candidates.
+- Historical C# releases and TwinCAT stage backups were moved with SHA-256 verification to D:/DATN_ARCHIVE_20261020.
+- START_DATN_PREVIEW.cmd now forwards to START_DATN_STATION_PREVIEW.cmd (newest preserved SensorLog preview). START_DATN.cmd retains original release.
+- The older Desktop/PlateVision50_V2 directory has not been removed while Visual Studio is observed open with PlateVision50, to avoid breaking unsaved editor state. Do not use it as the source of truth.
+- PLC/TwinCAT_Original_20261015 and PLC/Backups were archived to D; do not blindly activate or deploy the Git version.
