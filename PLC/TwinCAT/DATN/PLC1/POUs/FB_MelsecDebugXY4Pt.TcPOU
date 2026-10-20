@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_MelsecDebugXY4Pt" Id="{d87b6f2e-7da6-42c2-a98b-51142259b86c}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_MelsecDebugXY4Pt
+VAR_INPUT
+    bExecute          : BOOL := FALSE; // Rising edge for ONE 4-point DATA-ONLY test
+    bPermit           : BOOL := FALSE; // Maintenance gate, OFF by default
+    bMachineStopped   : BOOL := FALSE; // Axis, encoder and gantry are stationary
+    bPublisherIdle    : BOOL := FALSE; // All live motion publishers inhibited
+    bAbort            : BOOL := FALSE; // Cancel the data-only sequence
+    rCenterX_mm       : LREAL := 50.0;
+    rCenterY_mm       : LREAL := 85.0;
+    rAngleDeg         : LREAL := 0.0;
+    rLength_mm        : LREAL := 40.0;
+    rWidth_mm         : LREAL := 40.0;
+    tHold             : TIME := T#10S; // GX Works2 observation pause, NOT motion acknowledgment
+END_VAR
+VAR_IN_OUT
+    stSession         : ST_MelsecSession; // Same owned socket as all other TwinCAT FBs
+END_VAR
+VAR_OUTPUT
+    bBusy             : BOOL;
+    bDone             : BOOL;       // Four XY frames READ BACK; NOT robot motion completion
+    bError            : BOOL;
+    nErrorCode        : INT;
+    nCommErrorID      : UDINT;
+    nState            : INT := 0;
+    nCurrentVertex    : INT;        // 1..4, stays at 4 after success
+    nPassedVertices   : INT;
+    nWriteX           : DINT;
+    nWriteY           : DINT;
+    nReadX            : DINT;
+    nReadY            : DINT;
+    nReadVertex       : UINT;
+    bLastReadbackOK   : BOOL;
+    bAllMotionBitsLow : BOOL;
+    bOriginalRestored : BOOL; // Original XY/index restored after all four hold windows
+END_VAR
+VAR
+    fbStart           : R_TRIG;
+    fbWrite           : FB_MelsecWrite;
+    fbRead            : FB_MelsecRead;
+    tonHold           : TON;
+    aCorners          : ARRAY[1..4] OF ST_Point2D;
+    rAngleRad         : LREAL;
+    rC                : LREAL;
+    rS                : LREAL;
+    rHL               : LREAL;
+    rHW               : LREAL;
+    aXYWrite          : ARRAY[0..1] OF DINT;
+    aXYRead           : ARRAY[0..1] OF DINT;
+    nIndexWrite       : UINT;
+    nIndexRead        : UINT;
+    aOriginalXY       : ARRAY[0..1] OF DINT;
+    nOriginalIndex    : UINT;
+    bNeedSnapshot     : BOOL;
+    bRestoring        : BOOL;
+    aStartAck         : ARRAY[0..1] OF BOOL; // M1000 M1001
+    aRobotFlags       : ARRAY[0..3] OF BOOL; // M102, M103, M104, M105
+    nPlcFsmState      : DINT;               // D200/D201
+    bWriteReq         : BOOL;
+    bReadReq          : BOOL;
+    eReadDevice       : E_MelsecDevice;
+    nReadAddress      : UDINT;
+    nReadPoints       : UINT;
+    bReadBitMode      : BOOL;
+    pReadData         : PVOID;
+    nReadDataSize     : UDINT;
+    nWriteAddress     : UDINT;
+    nWritePoints      : UINT;
+    pWriteData        : PVOID;
+    nWriteDataSize    : UDINT;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// Diagnostic mode NEVER writes M1000 or any PLC bit, never touches Z.
+// Only D100..D103 (2x DINT XY) and D114 (UINT vertex) are ever written.
+// Explicit machine-stopped conditions are checked on EVERY scan.
+fbStart(CLK := bExecute);
+tonHold(IN := (nState = 20), PT := tHold);
+
+bReadReq := FALSE;
+bWriteReq := FALSE;
+
+IF (nState <> 0) AND (nState <> 99) AND (NOT bPermit OR NOT bMachineStopped OR
+    NOT bPublisherIdle OR bAbort OR NOT stSession.bConnected) THEN
+    bError := TRUE;
+    nErrorCode := 901; // Lost permit, motion interlock, or TCP
+    nState := 99;
+END_IF;
+
+CASE nState OF
+    0: // IDLE - no automatic restart
+        bBusy := FALSE;
+        IF fbStart.Q THEN
+            bDone := FALSE;
+            bError := FALSE;
+            bLastReadbackOK := FALSE;
+            bAllMotionBitsLow := FALSE;
+            nPassedVertices := 0;
+            nCurrentVertex := 0;
+            bNeedSnapshot := TRUE;
+            bRestoring := FALSE;
+            bOriginalRestored := FALSE;
+            nErrorCode := 0;
+            nCommErrorID := 0;
+            IF NOT bPermit OR NOT bMachineStopped OR NOT bPublisherIdle
+                OR bAbort OR NOT stSession.bConnected OR stSession.bBusy THEN
+                bError := TRUE; nErrorCode := 901;
+            ELSIF (rLength_mm <= 0.0) OR (rWidth_mm <= 0.0)
+                OR (rLength_mm > 100.0) OR (rWidth_mm > 100.0)
+                OR (tHold < T#2S) OR (tHold > T#60S) THEN
+                bError := TRUE; nErrorCode := 902;
+            ELSE
+                rAngleRad := rAngleDeg * 3.141592653589793 / 180.0;
+                rC := COS(rAngleRad);
+                rS := SIN(rAngleRad);
+                rHL := rLength_mm / 2.0;
+                rHW := rWidth_mm / 2.0;
+
+                aCorners[1].X := rCenterX_mm + rHL * rC - rHW * rS;
+                aCorners[1].Y := rCenterY_mm + rHL * rS + rHW * rC;
+                aCorners[2].X := rCenterX_mm - rHL * rC - rHW * rS;
+                aCorners[2].Y := rCenterY_mm - rHL * rS + rHW * rC;
+                aCorners[3].X := rCenterX_mm - rHL * rC + rHW * rS;
+                aCorners[3].Y := rCenterY_mm - rHL * rS - rHW * rC;
+                aCorners[4].X := rCenterX_mm + rHL * rC + rHW * rS;
+                aCorners[4].Y := rCenterY_mm + rHL * rS - rHW * rC;
+
+                nCurrentVertex := 1;
+                bBusy := TRUE;
+                nState := 1;
+            END_IF;
+        END_IF;
+
+    // Recheck Mitsubishi handshake before EVERY vertex (read-only).
+    1:
+        eReadDevice := DEV_M; nReadAddress := 1000; nReadPoints := 2;
+        bReadBitMode := TRUE;
+        pReadData := ADR(aStartAck); nReadDataSize := SIZEOF(aStartAck);
+        bReadReq := TRUE;
+        nState := 2;
+
+    2:
+        IF fbRead.bDone THEN
+            IF aStartAck[0] OR aStartAck[1] THEN
+                bError := TRUE; nErrorCode := 903; nState := 99;
+            ELSE
+                nState := 3;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 910; nCommErrorID := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    3:
+        eReadDevice := DEV_M; nReadAddress := 102; nReadPoints := 4;
+        bReadBitMode := TRUE;
+        pReadData := ADR(aRobotFlags); nReadDataSize := SIZEOF(aRobotFlags);
+        bReadReq := TRUE;
+        nState := 4;
+
+    4:
+        IF fbRead.bDone THEN
+            IF aRobotFlags[0] OR aRobotFlags[1] OR aRobotFlags[2] OR aRobotFlags[3] THEN
+                bError := TRUE; nErrorCode := 904; nState := 99;
+            ELSE
+                nState := 5;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 911; nCommErrorID := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    5:
+        eReadDevice := DEV_D; nReadAddress := 200; nReadPoints := 2;
+        bReadBitMode := FALSE;
+        pReadData := ADR(nPlcFsmState); nReadDataSize := SIZEOF(nPlcFsmState);
+        bReadReq := TRUE;
+        nState := 6;
+
+    6:
+        IF fbRead.bDone THEN
+            IF nPlcFsmState <> 0 THEN
+                bError := TRUE; nErrorCode := 905; nState := 99;
+            ELSE
+                bAllMotionBitsLow := TRUE;
+                IF bRestoring THEN
+                    nState := 30;
+                ELSIF bNeedSnapshot THEN
+                    nState := 7;
+                ELSE
+                    nState := 10;
+                END_IF;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 912; nCommErrorID := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    7: // Snapshot original XY before any data-only write
+        eReadDevice := DEV_D; nReadAddress := 100; nReadPoints := 4;
+        bReadBitMode := FALSE;
+        pReadData := ADR(aOriginalXY); nReadDataSize := SIZEOF(aOriginalXY);
+        bReadReq := TRUE;
+        nState := 8;
+
+    8:
+        IF fbRead.bDone THEN
+            nState := 9;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 918; nCommErrorID := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    9:
+        eReadDevice := DEV_D; nReadAddress := 114; nReadPoints := 1;
+        bReadBitMode := FALSE;
+        pReadData := ADR(nOriginalIndex); nReadDataSize := SIZEOF(nOriginalIndex);
+        bReadReq := TRUE;
+        nState := 91;
+
+    91:
+        IF fbRead.bDone THEN
+            bNeedSnapshot := FALSE;
+            nState := 10;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 919; nCommErrorID := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    10: // Data-only: two DINTs. Deliberately no Z/speed write.
+        IF (nCurrentVertex < 1) OR (nCurrentVertex > 4) OR
+            (aCorners[nCurrentVertex].X < 5.0) OR
+            (aCorners[nCurrentVertex].X > 170.0) OR
+            (aCorners[nCurrentVertex].Y < 5.0) OR
+            (aCorners[nCurrentVertex].Y > 165.0) THEN
+            bError := TRUE; nErrorCode := 906; nState := 99;
+        ELSE
+            nWriteX := LREAL_TO_DINT(aCorners[nCurrentVertex].X * 10000.0);
+            nWriteY := LREAL_TO_DINT(aCorners[nCurrentVertex].Y * 10000.0);
+            aXYWrite[0] := nWriteX;
+            aXYWrite[1] := nWriteY;
+            nIndexWrite := INT_TO_UINT(nCurrentVertex);
+            nWriteAddress := 100; nWritePoints := 4;
+            pWriteData := ADR(aXYWrite); nWriteDataSize := SIZEOF(aXYWrite);
+            bLastReadbackOK := FALSE;
+            bWriteReq := TRUE;
+            nState := 11;
+        END_IF;
+
+    11:
+        IF fbWrite.bDone THEN
+            nState := 12;
+        ELSIF fbWrite.bError THEN
+            bError := TRUE; nErrorCode := 913; nCommErrorID := fbWrite.nErrorID; nState := 99;
+        END_IF;
+
+    12: // Different rising edge for D114
+        nWriteAddress := 114; nWritePoints := 1;
+        pWriteData := ADR(nIndexWrite); nWriteDataSize := SIZEOF(nIndexWrite);
+        bWriteReq := TRUE;
+        nState := 13;
+
+    13:
+        IF fbWrite.bDone THEN
+            nState := 14;
+        ELSIF fbWrite.bError THEN
+            bError := TRUE; nErrorCode := 914; nCommErrorID := fbWrite.nErrorID; nState := 99;
+        END_IF;
+
+    14:
+        eReadDevice := DEV_D; nReadAddress := 100; nReadPoints := 4;
+        bReadBitMode := FALSE;
+        pReadData := ADR(aXYRead); nReadDataSize := SIZEOF(aXYRead);
+        bReadReq := TRUE;
+        nState := 15;
+
+    15:
+        IF fbRead.bDone THEN
+            nState := 16;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 915; nCommErrorID := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    16:
+        eReadDevice := DEV_D; nReadAddress := 114; nReadPoints := 1;
+        bReadBitMode := FALSE;
+        pReadData := ADR(nIndexRead); nReadDataSize := SIZEOF(nIndexRead);
+        bReadReq := TRUE;
+        nState := 17;
+
+    17:
+        IF fbRead.bDone THEN
+            nReadX := aXYRead[0];
+            nReadY := aXYRead[1];
+            nReadVertex := nIndexRead;
+            bLastReadbackOK := (nReadX = nWriteX) AND (nReadY = nWriteY)
+                               AND (nReadVertex = nIndexWrite);
+            IF bLastReadbackOK THEN
+                nPassedVertices := nPassedVertices + 1;
+                nState := 20; // Hold for operator GX Works2 observation
+            ELSE
+                bError := TRUE; nErrorCode := 916; nState := 99;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 917; nCommErrorID := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    20: // Observation timer. Never mislabel elapsed time as QD75 motion ACK.
+        IF tonHold.Q THEN
+            IF nCurrentVertex >= 4 THEN
+                bRestoring := TRUE;
+                bAllMotionBitsLow := FALSE;
+                nState := 1; // Recheck M1000/ACK/BUSY/FSM before restoring original packet
+            ELSE
+                nCurrentVertex := nCurrentVertex + 1;
+                bAllMotionBitsLow := FALSE;
+                nState := 1;
+            END_IF;
+        END_IF;
+
+    30: // Restore original XY, then original index: never leave stale debug target
+        nWriteAddress := 100; nWritePoints := 4;
+        pWriteData := ADR(aOriginalXY); nWriteDataSize := SIZEOF(aOriginalXY);
+        bWriteReq := TRUE;
+        nState := 31;
+
+    31:
+        IF fbWrite.bDone THEN
+            nState := 32;
+        ELSIF fbWrite.bError THEN
+            bError := TRUE; nErrorCode := 920; nCommErrorID := fbWrite.nErrorID; nState := 99;
+        END_IF;
+
+    32:
+        nWriteAddress := 114; nWritePoints := 1;
+        pWriteData := ADR(nOriginalIndex); nWriteDataSize := SIZEOF(nOriginalIndex);
+        bWriteReq := TRUE;
+        nState := 33;
+
+    33:
+        IF fbWrite.bDone THEN
+            nState := 34;
+        ELSIF fbWrite.bError THEN
+            bError := TRUE; nErrorCode := 921; nCommErrorID := fbWrite.nErrorID; nState := 99;
+        END_IF;
+
+    34:
+        eReadDevice := DEV_D; nReadAddress := 100; nReadPoints := 4;
+        bReadBitMode := FALSE;
+        pReadData := ADR(aXYRead); nReadDataSize := SIZEOF(aXYRead);
+        bReadReq := TRUE;
+        nState := 35;
+
+    35:
+        IF fbRead.bDone THEN
+            nState := 36;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 922; nCommErrorID := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    36:
+        eReadDevice := DEV_D; nReadAddress := 114; nReadPoints := 1;
+        bReadBitMode := FALSE;
+        pReadData := ADR(nIndexRead); nReadDataSize := SIZEOF(nIndexRead);
+        bReadReq := TRUE;
+        nState := 37;
+
+    37:
+        IF fbRead.bDone THEN
+            bOriginalRestored := (aXYRead[0] = aOriginalXY[0]) AND
+                (aXYRead[1] = aOriginalXY[1]) AND (nIndexRead = nOriginalIndex);
+            IF bOriginalRestored THEN
+                bBusy := FALSE;
+                bDone := TRUE; // All 4 readbacks AND full restore confirmed
+                nState := 0;
+            ELSE
+                bError := TRUE; nErrorCode := 923; nState := 99;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 924; nCommErrorID := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    99: // Latched diagnostic failure. NO reset command sent to the PLC.
+        bBusy := FALSE;
+        bDone := FALSE;
+        bReadReq := FALSE;
+        bWriteReq := FALSE;
+        IF NOT bExecute AND NOT bPermit AND NOT fbRead.bBusy AND NOT fbWrite.bBusy THEN
+            nState := 0;
+        END_IF;
+END_CASE;
+
+// READS may access only M1000,M1001,M102..M105,D200..D201,D100..D103,D114.
+// WRITES are strictly limited to D100..D103 and D114, never M, Z or QD75.
+fbWrite(
+    stSession := stSession, bExecute := bWriteReq,
+    eDevice := DEV_D, nStartAddr := nWriteAddress,
+    nPoints := nWritePoints, bBitAccess := FALSE,
+    pData := pWriteData, nDataSize := nWriteDataSize
+);
+fbRead(
+    stSession := stSession, bExecute := bReadReq,
+    eDevice := eReadDevice, nStartAddr := nReadAddress,
+    nPoints := nReadPoints, bBitAccess := bReadBitMode,
+    pData := pReadData, nDataSize := nReadDataSize
+);
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_MelsecDebugXY4Pt">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

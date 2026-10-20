@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_XYTrackingManualAck" Id="{c073479e-38e1-4262-a1e5-0c2f91d91f79}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_XYTrackingManualAck
+VAR_INPUT
+    bExecute         : BOOL := FALSE;
+    bPermit          : BOOL := FALSE; // OFF by default; user must approve spare PLC bit
+    bAckBitAudited   : BOOL := FALSE; // Must be confirmed unused in PLC and HMI
+    nAckAddress      : UDINT := 2100; // PROPOSED spare M, NOT M1001 or other motion bit
+    bSafeToWriteXY   : BOOL := FALSE; // All other Publishers disabled; no robot motion
+    bProductCaptured : BOOL;
+    aCornerNow       : ARRAY[1..4] OF ST_Point2D;
+    rConveyorSpeed   : LREAL;       // measured from encoder; may be zero for bench
+    rFlyTime_s       : LREAL := 0.12;
+    rXMax_mm         : LREAL := 180.0;
+    rYMax_mm         : LREAL := 170.0;
+    bAbort           : BOOL := FALSE;
+END_VAR
+VAR_IN_OUT
+    stSession        : ST_MelsecSession;
+END_VAR
+VAR_OUTPUT
+    bBusy            : BOOL;
+    bDone            : BOOL; // DATA-ONLY: all four XY frames acknowledged MANUALLY
+    bError           : BOOL;
+    nErrorCode       : INT;
+    nCommError       : UDINT;
+    nState           : INT := 0;
+    nVertex          : INT;
+    nAckedVertices   : INT;
+    bAckBitNow       : BOOL;
+    nSentX           : DINT;
+    nSentY           : DINT;
+    nReadX           : DINT;
+    nReadY           : DINT;
+    nReadVertex      : UINT;
+    bReadbackOK      : BOOL;
+    bRestored        : BOOL;
+END_VAR
+VAR
+    fbStart          : R_TRIG;
+    fbWrite          : FB_MelsecWrite;
+    fbRead           : FB_MelsecRead;
+    tonWait          : TON;
+    tonReview        : TON;
+    aOriginalXY      : ARRAY[0..1] OF DINT;
+    nOriginalIndex   : UINT;
+    aWriteXY         : ARRAY[0..1] OF DINT;
+    aReadXY          : ARRAY[0..1] OF DINT;
+    nWriteIndex      : UINT;
+    nReadIndex       : UINT;
+    aStartAck        : ARRAY[0..1] OF BOOL; // M1000 M1001
+    aRobotFlags      : ARRAY[0..3] OF BOOL; // M102..105
+    nPlcState        : DINT;             // D200 D201
+    bWriteReq        : BOOL;
+    bReadReq         : BOOL;
+    nWriteAddress    : UDINT;
+    nWritePoints     : UINT;
+    pWriteData       : PVOID;
+    nWriteSize       : UDINT;
+    eReadDevice      : E_MelsecDevice;
+    nReadAddress     : UDINT;
+    nReadPoints      : UINT;
+    bReadBitMode     : BOOL;
+    pReadData        : PVOID;
+    nReadSize        : UDINT;
+    rTargetX         : LREAL;
+    rTargetY         : LREAL;
+    bNeedOriginal    : BOOL;
+    bRestoring       : BOOL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// THIS IS NOT A ROBOT CYCLE. Never writes M1000, M1001, M105, Z or QD75.
+// Operator toggles a separate AUDITED spare PLC bit M2100 for manual ack.
+// M1001 is deliberately NOT used: the PLC owns it as true ROBOT DONE.
+fbStart(CLK := bExecute);
+tonWait(IN := bBusy AND NOT bRestoring AND (nState >= 10) AND
+            (nState <= 25), PT := T#25S);
+tonReview(IN := (nState = 23) OR (nState = 24), PT := T#2S);
+bWriteReq := FALSE;
+bReadReq := FALSE;
+
+IF (nState <> 0) AND (nState <> 99) AND
+   (NOT bPermit OR NOT bAckBitAudited OR NOT bSafeToWriteXY OR
+    bAbort OR NOT stSession.bConnected OR NOT bProductCaptured) THEN
+    bError := TRUE;
+    nErrorCode := 901;
+    nState := 99;
+END_IF;
+
+CASE nState OF
+    0:
+        bBusy := FALSE;
+        IF fbStart.Q THEN
+            bDone := FALSE; bError := FALSE; bRestored := FALSE;
+            nErrorCode := 0; nCommError := 0;
+            nAckedVertices := 0; nVertex := 0;
+            bReadbackOK := FALSE;
+            IF NOT bPermit OR NOT bAckBitAudited OR NOT bSafeToWriteXY OR
+               NOT bProductCaptured OR bAbort OR NOT stSession.bConnected OR
+               stSession.bBusy OR (nAckAddress < 2000) OR (nAckAddress > 8191) THEN
+                bError := TRUE; nErrorCode := 901;
+            ELSE
+                bBusy := TRUE; bNeedOriginal := TRUE;
+                bRestoring := FALSE;
+                nVertex := 1; nState := 1;
+            END_IF;
+        END_IF;
+
+    1: // Motion handshake must stay LOW
+        eReadDevice := DEV_M; nReadAddress := 1000; nReadPoints := 2;
+        bReadBitMode := TRUE;
+        pReadData := ADR(aStartAck); nReadSize := SIZEOF(aStartAck);
+        bReadReq := TRUE; nState := 2;
+
+    2:
+        IF fbRead.bDone THEN
+            IF aStartAck[0] OR aStartAck[1] THEN
+                bError := TRUE; nErrorCode := 902; nState := 99;
+            ELSE
+                nState := 3;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 910; nCommError := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    3:
+        eReadDevice := DEV_M; nReadAddress := 102; nReadPoints := 4;
+        bReadBitMode := TRUE;
+        pReadData := ADR(aRobotFlags); nReadSize := SIZEOF(aRobotFlags);
+        bReadReq := TRUE; nState := 4;
+
+    4:
+        IF fbRead.bDone THEN
+            IF aRobotFlags[0] OR aRobotFlags[1] OR aRobotFlags[2] OR aRobotFlags[3] THEN
+                bError := TRUE; nErrorCode := 903; nState := 99;
+            ELSE
+                nState := 5;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 911; nCommError := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    5:
+        eReadDevice := DEV_D; nReadAddress := 200; nReadPoints := 2;
+        bReadBitMode := FALSE;
+        pReadData := ADR(nPlcState); nReadSize := SIZEOF(nPlcState);
+        bReadReq := TRUE; nState := 6;
+
+    6:
+        IF fbRead.bDone THEN
+            IF nPlcState <> 0 THEN
+                bError := TRUE; nErrorCode := 904; nState := 99;
+            ELSE
+                nState := 7;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 912; nCommError := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    7: // Require manual ACK LOW before a new vertex
+        eReadDevice := DEV_M; nReadAddress := nAckAddress; nReadPoints := 1;
+        bReadBitMode := TRUE;
+        pReadData := ADR(bAckBitNow); nReadSize := SIZEOF(bAckBitNow);
+        bReadReq := TRUE; nState := 8;
+
+    8:
+        IF fbRead.bDone THEN
+            IF bAckBitNow THEN
+                bError := TRUE; nErrorCode := 905; nState := 99;
+            ELSIF bNeedOriginal THEN
+                nState := 30;
+            ELSIF bRestoring THEN
+                nState := 40;
+            ELSE
+                nState := 10;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 913; nCommError := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    30: // Save X/Y and index to restore after four acknowledgements
+        eReadDevice := DEV_D; nReadAddress := 100; nReadPoints := 4;
+        bReadBitMode := FALSE;
+        pReadData := ADR(aOriginalXY); nReadSize := SIZEOF(aOriginalXY);
+        bReadReq := TRUE; nState := 31;
+
+    31:
+        IF fbRead.bDone THEN nState := 32;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 914; nCommError := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    32:
+        eReadDevice := DEV_D; nReadAddress := 114; nReadPoints := 1;
+        bReadBitMode := FALSE;
+        pReadData := ADR(nOriginalIndex); nReadSize := SIZEOF(nOriginalIndex);
+        bReadReq := TRUE; nState := 33;
+
+    33:
+        IF fbRead.bDone THEN
+            bNeedOriginal := FALSE; nState := 10;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 915; nCommError := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    10: // Live computation directly before EACH vertex write
+        rTargetX := aCornerNow[nVertex].X + rConveyorSpeed * rFlyTime_s;
+        rTargetY := aCornerNow[nVertex].Y;
+        IF (ABS(rConveyorSpeed) > 1000.0) OR
+            (rTargetY < 0.0) OR (rTargetY > rYMax_mm) OR
+            (rTargetX > rXMax_mm) THEN
+            bError := TRUE; nErrorCode := 906; nState := 99;
+        ELSIF rTargetX < 0.0 THEN
+            // Camera is upstream: WAIT for tracked vertex to reach workspace
+            IF tonWait.Q THEN
+                bError := TRUE; nErrorCode := 907; nState := 99;
+            END_IF;
+        ELSE
+            nSentX := LREAL_TO_DINT(rTargetX * 10000.0);
+            nSentY := LREAL_TO_DINT(rTargetY * 10000.0);
+            aWriteXY[0] := nSentX;
+            aWriteXY[1] := nSentY;
+            nWriteIndex := INT_TO_UINT(nVertex);
+            nWriteAddress := 100; nWritePoints := 4;
+            pWriteData := ADR(aWriteXY); nWriteSize := SIZEOF(aWriteXY);
+            bReadbackOK := FALSE;
+            bWriteReq := TRUE; nState := 11;
+        END_IF;
+
+    11:
+        IF fbWrite.bDone THEN nState := 12;
+        ELSIF fbWrite.bError THEN
+            bError := TRUE; nErrorCode := 916; nCommError := fbWrite.nErrorID; nState := 99;
+        END_IF;
+
+    12:
+        nWriteAddress := 114; nWritePoints := 1;
+        pWriteData := ADR(nWriteIndex); nWriteSize := SIZEOF(nWriteIndex);
+        bWriteReq := TRUE; nState := 13;
+
+    13:
+        IF fbWrite.bDone THEN nState := 14;
+        ELSIF fbWrite.bError THEN
+            bError := TRUE; nErrorCode := 917; nCommError := fbWrite.nErrorID; nState := 99;
+        END_IF;
+
+    14:
+        eReadDevice := DEV_D; nReadAddress := 100; nReadPoints := 4;
+        bReadBitMode := FALSE;
+        pReadData := ADR(aReadXY); nReadSize := SIZEOF(aReadXY);
+        bReadReq := TRUE; nState := 15;
+
+    15:
+        IF fbRead.bDone THEN nState := 16;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 918; nCommError := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    16:
+        eReadDevice := DEV_D; nReadAddress := 114; nReadPoints := 1;
+        bReadBitMode := FALSE;
+        pReadData := ADR(nReadIndex); nReadSize := SIZEOF(nReadIndex);
+        bReadReq := TRUE; nState := 17;
+
+    17:
+        IF fbRead.bDone THEN
+            nReadX := aReadXY[0]; nReadY := aReadXY[1]; nReadVertex := nReadIndex;
+            bReadbackOK := (nReadX = nSentX) AND (nReadY = nSentY)
+                           AND (nReadVertex = nWriteIndex);
+            IF bReadbackOK THEN nState := 20;
+            ELSE bError := TRUE; nErrorCode := 919; nState := 99;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 920; nCommError := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    20: // Wait for human acknowledgement at separately reserved PLC M bit
+        IF (aCornerNow[nVertex].X > rXMax_mm) OR tonWait.Q THEN
+            bError := TRUE; nErrorCode := 921; nState := 99;
+        ELSE
+            eReadDevice := DEV_M; nReadAddress := nAckAddress; nReadPoints := 1;
+            bReadBitMode := TRUE;
+            pReadData := ADR(bAckBitNow); nReadSize := SIZEOF(bAckBitNow);
+            bReadReq := TRUE; nState := 21;
+        END_IF;
+
+    21:
+        IF fbRead.bDone THEN
+            IF bAckBitNow THEN
+                nAckedVertices := nAckedVertices + 1;
+                nState := 23;
+            ELSE
+                nState := 20;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 922; nCommError := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    23: // Show acknowledged point for >=2 s only when conveyor is stationary
+        IF (ABS(rConveyorSpeed) > 1.0) OR tonReview.Q THEN
+            nState := 24;
+        END_IF;
+
+    24: // Operator must clear ACK before TwinCAT computes next tracked corner
+        IF (aCornerNow[nVertex].X > rXMax_mm) OR tonWait.Q THEN
+            bError := TRUE; nErrorCode := 923; nState := 99;
+        ELSE
+            eReadDevice := DEV_M; nReadAddress := nAckAddress; nReadPoints := 1;
+            bReadBitMode := TRUE;
+            pReadData := ADR(bAckBitNow); nReadSize := SIZEOF(bAckBitNow);
+            bReadReq := TRUE; nState := 25;
+        END_IF;
+
+    25:
+        IF fbRead.bDone THEN
+            IF NOT bAckBitNow THEN
+                IF nVertex >= 4 THEN
+                    bRestoring := TRUE; nState := 1;
+                ELSE
+                    nVertex := nVertex + 1; nState := 1;
+                END_IF;
+            ELSE
+                nState := 24;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 924; nCommError := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    40:
+        nWriteAddress := 100; nWritePoints := 4;
+        pWriteData := ADR(aOriginalXY); nWriteSize := SIZEOF(aOriginalXY);
+        bWriteReq := TRUE; nState := 41;
+    41:
+        IF fbWrite.bDone THEN nState := 42;
+        ELSIF fbWrite.bError THEN
+            bError := TRUE; nErrorCode := 925; nCommError := fbWrite.nErrorID; nState := 99;
+        END_IF;
+    42:
+        nWriteAddress := 114; nWritePoints := 1;
+        pWriteData := ADR(nOriginalIndex); nWriteSize := SIZEOF(nOriginalIndex);
+        bWriteReq := TRUE; nState := 43;
+    43:
+        IF fbWrite.bDone THEN nState := 44;
+        ELSIF fbWrite.bError THEN
+            bError := TRUE; nErrorCode := 926; nCommError := fbWrite.nErrorID; nState := 99;
+        END_IF;
+    44:
+        eReadDevice := DEV_D; nReadAddress := 100; nReadPoints := 4;
+        bReadBitMode := FALSE;
+        pReadData := ADR(aReadXY); nReadSize := SIZEOF(aReadXY);
+        bReadReq := TRUE; nState := 45;
+    45:
+        IF fbRead.bDone THEN nState := 46;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 927; nCommError := fbRead.nErrorID; nState := 99;
+        END_IF;
+    46:
+        eReadDevice := DEV_D; nReadAddress := 114; nReadPoints := 1;
+        bReadBitMode := FALSE;
+        pReadData := ADR(nReadIndex); nReadSize := SIZEOF(nReadIndex);
+        bReadReq := TRUE; nState := 47;
+    47:
+        IF fbRead.bDone THEN
+            bRestored := (aReadXY[0] = aOriginalXY[0]) AND
+                          (aReadXY[1] = aOriginalXY[1]) AND
+                          (nReadIndex = nOriginalIndex);
+            IF bRestored THEN
+                bBusy := FALSE; bDone := TRUE; nState := 0;
+            ELSE
+                bError := TRUE; nErrorCode := 928; nState := 99;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 929; nCommError := fbRead.nErrorID; nState := 99;
+        END_IF;
+
+    99: // Fail closed, no robot command
+        bBusy := FALSE; bDone := FALSE;
+        IF NOT bExecute AND NOT bPermit AND NOT fbRead.bBusy AND NOT fbWrite.bBusy THEN
+            nState := 0;
+        END_IF;
+END_CASE;
+
+// MC 3E Client sends exactly these XY-only word regions; no M write possible.
+fbWrite(stSession := stSession, bExecute := bWriteReq,
+        eDevice := DEV_D, nStartAddr := nWriteAddress,
+        nPoints := nWritePoints, bBitAccess := FALSE,
+        pData := pWriteData, nDataSize := nWriteSize);
+fbRead(stSession := stSession, bExecute := bReadReq,
+       eDevice := eReadDevice, nStartAddr := nReadAddress,
+       nPoints := nReadPoints, bBitAccess := bReadBitMode,
+       pData := pReadData, nDataSize := nReadSize);
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_XYTrackingManualAck"><LineId Id="9" Count="0" /></LineIds>
+  </POU>
+</TcPlcObject>

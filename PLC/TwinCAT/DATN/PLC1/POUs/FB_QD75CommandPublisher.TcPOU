@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_QD75CommandPublisher" Id="{9ce28e12-ab97-4ea0-93f3-32a033782ac4}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_QD75CommandPublisher
+VAR_INPUT
+    // ================================================================
+    // 1. ĐIỀU KHIỂN CHU TRÌNH TỰ ĐỘNG 4 ĐỈNH
+    // ================================================================
+    bStartCycle         : BOOL;             // Cạnh lên: bắt đầu chu trình 4 đỉnh
+    bProductValid       : BOOL;            // Camera snapshot must exist before Start
+    rEncoderDist_mm     : LREAL;           // Continuous conveyor distance from encoder
+    bResetFault         : BOOL;            // Operator acknowledgement after fault
+    bEnableManualWrite  : BOOL := FALSE;   // Deliberate service mode, OFF by default
+    bAbortCycle         : BOOL;             // Hủy chu trình / yêu cầu dừng qua mạng
+
+    // Dữ liệu từ khối Tracking & Băng tải
+    aCornerNow          : ARRAY[1..4] OF ST_Point2D;
+    rConveyorSpeed_mm_s : LREAL;
+
+    // Thông số Gantry & Bù trôi
+    rFlyTime_s          : LREAL := 0.120;  // Thời gian Gantry bay tiếp cận (120ms)
+    rApproachSpeed_mm_s : LREAL := 500.0;  // Tốc độ bay tiếp cận (500 mm/s)
+    rSyncTime_s         : LREAL := 0.060;  // Thời gian trượt đồng tốc X (60ms)
+    rZDown_mm           : LREAL := 4.0;    // Độ cao Z hạ xuống chấm keo (4.0mm)
+    rZSafe_mm           : LREAL := 0.0;    // Độ cao Z rút lên an toàn (0.0mm)
+
+    // ================================================================
+    // 2. CHẾ ĐỘ TEST THỦ CÔNG TRỰC TIẾP (KHI bStartCycle = FALSE)
+    // ================================================================
+    bManualWriteD100    : BOOL := FALSE;    // Click đúp TRUE -> Ghi số 32-bit vào D100-D101
+    nD100_ManualVal     : DINT := 100;      // Giá trị 32-bit tùy ý bạn muốn ghi thử vào D100
+    bManualWriteM1000   : BOOL := FALSE;    // Click đúp TRUE -> Ghi bit M1000 (ON hoặc OFF)
+    bM1000_ManualVal    : BOOL := TRUE;     // TRUE = Bật M1000 ON, FALSE = Tắt M1000 OFF
+    bManualReadM1001    : BOOL := FALSE;    // Click đúp TRUE -> Đọc bit M1001 từ PLC-Q về
+END_VAR
+
+VAR_IN_OUT
+    stSession           : ST_MelsecSession; // Socket TCP dùng chung
+END_VAR
+
+VAR_OUTPUT
+    // ================================================================
+    // TRẠNG THÁI VÀ ĐẦU RA GIÁM SÁT
+    // ================================================================
+    stCommand           : ST_QD75_Command;  // Gói 15 words gửi sang D100..D114
+    bCmdM1000           : BOOL;             // Trạng thái bit M1000
+    bCmdM105            : BOOL;             // Trạng thái bit M105 (Abort)
+    bBusy               : BOOL;             // Đang chạy chu trình 4 đỉnh
+    bDone               : BOOL;             // Đã hoàn thành cả 4 đỉnh
+    bError              : BOOL;             // Báo lỗi
+    nErrorCode          : INT;              // Mã lỗi (501..503, 900..921)
+    nCurrentVertex      : INT;              // Đỉnh đang thực hiện (1..4)
+
+    rTargetX_mm         : LREAL;            // Tọa độ X đón đầu (mm)
+    rTargetY_mm         : LREAL;            // Tọa độ Y (mm)
+    rLead_mm            : LREAL;            // Bù trôi trong thời gian bay (mm)
+    rDeltaXSync_mm      : LREAL;            // Quãng trượt đồng tốc X (mm)
+
+    nLastCommError      : UDINT;            // MC socket/end-code diagnostics
+    bM1001_ReadBack     : BOOL;             // Giá trị M1001 đọc được từ PLC-Q
+    bStopCommandConfirmed : BOOL;           // Chỉ TRUE khi ghi M1000=OFF và M105=ON đều được ACK
+END_VAR
+
+VAR
+    fbWrite             : FB_MelsecWrite;
+    fbRead              : FB_MelsecRead;
+
+    // Biến đệm dữ liệu truyền thông
+    bM1000_Value        : BOOL;
+    bM105_Value         : BOOL;
+    bStatusBit          : BOOL;
+    aStatusBits         : ARRAY[0..2] OF BOOL; // M102 Busy, M103 Position, M104 Alarm
+    bM1000OffConfirmed  : BOOL;
+    nD100_SendDINT      : DINT;
+
+    // Tham số lệnh động
+    bWriteReq           : BOOL;
+    bReadReq            : BOOL;
+    eWriteDevice        : E_MelsecDevice;
+    nWriteAddress       : UDINT;
+    nWritePoints        : UINT;
+    bWriteBitMode       : BOOL;
+    pWriteData          : PVOID;
+    nWriteDataSize      : UDINT;
+
+    eReadDevice         : E_MelsecDevice;
+    nReadAddress        : UDINT;
+    nReadPoints         : UINT;
+    bReadBitMode        : BOOL;
+    pReadData           : PVOID;
+    nReadDataSize       : UDINT;
+
+    nCommError          : UDINT;
+    tonPoll             : TON;
+    tonAck              : TON;            // Overall time limit, states 30+31
+    tonRelease          : TON;            // Overall time limit, states 40+41
+    aCycleCorners       : ARRAY[1..4] OF ST_Point2D;
+    rCycleStartDist_mm  : LREAL;
+    aRobotStatus        : ARRAY[0..2] OF BOOL; // M102 Busy, M103 InPosition, M104 Alarm
+    tonStop             : TON;
+    fbStartEdge         : R_TRIG;
+    nState              : INT := 0;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbStartEdge(CLK := bStartCycle);
+
+// Update all watchdogs EVERY scan, including scans waiting for an asynchronous socket.
+tonAck(IN := (nState = 30) OR (nState = 31) OR (nState = 33) OR (nState = 35), PT := T#10S);
+tonRelease(IN := (nState = 40) OR (nState = 41) OR (nState = 43) OR (nState = 45), PT := T#5S);
+tonStop(IN := (nState >= 90) AND (nState <= 92), PT := T#8S);
+
+// Abort is a request through non-safety-rated TCP, NOT a hardware emergency stop.
+IF bAbortCycle AND (nState <> 90) AND (nState <> 91)
+    AND (nState <> 911) AND (nState <> 92)
+    AND (nState <> 93) AND (nState <> 99) THEN
+    bBusy := FALSE;
+    bDone := FALSE;
+    bError := TRUE;
+    nErrorCode := 930;
+    bStopCommandConfirmed := FALSE;
+    nState := 90;
+END_IF;
+
+CASE nState OF
+    0: // IDLE. No physical write occurs on transition to idle.
+        bBusy := FALSE;
+        bCmdM1000 := FALSE;
+        nCurrentVertex := 0;
+        bWriteReq := FALSE;
+        bReadReq := FALSE;
+        IF fbStartEdge.Q AND NOT bAbortCycle THEN
+            IF NOT stSession.bConnected THEN
+                bError := TRUE; nErrorCode := 900;
+            ELSIF NOT bProductValid THEN
+                bError := TRUE; nErrorCode := 901; // No valid camera product
+            ELSIF stSession.bBusy THEN
+                bError := TRUE; nErrorCode := 902; // Shared socket unavailable
+            ELSE
+                // Freeze identity of current product; use encoder travel for later vertices.
+                aCycleCorners := aCornerNow;
+                rCycleStartDist_mm := rEncoderDist_mm;
+                bDone := FALSE; bError := FALSE; nErrorCode := 0;
+                bBusy := TRUE; nCurrentVertex := 1;
+                nState := 10;
+            END_IF;
+        ELSIF bManualWriteD100 OR bManualWriteM1000 THEN
+            IF NOT bEnableManualWrite THEN
+                bManualWriteD100 := FALSE;
+                bManualWriteM1000 := FALSE;
+                bError := TRUE; nErrorCode := 903; // Service mode disabled
+            ELSIF stSession.bConnected AND NOT stSession.bBusy THEN
+                IF bManualWriteD100 THEN
+                    nD100_SendDINT := nD100_ManualVal;
+                    eWriteDevice := DEV_D; nWriteAddress := 100; nWritePoints := 2;
+                    bWriteBitMode := FALSE;
+                    pWriteData := ADR(nD100_SendDINT); nWriteDataSize := SIZEOF(nD100_SendDINT);
+                ELSE
+                    bM1000_Value := bM1000_ManualVal;
+                    eWriteDevice := DEV_M; nWriteAddress := 1000; nWritePoints := 1;
+                    bWriteBitMode := TRUE;
+                    pWriteData := ADR(bM1000_Value); nWriteDataSize := SIZEOF(bM1000_Value);
+                END_IF;
+                bWriteReq := TRUE; nState := 70;
+            ELSE
+                bManualWriteD100 := FALSE;
+                bManualWriteM1000 := FALSE;
+                bError := TRUE; nErrorCode := 900;
+            END_IF;
+        ELSIF bManualReadM1001 THEN
+            IF stSession.bConnected AND NOT stSession.bBusy THEN
+                eReadDevice := DEV_M; nReadAddress := 1001; nReadPoints := 1;
+                bReadBitMode := TRUE;
+                pReadData := ADR(bStatusBit); nReadDataSize := SIZEOF(bStatusBit);
+                bReadReq := TRUE; nState := 80;
+            ELSE
+                bManualReadM1001 := FALSE;
+                bError := TRUE; nErrorCode := 900;
+            END_IF;
+        END_IF;
+
+    10: // Preflight before each vertex: read contiguous M102/M103/M104
+        IF NOT stSession.bConnected THEN
+            bError := TRUE; nErrorCode := 900; nState := 99;
+        ELSE
+            eReadDevice := DEV_M; nReadAddress := 102; nReadPoints := 3;
+            bReadBitMode := TRUE;
+            pReadData := ADR(aRobotStatus); nReadDataSize := SIZEOF(aRobotStatus);
+            bReadReq := TRUE; nState := 11;
+        END_IF;
+
+    11:
+        bReadReq := FALSE;
+        IF fbRead.bDone THEN
+            IF aRobotStatus[2] THEN
+                bError := TRUE; nErrorCode := 904; nState := 99;
+            ELSIF aRobotStatus[0] OR aRobotStatus[1] THEN
+                bError := TRUE; nErrorCode := 905; nState := 99;
+            ELSE
+                nState := 14;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            nLastCommError := fbRead.nErrorID;
+            bError := TRUE; nErrorCode := 920; nState := 99;
+        END_IF;
+
+    14: // ACK must also be low before any new command.
+        eReadDevice := DEV_M; nReadAddress := 1001; nReadPoints := 1;
+        bReadBitMode := TRUE;
+        pReadData := ADR(bStatusBit); nReadDataSize := SIZEOF(bStatusBit);
+        bReadReq := TRUE; nState := 15;
+
+    15:
+        bReadReq := FALSE;
+        IF fbRead.bDone THEN
+            IF bStatusBit THEN
+                bError := TRUE; nErrorCode := 906; nState := 99;
+            ELSE
+                nState := 20;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            nLastCommError := fbRead.nErrorID;
+            bError := TRUE; nErrorCode := 920; nState := 99;
+        END_IF;
+
+    20: // Validate every requested position BEFORE sending D100..D114.
+        rLead_mm := rConveyorSpeed_mm_s * rFlyTime_s;
+        rDeltaXSync_mm := rConveyorSpeed_mm_s * rSyncTime_s;
+        rTargetX_mm := aCycleCorners[nCurrentVertex].X
+                       + (rEncoderDist_mm - rCycleStartDist_mm) + rLead_mm;
+        rTargetY_mm := aCycleCorners[nCurrentVertex].Y;
+
+        IF (nCurrentVertex < 1) OR (nCurrentVertex > 4)
+            OR (rConveyorSpeed_mm_s <= 0.0) OR (rConveyorSpeed_mm_s > 1000.0)
+            OR (rApproachSpeed_mm_s <= 0.0) OR (rApproachSpeed_mm_s > 1000.0)
+            OR (rFlyTime_s < 0.0) OR (rFlyTime_s > 1.0)
+            OR (rSyncTime_s <= 0.0) OR (rSyncTime_s > 0.5)
+            OR (rTargetX_mm < 0.0) OR ((rTargetX_mm + rDeltaXSync_mm) > 180.0)
+            OR (rTargetY_mm < 0.0) OR (rTargetY_mm > 170.0)
+            OR (rZSafe_mm < 0.0) OR (rZDown_mm > 52.0)
+            OR (rZDown_mm < rZSafe_mm) THEN
+            bError := TRUE; nErrorCode := 501; nState := 99;
+        ELSE
+            stCommand.Target_X       := LREAL_TO_DINT(rTargetX_mm * 10000.0);
+            stCommand.Target_Y       := LREAL_TO_DINT(rTargetY_mm * 10000.0);
+            stCommand.Target_Z_Down  := LREAL_TO_DINT(rZDown_mm * 10000.0);
+            stCommand.Target_Z_Safe  := LREAL_TO_DINT(rZSafe_mm * 10000.0);
+            stCommand.Speed_Approach := LREAL_TO_DINT(rApproachSpeed_mm_s * 6000.0);
+            stCommand.Speed_Sync     := LREAL_TO_DINT(rConveyorSpeed_mm_s * 6000.0);
+            stCommand.DeltaX_Sync    := LREAL_TO_DINT(rDeltaXSync_mm * 10000.0);
+            stCommand.Vertex_Index  := nCurrentVertex;
+
+            eWriteDevice := DEV_D; nWriteAddress := 100; nWritePoints := 15;
+            bWriteBitMode := FALSE;
+            pWriteData := ADR(stCommand); nWriteDataSize := SIZEOF(stCommand);
+            bWriteReq := TRUE; nState := 21;
+        END_IF;
+
+    21:
+        bWriteReq := FALSE;
+        IF fbWrite.bDone THEN
+            // Tạo ít nhất một scan bExecute=FALSE trước lệnh ghi tiếp theo.
+            nState := 211;
+        ELSIF fbWrite.bError THEN
+            nLastCommError := fbWrite.nErrorID;
+            bError := TRUE; nErrorCode := 910; nState := 90;
+        END_IF;
+
+    211:
+        bCmdM1000 := TRUE; bM1000_Value := TRUE;
+        eWriteDevice := DEV_M; nWriteAddress := 1000; nWritePoints := 1;
+        bWriteBitMode := TRUE;
+        pWriteData := ADR(bM1000_Value); nWriteDataSize := SIZEOF(bM1000_Value);
+        bWriteReq := TRUE; nState := 22;
+
+    22:
+        bWriteReq := FALSE;
+        IF fbWrite.bDone THEN
+            nState := 30;
+        ELSIF fbWrite.bError THEN
+            nLastCommError := fbWrite.nErrorID;
+            bError := TRUE; nErrorCode := 911; nState := 90;
+        END_IF;
+
+    30:
+        IF tonAck.Q THEN
+            bError := TRUE; nErrorCode := 920; nState := 90;
+        ELSE
+            tonPoll(IN := TRUE, PT := T#20MS);
+            IF tonPoll.Q THEN
+                tonPoll(IN := FALSE);
+                eReadDevice := DEV_M; nReadAddress := 104; nReadPoints := 1;
+                bReadBitMode := TRUE;
+                pReadData := ADR(aRobotStatus[2]); nReadDataSize := SIZEOF(aRobotStatus[2]);
+                bReadReq := TRUE; nState := 33;
+            END_IF;
+        END_IF;
+
+    33: // Giám sát M104 Alarm cả trong lúc chờ hoàn thành đỉnh.
+        bReadReq := FALSE;
+        IF fbRead.bDone THEN
+            IF aRobotStatus[2] THEN
+                bError := TRUE; nErrorCode := 927; nState := 90;
+            ELSE
+                nState := 35;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 928; nState := 90;
+        END_IF;
+
+    35:
+        eReadDevice := DEV_M; nReadAddress := 1001; nReadPoints := 1;
+        bReadBitMode := TRUE;
+        pReadData := ADR(bStatusBit); nReadDataSize := SIZEOF(bStatusBit);
+        bReadReq := TRUE; nState := 31;
+
+    31:
+        bReadReq := FALSE;
+        IF tonAck.Q THEN
+            bError := TRUE; nErrorCode := 920; nState := 90;
+        ELSIF fbRead.bDone THEN
+            bM1001_ReadBack := bStatusBit;
+            IF bStatusBit THEN
+                bCmdM1000 := FALSE; bM1000_Value := FALSE;
+                eWriteDevice := DEV_M; nWriteAddress := 1000; nWritePoints := 1;
+                bWriteBitMode := TRUE;
+                pWriteData := ADR(bM1000_Value); nWriteDataSize := SIZEOF(bM1000_Value);
+                bWriteReq := TRUE; nState := 32;
+            ELSE
+                nState := 30;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            nLastCommError := fbRead.nErrorID;
+            bError := TRUE; nErrorCode := 920; nState := 90;
+        END_IF;
+
+    32:
+        bWriteReq := FALSE;
+        IF fbWrite.bDone THEN
+            nState := 40;
+        ELSIF fbWrite.bError THEN
+            nLastCommError := fbWrite.nErrorID;
+            bError := TRUE; nErrorCode := 912; nState := 90;
+        END_IF;
+
+    40:
+        IF tonRelease.Q THEN
+            bError := TRUE; nErrorCode := 921; nState := 90;
+        ELSE
+            tonPoll(IN := TRUE, PT := T#20MS);
+            IF tonPoll.Q THEN
+                tonPoll(IN := FALSE);
+                eReadDevice := DEV_M; nReadAddress := 104; nReadPoints := 1;
+                bReadBitMode := TRUE;
+                pReadData := ADR(aRobotStatus[2]); nReadDataSize := SIZEOF(aRobotStatus[2]);
+                bReadReq := TRUE; nState := 43;
+            END_IF;
+        END_IF;
+
+    43:
+        bReadReq := FALSE;
+        IF fbRead.bDone THEN
+            IF aRobotStatus[2] THEN
+                bError := TRUE; nErrorCode := 927; nState := 90;
+            ELSE
+                nState := 45;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            bError := TRUE; nErrorCode := 928; nState := 90;
+        END_IF;
+
+    45:
+        eReadDevice := DEV_M; nReadAddress := 1001; nReadPoints := 1;
+        bReadBitMode := TRUE;
+        pReadData := ADR(bStatusBit); nReadDataSize := SIZEOF(bStatusBit);
+        bReadReq := TRUE; nState := 41;
+
+    41:
+        bReadReq := FALSE;
+        IF tonRelease.Q THEN
+            bError := TRUE; nErrorCode := 921; nState := 90;
+        ELSIF fbRead.bDone THEN
+            bM1001_ReadBack := bStatusBit;
+            IF NOT bStatusBit THEN
+                IF nCurrentVertex < 4 THEN
+                    nCurrentVertex := nCurrentVertex + 1;
+                    nState := 10; // Preflight next vertex, including M103 and M104
+                ELSE
+                    bBusy := FALSE; bDone := TRUE; nState := 0;
+                END_IF;
+            ELSE
+                nState := 40;
+            END_IF;
+        ELSIF fbRead.bError THEN
+            nLastCommError := fbRead.nErrorID;
+            bError := TRUE; nErrorCode := 921; nState := 90;
+        END_IF;
+
+    70: // Manual write (service mode only)
+        bWriteReq := FALSE;
+        IF fbWrite.bDone OR fbWrite.bError THEN
+            IF fbWrite.bError THEN
+                nLastCommError := fbWrite.nErrorID;
+                bError := TRUE; nErrorCode := 910;
+            END_IF;
+            bManualWriteD100 := FALSE; bManualWriteM1000 := FALSE;
+            nState := 0;
+        END_IF;
+
+    80: // Read-only diagnostics
+        bReadReq := FALSE;
+        IF fbRead.bDone OR fbRead.bError THEN
+            IF fbRead.bDone THEN
+                bM1001_ReadBack := bStatusBit;
+            ELSE
+                nLastCommError := fbRead.nErrorID;
+                bError := TRUE; nErrorCode := 920;
+            END_IF;
+            bManualReadM1001 := FALSE; nState := 0;
+        END_IF;
+
+    90: // Best-effort abort: wait for a pending transaction to finish first.
+        bWriteReq := FALSE;
+        bReadReq := FALSE;
+        bBusy := FALSE; bDone := FALSE; bCmdM1000 := FALSE; bCmdM105 := TRUE;
+        IF NOT stSession.bConnected OR tonStop.Q THEN
+            bError := TRUE; nState := 99;
+        ELSIF NOT stSession.bBusy AND NOT fbWrite.bBusy AND NOT fbRead.bBusy THEN
+            bM105_Value := TRUE;
+            eWriteDevice := DEV_M; nWriteAddress := 105; nWritePoints := 1;
+            bWriteBitMode := TRUE;
+            pWriteData := ADR(bM105_Value); nWriteDataSize := SIZEOF(bM105_Value);
+            bWriteReq := TRUE; nState := 91;
+        END_IF;
+
+    91:
+        bWriteReq := FALSE;
+        IF fbWrite.bDone THEN
+            nState := 911; // Ngắt một scan bExecute để R_TRIG ghi tiếp nhận cạnh lên.
+        ELSIF fbWrite.bError OR tonStop.Q THEN
+            nLastCommError := fbWrite.nErrorID;
+            bError := TRUE; nState := 99;
+        END_IF;
+
+    911:
+        bM1000_Value := FALSE;
+        eWriteDevice := DEV_M; nWriteAddress := 1000; nWritePoints := 1;
+        bWriteBitMode := TRUE;
+        pWriteData := ADR(bM1000_Value); nWriteDataSize := SIZEOF(bM1000_Value);
+        bWriteReq := TRUE; nState := 92;
+
+    92:
+        bWriteReq := FALSE;
+        IF fbWrite.bDone THEN
+            bStopCommandConfirmed := TRUE;
+            bError := TRUE; nState := 99;
+        ELSIF fbWrite.bError OR tonStop.Q THEN
+            nLastCommError := fbWrite.nErrorID;
+            bError := TRUE; nState := 99;
+        END_IF;
+
+    99: // Fault latched. No automatic restart, manual acknowledgement required.
+        bBusy := FALSE;
+        bWriteReq := FALSE;
+        bReadReq := FALSE;
+        IF bResetFault AND NOT bAbortCycle AND NOT bStartCycle AND stSession.bConnected
+            AND NOT stSession.bBusy AND NOT fbWrite.bBusy AND NOT fbRead.bBusy THEN
+            IF NOT bStopCommandConfirmed THEN
+                nState := 90; // Chưa nhận ACK dừng: bắt buộc thử dừng lại trước khi reset.
+            ELSE
+            bM105_Value := FALSE; // Deliberate operator reset after safe conditions
+            eWriteDevice := DEV_M; nWriteAddress := 105; nWritePoints := 1;
+            bWriteBitMode := TRUE;
+            pWriteData := ADR(bM105_Value); nWriteDataSize := SIZEOF(bM105_Value);
+            bWriteReq := TRUE; nState := 95;
+            END_IF;
+        END_IF;
+
+    95:
+        bWriteReq := FALSE;
+        IF fbWrite.bDone THEN
+            bCmdM105 := FALSE; bCmdM1000 := FALSE;
+            bStopCommandConfirmed := FALSE;
+            bError := FALSE; nErrorCode := 0; nState := 0;
+        ELSIF fbWrite.bError THEN
+            nLastCommError := fbWrite.nErrorID;
+            nState := 99;
+        END_IF;
+END_CASE;
+
+// Exactly one operation at a time; both FBs use ownership-based socket locking.
+fbWrite(
+    stSession := stSession, bExecute := bWriteReq,
+    eDevice := eWriteDevice, nStartAddr := nWriteAddress,
+    nPoints := nWritePoints, bBitAccess := bWriteBitMode,
+    pData := pWriteData, nDataSize := nWriteDataSize,
+    nErrorID => nCommError
+);
+fbRead(
+    stSession := stSession, bExecute := bReadReq,
+    eDevice := eReadDevice, nStartAddr := nReadAddress,
+    nPoints := nReadPoints, bBitAccess := bReadBitMode,
+    pData := pReadData, nDataSize := nReadDataSize,
+    nErrorID => nCommError
+);
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_QD75CommandPublisher">
+      <LineId Id="223" Count="180" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

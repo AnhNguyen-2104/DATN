@@ -1,0 +1,820 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="MAIN" Id="{1dc1cc65-9e37-4e46-ab96-71432f29bc06}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR
+    // ================================================================
+    // 1. KẾT NỐI TCP VỚI CPU MITSUBISHI Q06UDEH (CỔNG 5010)
+    // ================================================================
+    stMelsec            : ST_MelsecSession; // Session TCP dùng chung
+    fbMelsecConfig      : FB_MelsecTcpConfig;
+
+    bTcpEnable          : BOOL := TRUE;     // Tự động kết nối và duy trì kết nối mạng
+    sPlcQ_IP            : STRING(15) := '192.168.3.39'; // IP của PLC-Q
+    nPlcQ_Port          : UDINT := 5010;   // Cổng Port MC Protocol 5010
+
+    bPlcQConnected      : BOOL;             // ĐÈN BÁO: TRUE = Đã thông mạng với PLC-Q
+    bPlcQError          : BOOL;
+    nPlcQErrorID        : UDINT;
+
+    // ================================================================
+    // 2. TEST TRUYỀN THÔNG THỦ CÔNG SANG PLC-Q (KHI bStartGlueCycle = FALSE)
+    // ================================================================
+    bTest_WriteD100     : BOOL := FALSE;    // Click đúp TRUE -> Ghi nTest_D100_Val vào D100-D101
+    nTest_D100_Val      : DINT := 100;      // Số 32-bit gửi thử sang D100
+    bTest_WriteM1000    : BOOL := FALSE;    // Click đúp TRUE -> Ghi bit M1000
+    bTest_M1000_Val     : BOOL := TRUE;     // Giá trị bit M1000 muốn ghi (TRUE=ON, FALSE=OFF)
+    bTest_ReadM1001     : BOOL := FALSE;    // Click đúp TRUE -> Đọc bit M1001 từ PLC-Q
+    bTest_M1001_Result  : BOOL;             // Giá trị M1001 đọc được từ PLC-Q
+
+    // ================================================================
+    // 3. ENCODER BĂNG TẢI: ST-5114 MODULE 12
+    // ================================================================
+    fbConveyor          : FB_ConveyorEncoder;
+
+    nEncoderPulse       : UINT;            // HARDWARE RAW counter, NOT zeroed on TwinCAT boot
+    nEncoderPulseSinceStart : DINT := 0; // VIRTUAL count starting from 0 on PLC boot
+    nEncoderDelta       : INT;             // Xung thay đổi trong 10 ms
+    rConveyorSpeed      : LREAL;           // Vận tốc băng tải lọc mượt, mm/s
+    rConveyorSpeedMPM   : LREAL;           // Vận tốc băng tải, m/phút
+    rConveyorDist       : LREAL;           // Tổng quãng đường băng tải, mm
+
+    // ================================================================
+    // ================================================================
+    // MD200 VFD PREPARATION / VIRTUAL ONLY (NO PHYSICAL I/O MAPPING).
+    // Outputs remain disconnected from Crevis ST-2318 and ST-4424.
+    // ================================================================
+    fbMD200_VFD               : FB_InovanceMD200Conveyor;
+    // Global normal-PLC motion inhibit, NOT an emergency stop safety function.
+    // TRUE only when the auxiliary feedback from hardwired EStop is healthy.
+    bSystemEStopOK             : BOOL := FALSE;
+    bSystemStopRequested       : BOOL := TRUE;
+    // Only 3 operator-visible MD200 signals: EStopOK monitor, START and Hz.
+    // EStopOK is derived from the wired digital feedback, NOT an HMI override.
+    bMD200_EStopOK           : BOOL := FALSE;
+    bMD200_Start             : BOOL := FALSE;
+    rMD200_SetFrequency_Hz    : LREAL := 0.0;
+    // Diagnostics (read-only outputs from the FB)
+    bMD200_DO_RunVirtual      : BOOL;
+    nMD200_AO_RawVirtual      : INT;
+    rMD200_AO_VoltsVirtual    : LREAL;
+    rMD200_Target_Hz          : LREAL;
+    rMD200_Ramped_Hz          : LREAL;
+    bMD200_AtTarget           : BOOL;
+    bMD200_Limited            : BOOL;
+    nMD200_Status             : UINT;
+
+    // ================================================================
+    // 4. EZI-SERVO: TRỤC QUAY ĐƠN VỊ DEGREE
+    // ================================================================
+    Axis1               : AXIS_REF;
+
+    fbServo             : FB_EziServoControl;
+
+    bServo_Enable       : BOOL := FALSE;     // TRUE = Servo ON / giữ cốt
+    bServo_Reset        : BOOL := FALSE;    // TRUE một chu kỳ = Reset Alarm
+    bServo_JogFwd       : BOOL := FALSE;    // TRUE = chạy thuận
+    bServo_JogBwd       : BOOL := FALSE;    // TRUE = chạy nghịch
+
+    rServo_Speed        : LREAL := 100.0;   // Degree/s
+    rServo_Acc          : LREAL := 400.0;   // Degree/s2
+    rServo_Dec          : LREAL := 400.0;   // Degree/s2
+
+    bServo_Ready        : BOOL;             // TRUE = Servo ON
+    rServo_ActPos_Deg   : LREAL;            // Góc thực tế, Degree
+    rServo_ActVel_Deg_s : LREAL;            // Vận tốc thực tế, Degree/s
+
+    // ================================================================
+    // 5. TRACKING 4 ĐIỂM: CAMERA + ENCODER
+    // ================================================================
+    fbTracking4Pt       : FB_ConveyorTracking4Pt;
+
+    bSystemReset        : BOOL := FALSE;    // TRUE một chu kỳ: reset mốc phần mềm về 0
+    // Camera giả lập test
+    bCameraTrigger      : BOOL := FALSE;    // FALSE -> TRUE: chốt sản phẩm mới
+    rCameraCenterX      : LREAL := 0.0;     // Camera input, starts 0 until REAL result
+    rCameraCenterY      : LREAL := 0.0;     // Camera input, starts 0 until REAL result
+    rCameraAngleDeg     : LREAL := 0.0;     // Góc phôi, Degree
+    rProductLength      : LREAL := 40.0;    // mm
+    rProductWidth       : LREAL := 40.0;    // mm
+
+    // Kết quả debug Tracking
+    bProductValid       : BOOL;
+    nPulseAtCamera      : UINT;
+    nPulseTravel        : INT;
+    rPartTravel_mm      : LREAL;
+
+    aCornerBase         : ARRAY[1..4] OF ST_Point2D;
+    aCornerNow          : ARRAY[1..4] OF ST_Point2D;
+
+    // ================================================================
+    // 6. QD75 COMMAND PUBLISHER: ĐIỀU PHỐI 4 ĐỈNH SANG PLC-Q
+    // ================================================================
+    fbPublisher         : FB_QD75CommandPublisher;
+
+    // ================================================================
+    // AUTO DISPATCH: opt-in only, requires an actual camera event.
+    // No motor/robot command can be emitted by this feature by default.
+    // ================================================================
+    bAutoDispatchEnable : BOOL := FALSE;   // Operator enables auto sequence only after commissioning
+    bAutoDispatchArm    : BOOL := FALSE;   // Independent arm interlock
+    fbAutoCameraEdge    : R_TRIG;
+    tonAutoProductTTL   : TON;
+    bAutoPendingProduct : BOOL := FALSE;
+    bAutoStartPulse     : BOOL := FALSE;
+    nAutoDispatchState  : INT := 0;       // 0 idle, 1 queued, 2 speed invalid, 3 TCP busy/offline, 4 motion busy, 5 expired, 6 invalid product, 10 request issued
+    nAutoStartRequests  : UDINT := 0;
+
+    // ================================================================
+    // 6A. ISOLATED DATA-ONLY XY DEBUG (D100-D103 + D114, NO Z/M1000)
+    // Requires physically stopped conveyor and robot; service opt-in.
+    // ================================================================
+    fbDebugXY           : FB_MelsecDebugXY4Pt;
+    bDebugXYPermit      : BOOL := FALSE; // Set TRUE only during maintenance
+    bDebugXYExecute     : BOOL := FALSE; // Pulse FALSE -> TRUE once
+    bDebugXYAbort       : BOOL := FALSE;
+    rDebugCenterX       : LREAL := 50.0;
+    rDebugCenterY       : LREAL := 85.0;
+    rDebugAngleDeg      : LREAL := 0.0;
+    rDebugLength        : LREAL := 40.0;
+    rDebugWidth         : LREAL := 40.0;
+    bDebugXYMachineStopped : BOOL;
+    bDebugXYBusy        : BOOL;
+    bDebugXYDone        : BOOL; // Data ACK only, not robot done
+    bDebugXYError       : BOOL;
+    nDebugXYErrorCode   : INT;
+    nDebugXYCommError   : UDINT;
+    nDebugXYState       : INT;
+    nDebugXYVertex      : INT;
+    nDebugXYPassed      : INT;
+    nDebugXYWriteX      : DINT;
+    nDebugXYWriteY      : DINT;
+    nDebugXYReadX       : DINT;
+    nDebugXYReadY       : DINT;
+    nDebugXYReadVertex  : UINT;
+    bDebugXYReadbackOK  : BOOL;
+    bDebugXYAllBitsLow  : BOOL;
+    bDebugXYRestored    : BOOL;
+
+    // ================================================================
+    // UPSTREAM CAMERA -> ENCODER -> ROBOT XY
+    // Camera provides CENTER X/Y (physical mm) and ANGLE, not corners.
+    // Calibration and real camera transport MUST be proven before enabling.
+    // ================================================================
+    fbUpstreamTrack      : FB_UpstreamCameraTracking4Pt;
+    bUpstreamReset       : BOOL := FALSE;
+    bCameraExposeTrigger : BOOL := FALSE; // Pulse from strobe/trigger at IMAGE exposure
+    fbCameraExposeEdge   : R_TRIG;
+    fbVisionResultEdge   : R_TRIG;
+    tonExposureTTL       : TON;
+    bExposureEncoderLatched : BOOL := FALSE;
+    rEncoderAtExposure_mm   : LREAL := 0.0;
+    bVisionFeedVerified  : BOOL := FALSE; // FALSE until actual camera bridge is installed
+    bVisionCalibrationOK : BOOL := FALSE; // TRUE only after physical frame calibration
+    rCameraToWorkStart_mm : LREAL := 0.0; // USER-EDITABLE POSITIVE DISTANCE (mm); 0 blocks tracking
+    rCamToRobotX_mm      : LREAL := 0.0;  // Fine X offset after measuring camera-to-work distance
+    rCamToRobotY_mm      : LREAL := 0.0;
+    rCamToRobotYaw_deg   : LREAL := 0.0;
+    bUpstreamCaptured    : BOOL;
+    bUpstreamInWorkspace : BOOL;
+    bUpstreamPastRobot   : BOOL;
+    nUpstreamError       : INT;
+    rUpstreamDrift_mm    : LREAL;
+    rUpstreamCenterX     : LREAL;
+    rUpstreamCenterY     : LREAL;
+    rUpstreamNowX        : LREAL;
+    rUpstreamNowY        : LREAL;
+    rToRobotWorkStart_mm : LREAL; // Countdown to X=0, 0 after entering
+    aUpstreamCornerNow   : ARRAY[1..4] OF ST_Point2D;
+
+    // ================================================================
+    // CAMERA FIFO MONITOR (DATA ONLY): independent 8-product queue.
+    // Camera returns CENTER X/Y in mm and ANGLE in degrees, NOT corners.
+    // No robot Publisher connection or M1000 writes in this stage.
+    // ================================================================
+    fbCameraQueue        : FB_CameraProductQueue;
+    bLegacyMotionPublisherAllow : BOOL := FALSE; // explicit safety gate: NO robot in FIFO stage
+    bQueueReset          : BOOL := FALSE;
+    bQueueSimMode        : BOOL := FALSE; // explicit dry-run mode only
+    bQueueSimExposure    : BOOL := FALSE;
+    bQueueSimResult      : BOOL := FALSE;
+    bQueueSimCompleteHead : BOOL := FALSE; // virtual DONE, NOT Mitsubishi ACK
+    nQueueCount          : INT;
+    nQueueHeadProductID  : UDINT;
+    nQueueHeadState      : INT;
+    bQueueHeadValid      : BOOL;
+    bQueueHeadAllInside  : BOOL; // geometric observation only
+    bQueueHeadForecastOK : BOOL; // theoretical estimate, NOT permission to move
+    rQueueHeadTravel_mm  : LREAL;
+    rQueueToWorkStart_mm : LREAL;
+    rQueueHeadX_mm       : LREAL;
+    rQueueHeadY_mm       : LREAL;
+    aQueueHeadCornerNow  : ARRAY[1..4] OF ST_Point2D;
+    nQueueAccepted       : UDINT;
+    nQueueRejected       : UDINT;
+    nQueueMissed         : UDINT;
+    nQueueSimCompleted   : UDINT;
+    bQueueInputFault     : BOOL;
+    nQueueErrorCode      : INT;
+
+    // ================================================================
+    // MANUAL ACK BENCH MODE ONLY: no M1000, Z, QD75 or valve writes.
+    // User reserves/audits a spare PLC bit (proposed M2100), NOT M1001.
+    // ================================================================
+    fbXYManualAck        : FB_XYTrackingManualAck;
+    bXYManualPermit      : BOOL := FALSE;
+    bXYManualExecute     : BOOL := FALSE;
+    bXYManualAbort       : BOOL := FALSE;
+    bXYManualAckBitAudited : BOOL := FALSE;
+    nXYManualAckMAddress : UDINT := 2100;
+    bXYManualSafe        : BOOL;
+    bXYManualBusy        : BOOL;
+    bXYManualDone        : BOOL;
+    bXYManualError       : BOOL;
+    bXYManualRestored    : BOOL;
+    nXYManualErrorCode   : INT;
+    nXYManualCommError   : UDINT;
+    nXYManualState       : INT;
+    nXYManualVertex      : INT;
+    nXYManualAcked       : INT;
+    nXYManualSentX       : DINT;
+    nXYManualSentY       : DINT;
+    nXYManualReadX       : DINT;
+    nXYManualReadY       : DINT;
+    nXYManualReadVertex  : UINT;
+    bXYManualReadbackOK  : BOOL;
+
+    // Lệnh chu trình chấm keo
+    bStartGlueCycle     : BOOL := FALSE;   // FALSE -> TRUE: kích chạy chu trình 4 đỉnh
+    bGlueResetFault     : BOOL := FALSE;    // Operator acknowledges latched fault
+    bEnableManualWrite  : BOOL := FALSE;    // OFF unless supervised maintenance
+    bAbortGlueCycle     : BOOL := FALSE;   // TRUE: dừng khẩn cấp (ghi M105)
+
+    // Trạng thái giám sát chu trình
+    bGlueCycleBusy      : BOOL;            // Đang chạy 4 đỉnh
+    bGlueCycleDone      : BOOL;            // Hoàn tất cả 4 đỉnh
+    bGlueCycleError     : BOOL;            // Báo lỗi
+    bStopCommandConfirmed : BOOL;          // PLC đã xác nhận 2 lệnh dừng qua TCP
+    nGlueCurVertex      : INT;             // Đỉnh đang thực hiện (1..4)
+    nGlueCommErrorID    : UDINT;           // raw error from MC socket or Mitsubishi
+    nGlueErrorCode      : INT;             // Mã lỗi (501..503, 900..921)
+
+    // ================================================================
+    // 7. MC 3E TCP WORD/BIT ECHO VERIFY (OFF by default)
+    //    Explicit permission required. Never use motion/handshake addresses.
+    // ================================================================
+    fbEchoWord          : FB_MelsecEchoVerify;
+    fbEchoBit           : FB_MelsecEchoVerify;
+    bEchoPermit         : BOOL := FALSE;    // Maintenance only
+    bEchoMachineSafe    : BOOL := FALSE;    // Operator confirmed gantry safe
+    bEchoAddressChecked : BOOL := FALSE;    // Both addresses audited in PLC/HMI
+    bEchoRequestWord    : BOOL := FALSE;    // One-shot rising edge
+    bEchoRequestBit     : BOOL := FALSE;    // One-shot rising edge
+    nEchoDAddress       : UDINT := 0;       // Must be an approved unused D>=3000
+    nEchoMAddress       : UDINT := 0;       // Must be an approved unused M>=2000
+    wEchoTestValue      : WORD := 16#A55A;
+    bEchoTestValue      : BOOL := TRUE;
+    bEchoWordDone       : BOOL;
+    bEchoWordBusy       : BOOL;
+    bEchoWordError      : BOOL;
+    bEchoWordMatch      : BOOL;
+    bEchoWordRestored   : BOOL;
+    bEchoWordRestoreUncertain : BOOL;
+    nEchoWordErrorID    : UDINT;
+    wEchoWordBefore     : WORD;
+    wEchoWordAfter      : WORD;
+    bEchoBitDone        : BOOL;
+    bEchoBitBusy        : BOOL;
+    bEchoBitError       : BOOL;
+    bEchoBitMatch       : BOOL;
+    bEchoBitRestored    : BOOL;
+    bEchoBitRestoreUncertain : BOOL;
+    nEchoBitErrorID     : UDINT;
+    bEchoBitBefore      : BOOL;
+    bEchoBitAfter       : BOOL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// ================================================================
+// 1. TCP CONFIG: Kết nối / tự reconnect đến PLC-Q
+// ================================================================
+fbMelsecConfig(
+    bEnable     := bTcpEnable,
+    sRemoteHost := sPlcQ_IP,
+    nRemotePort := nPlcQ_Port,
+    stSession   := stMelsec
+);
+
+// Biến trạng thái đưa ra ngoài để Online debug dễ
+bPlcQConnected := stMelsec.bConnected;
+bPlcQError     := stMelsec.bError;
+nPlcQErrorID   := stMelsec.nErrorID;
+
+// ================================================================
+// SYSTEM-WIDE NORMAL PLC INTERLOCK FROM ONE PHYSICAL E-STOP FEEDBACK.
+// NOT SAFETY RATED. Hardware chain must remove hazardous motion in both
+// MD200 and Mitsubishi QD75 independently of TwinCAT and Ethernet.
+// HMI/ADS must NOT force this input. Keep network alive for best-effort
+// Q-PLC cancel. Clear old command bits to prevent unintended restart.
+// ================================================================
+bSystemEStopOK := GVL_MD200_IO.bEStopFeedback;
+bSystemStopRequested := NOT bSystemEStopOK;
+IF bSystemStopRequested THEN
+    bMD200_Start := FALSE;
+    bServo_Enable := FALSE;
+    bServo_JogFwd := FALSE;
+    bServo_JogBwd := FALSE;
+    bServo_Reset := FALSE;
+    bStartGlueCycle := FALSE;
+    bAutoDispatchEnable := FALSE;
+    bAutoDispatchArm := FALSE;
+    bAutoPendingProduct := FALSE;
+    bAutoStartPulse := FALSE;
+    bLegacyMotionPublisherAllow := FALSE;
+    bEnableManualWrite := FALSE;
+    bTest_WriteM1000 := FALSE;
+    bTest_WriteD100 := FALSE;
+    bDebugXYPermit := FALSE;
+    bDebugXYExecute := FALSE;
+    bXYManualPermit := FALSE;
+    bXYManualExecute := FALSE;
+    bEchoPermit := FALSE;
+    bEchoRequestWord := FALSE;
+    bEchoRequestBit := FALSE;
+    bQueueSimMode := FALSE;
+END_IF;
+
+
+// ================================================================
+// 2. ENCODER BĂNG TẢI: ST-5114 INPUT BYTE 0 + BYTE 1
+// ================================================================
+fbConveyor(
+    bByte0          := GVL.aIn[0],
+    bByte1          := GVL.aIn[1],
+    rK_mm           := 0.476475,
+    rCycleTime      := 0.01,
+
+    nRawPulse       => nEncoderPulse,
+    nDeltaPulse     => nEncoderDelta,
+    rSpeed_mm_s     => rConveyorSpeed,
+    rSpeed_m_min    => rConveyorSpeedMPM,
+    rTotalDist_mm   => rConveyorDist
+);
+
+// The display count starts at 0 on PLC boot, unlike nEncoderPulse,
+// which is the actual hardware ST-5114 counter and may be non-zero.
+// DINT is used to avoid modulo-65536 wrap in this visual counter.
+nEncoderPulseSinceStart := nEncoderPulseSinceStart + INT_TO_DINT(nEncoderDelta);
+
+// ================================================================
+// ================================================================
+// MD200 SIMPLE: EStop feedback, START request, 0..25Hz only.
+// Actual emergency stop MUST act independently through the hardwired
+// safety circuit. Software feedback is a monitor, not a safety device.
+// ================================================================
+bMD200_EStopOK := bSystemEStopOK;
+fbMD200_VFD(
+    bEStopOK            := bMD200_EStopOK,
+    bStart              := bMD200_Start,
+    rFrequencySet_Hz    := rMD200_SetFrequency_Hz,
+    bDO_RunForward      => bMD200_DO_RunVirtual,
+    nAO_12bitRaw        => nMD200_AO_RawVirtual,
+    rAO_Volts           => rMD200_AO_VoltsVirtual,
+    rTarget_Hz          => rMD200_Target_Hz,
+    rRamped_Hz          => rMD200_Ramped_Hz,
+    bAtTarget           => bMD200_AtTarget,
+    bLimited25Hz        => bMD200_Limited,
+    nStatus             => nMD200_Status
+);
+
+// Only ONE producer writes process-image outputs; no direct ADS test signal.
+// FB implements 25Hz clamp and all software/verified interlock checks.
+// In this isolated stage the outputs are AT %Q* process tags, still
+// NOT linked to physical Crevis channels until I/O link verification.
+IF (nMD200_AO_RawVirtual >= 0) AND (nMD200_AO_RawVirtual <= 4095) THEN
+    GVL_MD200_IO.nAO1_Raw := INT_TO_UINT(nMD200_AO_RawVirtual);
+ELSE
+    GVL_MD200_IO.nAO1_Raw := 0;
+END_IF;
+GVL_MD200_IO.bRUN_DO := bMD200_DO_RunVirtual;
+
+// ================================================================
+// 3. EZI-SERVO: ENABLE, RESET, JOG VÀ GIÁM SÁT
+// ================================================================
+fbServo(
+    Axis            := Axis1,
+    bEnable         := bServo_Enable AND bSystemEStopOK,
+    bResetFault     := bServo_Reset AND bSystemEStopOK,
+    bJogFwd         := bServo_JogFwd AND bSystemEStopOK,
+    bJogBwd         := bServo_JogBwd AND bSystemEStopOK,
+    rTargetVelocity := rServo_Speed,
+    rAcc            := rServo_Acc,
+    rDec            := rServo_Dec,
+
+    bReady          => bServo_Ready,
+    rActPos_Deg     => rServo_ActPos_Deg,
+    rActVel_Deg     => rServo_ActVel_Deg_s
+);
+
+IF bServo_Reset THEN
+    bServo_Reset := FALSE;
+END_IF;
+
+
+// ================================================================
+// 4. TRACKING 4 ĐIỂM: CAMERA + ENCODER
+// ================================================================
+fbTracking4Pt(
+    bResetSystem   := bSystemReset OR bSystemStopRequested,
+    bCameraResult  := FALSE, // legacy tracker intentionally disconnected from Camera
+    bAcceptCamera  := FALSE, // all live products must use FIFO, not legacy single item
+    rCenterX_mm    := rCameraCenterX,
+    rCenterY_mm    := rCameraCenterY,
+    rAngleDeg      := rCameraAngleDeg,
+    rLength_mm     := rProductLength,
+    rWidth_mm      := rProductWidth,
+
+    nEncoderNow    := nEncoderPulse,
+    rMmPerPulse    := 0.476475,
+    rXMaxLimit_mm  := 180.0,
+
+    bProductValid  => bProductValid,
+    nPulseAtCamera => nPulseAtCamera,
+    nPulseTravel   => nPulseTravel,
+    rTravel_mm     => rPartTravel_mm,
+    aCornerBase    => aCornerBase,
+    aCornerNow     => aCornerNow
+);
+
+IF bSystemReset THEN
+    bSystemReset := FALSE;
+END_IF;
+
+// ================================================================
+// 4A. CAMERA -> AUTO DISPATCH (explicitly DISABLED until commissioned)
+// The camera event queues one product. No command is sent merely
+// because bProductValid remains TRUE from a previous snapshot.
+// ================================================================
+fbAutoCameraEdge(CLK := bCameraTrigger);
+bAutoStartPulse := FALSE;
+
+// A pending camera event has a bounded lifetime (no stale product commands).
+tonAutoProductTTL(IN := bAutoPendingProduct, PT := T#750MS);
+
+IF bSystemStopRequested OR NOT bAutoDispatchEnable OR NOT bAutoDispatchArm OR bAbortGlueCycle
+   OR bGlueResetFault OR bGlueCycleError OR bEchoPermit OR bDebugXYPermit OR bXYManualPermit THEN
+    bAutoPendingProduct := FALSE;
+    nAutoDispatchState := 0;
+ELSIF fbAutoCameraEdge.Q AND bProductValid AND NOT bGlueCycleBusy THEN
+    bAutoPendingProduct := TRUE;
+    nAutoDispatchState := 1;
+END_IF;
+
+IF bAutoPendingProduct THEN
+    IF tonAutoProductTTL.Q THEN
+        bAutoPendingProduct := FALSE;
+        nAutoDispatchState := 5; // Stale camera event discarded
+    ELSIF NOT bProductValid THEN
+        bAutoPendingProduct := FALSE;
+        nAutoDispatchState := 6;
+    ELSIF (rConveyorSpeed <= 0.0) OR (rConveyorSpeed > 1000.0) THEN
+        nAutoDispatchState := 2; // Invalid conveyor speed; do not write 0 speed to QD75
+    ELSIF NOT bPlcQConnected OR stMelsec.bBusy THEN
+        nAutoDispatchState := 3;
+    ELSIF bGlueCycleBusy OR bStartGlueCycle OR bEnableManualWrite
+        OR bEchoWordBusy OR bEchoBitBusy THEN
+        nAutoDispatchState := 4;
+    ELSE
+        bAutoStartPulse := TRUE; // Exactly one scan; Publisher performs PLC preflight
+        bAutoPendingProduct := FALSE;
+        nAutoStartRequests := nAutoStartRequests + 1;
+        nAutoDispatchState := 10;
+    END_IF;
+END_IF;
+
+
+// ================================================================
+// 5. QD75 COMMAND PUBLISHER: ĐIỀU PHỐI 4 ĐỈNH & TEST THỦ CÔNG
+// ================================================================
+fbPublisher(
+    stSession           := stMelsec,
+    bStartCycle         := (bStartGlueCycle OR bAutoStartPulse) AND bSystemEStopOK AND bLegacyMotionPublisherAllow AND NOT bQueueSimMode AND NOT bEchoPermit AND NOT bEchoWordBusy AND NOT bEchoBitBusy AND NOT bDebugXYPermit AND NOT bDebugXYBusy AND NOT bXYManualPermit AND NOT bXYManualBusy,
+    // Best-effort TCP cancellation only; cannot replace independent QD75
+    // hardwired EStop. Avoid sending M105 when publisher is idle.
+    bAbortCycle         := bAbortGlueCycle OR
+                           (bSystemStopRequested AND
+                             (bGlueCycleBusy OR (fbPublisher.nState = 70)
+                              OR (fbPublisher.nState = 95))),
+    bProductValid       := bProductValid,
+    rEncoderDist_mm     := rConveyorDist,
+    bResetFault         := bGlueResetFault AND bSystemEStopOK,
+    bEnableManualWrite  := bEnableManualWrite AND bSystemEStopOK AND NOT bDebugXYPermit AND NOT bXYManualPermit,
+
+    // Tọa độ 4 góc thời gian thực từ khối Tracking
+    aCornerNow          := aCornerNow,
+    rConveyorSpeed_mm_s := rConveyorSpeed,
+
+    // Động học
+    rFlyTime_s          := 0.120,
+    rApproachSpeed_mm_s := 500.0,
+    rSyncTime_s         := 0.060,
+    rZDown_mm           := 4.0,
+    rZSafe_mm           := 0.0,
+
+    // Chế độ test thủ công (chỉ có tác dụng khi bStartGlueCycle = FALSE)
+    bManualWriteD100    := bTest_WriteD100 AND bSystemEStopOK AND bLegacyMotionPublisherAllow AND NOT bQueueSimMode AND NOT bDebugXYPermit AND NOT bXYManualPermit,
+    nD100_ManualVal     := nTest_D100_Val,
+    bManualWriteM1000   := bTest_WriteM1000 AND bSystemEStopOK AND bLegacyMotionPublisherAllow AND NOT bQueueSimMode AND NOT bDebugXYPermit AND NOT bXYManualPermit,
+    bM1000_ManualVal    := bTest_M1000_Val,
+    bManualReadM1001    := bTest_ReadM1001 AND bSystemEStopOK AND NOT bDebugXYPermit AND NOT bXYManualPermit,
+
+    // Giám sát
+    bBusy               => bGlueCycleBusy,
+    bDone               => bGlueCycleDone,
+    bError              => bGlueCycleError,
+    nErrorCode          => nGlueErrorCode,
+    nLastCommError      => nGlueCommErrorID,
+    nCurrentVertex      => nGlueCurVertex,
+    bM1001_ReadBack     => bTest_M1001_Result,
+    bStopCommandConfirmed => bStopCommandConfirmed
+);
+
+// Tự động nhả cờ kích test sau khi lệnh được nhận
+IF bTest_WriteD100 AND NOT fbPublisher.bManualWriteD100 THEN
+    bTest_WriteD100 := FALSE;
+END_IF;
+
+IF bTest_WriteM1000 AND NOT fbPublisher.bManualWriteM1000 THEN
+    bTest_WriteM1000 := FALSE;
+END_IF;
+
+IF bTest_ReadM1001 AND NOT fbPublisher.bManualReadM1001 THEN
+    bTest_ReadM1001 := FALSE;
+END_IF;
+
+// ================================================================
+// 6. OPTIONAL WRITE -> READ SAME ADDRESS -> RESTORE -> VERIFY.
+//    Never activated automatically. Does not touch motion D100/M1000.
+//    Only one echo request at a time; uses shared stSession mutex.
+// ================================================================
+fbEchoWord(
+    stSession := stMelsec,
+    bExecute := bEchoRequestWord AND bSystemEStopOK AND NOT bEchoRequestBit,
+    bEnable := bEchoPermit AND bSystemEStopOK AND NOT bGlueCycleBusy AND NOT bStartGlueCycle
+               AND NOT bEnableManualWrite AND NOT bEchoBitBusy AND NOT bDebugXYPermit AND NOT bXYManualPermit,
+    bAddressVerifiedUnused := bEchoAddressChecked,
+    bMachineSafe := bEchoMachineSafe,
+    bBitDevice := FALSE,
+    nAddress := nEchoDAddress,
+    wTestValue := wEchoTestValue,
+    bBusy => bEchoWordBusy,
+    bDone => bEchoWordDone,
+    bError => bEchoWordError,
+    bMatch => bEchoWordMatch,
+    bRestored => bEchoWordRestored,
+    bRestoreUncertain => bEchoWordRestoreUncertain,
+    nErrorID => nEchoWordErrorID,
+    wOriginal => wEchoWordBefore,
+    wReadBack => wEchoWordAfter
+);
+
+fbEchoBit(
+    stSession := stMelsec,
+    bExecute := bEchoRequestBit AND bSystemEStopOK AND NOT bEchoRequestWord,
+    bEnable := bEchoPermit AND bSystemEStopOK AND NOT bGlueCycleBusy AND NOT bStartGlueCycle
+               AND NOT bEnableManualWrite AND NOT bEchoWordBusy AND NOT bDebugXYPermit AND NOT bXYManualPermit,
+    bAddressVerifiedUnused := bEchoAddressChecked,
+    bMachineSafe := bEchoMachineSafe,
+    bBitDevice := TRUE,
+    nAddress := nEchoMAddress,
+    bTestValue := bEchoTestValue,
+    bBusy => bEchoBitBusy,
+    bDone => bEchoBitDone,
+    bError => bEchoBitError,
+    bMatch => bEchoBitMatch,
+    bRestored => bEchoBitRestored,
+    bRestoreUncertain => bEchoBitRestoreUncertain,
+    nErrorID => nEchoBitErrorID,
+    bOriginal => bEchoBitBefore,
+    bReadBack => bEchoBitAfter
+);
+
+// ================================================================
+// 7. DATA-ONLY DIAGNOSTIC: REAL TwinCAT -> MC TCP -> Mitsubishi.
+// Operator must stop servo/conveyor, and provide two rising-edge
+// flags (Permit=TRUE, Execute pulse). No Z, speed, M1000 or Y writes.
+// ================================================================
+bDebugXYMachineStopped :=
+    NOT bServo_JogFwd AND NOT bServo_JogBwd
+    AND (ABS(rServo_ActVel_Deg_s) < 0.2)
+    AND (ABS(rConveyorSpeed) < 0.5)
+    AND NOT bGlueCycleBusy AND NOT bStartGlueCycle
+    AND NOT bAbortGlueCycle AND NOT bGlueCycleError;
+
+fbDebugXY(
+    stSession := stMelsec,
+    bExecute := bDebugXYExecute AND bSystemEStopOK,
+    bPermit := bDebugXYPermit AND bSystemEStopOK AND NOT bXYManualPermit AND NOT bEchoPermit
+               AND NOT bEnableManualWrite AND NOT bAutoDispatchEnable
+               AND NOT bAutoDispatchArm,
+    bMachineStopped := bDebugXYMachineStopped,
+    bPublisherIdle := (fbPublisher.nState = 0)
+                      AND NOT bEchoWordBusy AND NOT bEchoBitBusy
+                      AND NOT bTest_WriteM1000 AND NOT bTest_WriteD100,
+    bAbort := bDebugXYAbort OR bSystemStopRequested,
+    rCenterX_mm := rDebugCenterX,
+    rCenterY_mm := rDebugCenterY,
+    rAngleDeg := rDebugAngleDeg,
+    rLength_mm := rDebugLength,
+    rWidth_mm := rDebugWidth,
+    tHold := T#10S,
+    bBusy => bDebugXYBusy,
+    bDone => bDebugXYDone,
+    bError => bDebugXYError,
+    nErrorCode => nDebugXYErrorCode,
+    nCommErrorID => nDebugXYCommError,
+    nState => nDebugXYState,
+    nCurrentVertex => nDebugXYVertex,
+    nPassedVertices => nDebugXYPassed,
+    nWriteX => nDebugXYWriteX,
+    nWriteY => nDebugXYWriteY,
+    nReadX => nDebugXYReadX,
+    nReadY => nDebugXYReadY,
+    nReadVertex => nDebugXYReadVertex,
+    bLastReadbackOK => bDebugXYReadbackOK,
+    bAllMotionBitsLow => bDebugXYAllBitsLow,
+    bOriginalRestored => bDebugXYRestored
+);
+
+// ================================================================
+// 8. TRACK CAMERA CENTER+ANGLE (mm) FROM UPSTREAM STATION.
+// Image exposure precedes Camera processing result. Encoder must be
+// latched at exposure event, not at the delayed result arrival.
+// ================================================================
+fbCameraExposeEdge(CLK := bCameraExposeTrigger);
+IF fbCameraExposeEdge.Q AND bVisionFeedVerified THEN
+    rEncoderAtExposure_mm := rConveyorDist;
+    bExposureEncoderLatched := TRUE;
+END_IF;
+tonExposureTTL(IN := bExposureEncoderLatched, PT := T#5S);
+IF tonExposureTTL.Q THEN
+    bExposureEncoderLatched := FALSE; // Reject stale camera processing events
+END_IF;
+fbVisionResultEdge(CLK := bCameraTrigger AND bVisionFeedVerified);
+
+fbUpstreamTrack(
+    bReset := bUpstreamReset OR bSystemStopRequested,
+    bCameraResult := bCameraTrigger AND bVisionFeedVerified AND bSystemEStopOK,
+    bAcceptCamera := bSystemEStopOK AND NOT bXYManualBusy AND NOT bGlueCycleBusy AND NOT bDebugXYBusy,
+    bCalibrationConfirmed := bVisionCalibrationOK AND bVisionFeedVerified,
+    bExposureEncoderValid := bExposureEncoderLatched,
+    rEncoderAtExposure_mm := rEncoderAtExposure_mm,
+    rCameraCenterX_mm := rCameraCenterX,
+    rCameraCenterY_mm := rCameraCenterY,
+    rCameraAngleDeg := rCameraAngleDeg,
+    rCameraToWorkStart_mm := rCameraToWorkStart_mm,
+    rCameraToRobotX_mm := rCamToRobotX_mm,
+    rCameraToRobotY_mm := rCamToRobotY_mm,
+    rCameraToRobotYawDeg := rCamToRobotYaw_deg,
+    rEncoderTotalDist_mm := rConveyorDist,
+    rLength_mm := rProductLength,
+    rWidth_mm := rProductWidth,
+    rRobotXMin_mm := 0.0,
+    rRobotXMax_mm := 180.0,
+    rRobotYMin_mm := 0.0,
+    rRobotYMax_mm := 170.0,
+    bCaptured => bUpstreamCaptured,
+    bInRobotWorkspace => bUpstreamInWorkspace,
+    bAllCornersPastRobot => bUpstreamPastRobot,
+    nErrorCode => nUpstreamError,
+    rEncoderTravel_mm => rUpstreamDrift_mm,
+    rCenterAtCaptureX_mm => rUpstreamCenterX,
+    rCenterAtCaptureY_mm => rUpstreamCenterY,
+    rCenterNowX_mm => rUpstreamNowX,
+    rCenterNowY_mm => rUpstreamNowY,
+    rToRobotWorkStart_mm => rToRobotWorkStart_mm,
+    aCornerNow => aUpstreamCornerNow
+);
+IF fbVisionResultEdge.Q THEN
+    bExposureEncoderLatched := FALSE;
+END_IF;
+IF bUpstreamReset THEN
+    bUpstreamReset := FALSE;
+END_IF;
+
+// ================================================================
+// 8A. CAMERA PRODUCT FIFO — data only, no gantry motion commands.
+// Real camera must provide CenterX/Y in millimeters, Angle in degrees.
+// One unmatched exposure max (until camera provides explicit FrameID).
+// Simulation requires bQueueSimMode and is isolated from QD75 Publisher.
+// ================================================================
+fbCameraQueue(
+    bReset := bQueueReset OR bSystemStopRequested,
+    bLiveExposure := bCameraExposeTrigger AND bSystemEStopOK,
+    bLiveResult := bCameraTrigger AND bSystemEStopOK,
+    bLiveBridgeVerified := bVisionFeedVerified,
+    bCalibrationConfirmed := bVisionCalibrationOK,
+    bSimMode := bQueueSimMode AND bSystemEStopOK AND NOT bLegacyMotionPublisherAllow
+                AND NOT bXYManualPermit AND NOT bDebugXYPermit
+                AND NOT bAutoDispatchEnable AND NOT bStartGlueCycle,
+    bSimExposure := bQueueSimExposure AND bSystemEStopOK,
+    bSimResult := bQueueSimResult AND bSystemEStopOK,
+    bSimCompleteHead := bQueueSimCompleteHead AND bSystemEStopOK,
+    rCenterX_mm := rCameraCenterX,
+    rCenterY_mm := rCameraCenterY,
+    rAngle_deg := rCameraAngleDeg,
+    rCameraToWorkStart_mm := rCameraToWorkStart_mm,
+    rCameraFineOffsetX_mm := rCamToRobotX_mm,
+    rCameraOffsetY_mm := rCamToRobotY_mm,
+    rCameraYaw_deg := rCamToRobotYaw_deg,
+    rLength_mm := rProductLength,
+    rWidth_mm := rProductWidth,
+    rEncoderTotalDist_mm := rConveyorDist,
+    rConveyorSpeed_mm_s := rConveyorSpeed,
+    rXMin_mm := 0.0,
+    rXMax_mm := 180.0,
+    rYMin_mm := 0.0,
+    rYMax_mm := 170.0,
+    rMinCycleBudget_s := 1.2,
+    rFlyTime_s := 0.12,
+    rSyncTime_s := 0.06,
+    nQueueCount => nQueueCount,
+    nHeadProductID => nQueueHeadProductID,
+    nHeadState => nQueueHeadState,
+    bHeadValid => bQueueHeadValid,
+    bHeadAllInside => bQueueHeadAllInside,
+    bHeadForecastOK => bQueueHeadForecastOK,
+    rHeadTravel_mm => rQueueHeadTravel_mm,
+    rHeadToWorkStart_mm => rQueueToWorkStart_mm,
+    rHeadCenterX_mm => rQueueHeadX_mm,
+    rHeadCenterY_mm => rQueueHeadY_mm,
+    aHeadCornerNow => aQueueHeadCornerNow,
+    nAccepted => nQueueAccepted,
+    nRejected => nQueueRejected,
+    nMissed => nQueueMissed,
+    nSimCompleted => nQueueSimCompleted,
+    bInputFault => bQueueInputFault,
+    nErrorCode => nQueueErrorCode
+);
+
+IF bQueueReset THEN
+    bQueueReset := FALSE;
+END_IF;
+
+// ================================================================
+// 9. DATA-ONLY PLC PUBLISH, wait for MANUAL ACK from audited spare M.
+// Absolutely no robot Start/Move or M1001 spoofing from TwinCAT.
+// ================================================================
+bXYManualSafe := bSystemEStopOK AND NOT bDebugXYPermit
+    AND NOT bGlueCycleBusy AND NOT bStartGlueCycle
+    AND NOT bAbortGlueCycle AND NOT bGlueCycleError
+    AND NOT bEnableManualWrite AND NOT bEchoPermit
+    AND NOT bEchoWordBusy AND NOT bEchoBitBusy
+    AND NOT bAutoDispatchEnable AND NOT bAutoDispatchArm
+    AND NOT bTest_WriteM1000 AND NOT bTest_WriteD100
+    AND (fbPublisher.nState = 0)
+    AND bPlcQConnected;
+
+fbXYManualAck(
+    stSession := stMelsec,
+    bExecute := bXYManualExecute AND bSystemEStopOK,
+    bPermit := bXYManualPermit AND bSystemEStopOK AND bVisionFeedVerified
+               AND bVisionCalibrationOK AND bXYManualSafe,
+    bAckBitAudited := bXYManualAckBitAudited,
+    nAckAddress := nXYManualAckMAddress,
+    bSafeToWriteXY := bXYManualSafe,
+    bProductCaptured := bUpstreamCaptured,
+    aCornerNow := aUpstreamCornerNow,
+    rConveyorSpeed := rConveyorSpeed,
+    rFlyTime_s := 0.12,
+    rXMax_mm := 180.0,
+    rYMax_mm := 170.0,
+    bAbort := bXYManualAbort OR bSystemStopRequested,
+    bBusy => bXYManualBusy,
+    bDone => bXYManualDone,
+    bError => bXYManualError,
+    nErrorCode => nXYManualErrorCode,
+    nCommError => nXYManualCommError,
+    nState => nXYManualState,
+    nVertex => nXYManualVertex,
+    nAckedVertices => nXYManualAcked,
+    nSentX => nXYManualSentX,
+    nSentY => nXYManualSentY,
+    nReadX => nXYManualReadX,
+    nReadY => nXYManualReadY,
+    nReadVertex => nXYManualReadVertex,
+    bReadbackOK => bXYManualReadbackOK,
+    bRestored => bXYManualRestored
+);
+]]></ST>
+    </Implementation>
+    <LineIds Name="MAIN">
+      <LineId Id="2227" Count="66" />
+      <LineId Id="1352" Count="0" />
+      <LineId Id="2316" Count="21" />
+      <LineId Id="2315" Count="0" />
+      <LineId Id="2361" Count="20" />
+      <LineId Id="2360" Count="0" />
+      <LineId Id="2493" Count="26" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

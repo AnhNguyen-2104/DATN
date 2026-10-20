@@ -1,0 +1,52 @@
+{
+  "GXWorks2\\Candidates\\Test2_D_DATN.gxw": {
+    "source": "D:\\DATN\\Test2.gxw",
+    "size": 2476032,
+    "sha256": "11cf8c99e1915919ecaf995a2457dd300030b299728a96c1287b490c22a29b1b"
+  },
+  "GXWorks2\\Candidates\\Test2_FROM_SESSION_20261017.gxw": {
+    "source": "D:\\DATN\\AI_Debug_20261017\\Test2_FROM_SESSION.gxw",
+    "size": 2490880,
+    "sha256": "803f8f96dfbc9d52b0caeb730229eca3eb0ec37667723d9fc9d80425884e5d99"
+  },
+  "GXWorks2\\Backups\\Test2_ORIGINAL_20261017.gxw": {
+    "source": "D:\\DATN\\AI_Debug_20261017\\Test2_ORIGINAL_20261017.gxw",
+    "size": 2476032,
+    "sha256": "11cf8c99e1915919ecaf995a2457dd300030b299728a96c1287b490c22a29b1b"
+  },
+  "GXWorks2\\References\\Control-Robot_Gantry_20260702.gxw": {
+    "source": "D:\\Test_PLC_Q\\Control-Robot -Gantry.gxw",
+    "size": 2857984,
+    "sha256": "17f381d34dcebda593eac179c0861db560e78edaf5e6cd84d69ea6f528f6b36d"
+  },
+  "Source\\PLC_Q_Session2_Logic.st": {
+    "source": "D:\\VC\\PLC_Q_Session2_Logic.st",
+    "size": 11036,
+    "sha256": "81a7d9435fd63b68b2a6b2f1e951590f5586bfb7cbc52d574f5d3f93ec9c8010"
+  },
+  "Source\\PLC_Q_Session2_Ladder.csv": {
+    "source": "D:\\VC\\PLC_Q_Session2_Ladder.csv",
+    "size": 6966,
+    "sha256": "45663ca16d214f447368e63c61403611df0a30863074c7a4fa36c62124c688c7"
+  },
+  "Docs\\Session2_Contract_For_Session1.md": {
+    "source": "D:\\VC\\Session2_Contract_For_Session1.md",
+    "size": 9058,
+    "sha256": "646cc95ccc1e25aac9f369a9d913c297bd1837b811cdf8bf54b37adb61eb7df6"
+  },
+  "Docs\\Glue_Tracking_System_Specs.md": {
+    "source": "D:\\VC\\Glue_Tracking_System_Specs.md",
+    "size": 19523,
+    "sha256": "f34c30337aeeccadd1bf593682e5532c4038dae48ce730272356ab8bc95dd8ef"
+  },
+  "Docs\\Session2_Mitsubishi_Q_Guide.md": {
+    "source": "D:\\VC\\Session2_Mitsubishi_Q_Guide.md",
+    "size": 26816,
+    "sha256": "64fa22b4f0de0ba29999bfa5c8e8452941d604dced6523bf176047167273df66"
+  },
+  "Docs\\Session2_BenchTest_Without_TwinCAT.md": {
+    "source": "D:\\VC\\Session2_BenchTest_Without_TwinCAT.md",
+    "size": 9740,
+    "sha256": "802dcccd92099859ddf3045c2abd632e699b02e26d897eb7f3a12f39e5174864"
+  }
+}

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_ConveyorEncoder" Id="{440bead7-93b3-4398-9eef-b53f7eb81492}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ConveyorEncoder
+VAR_INPUT
+    bByte0          : BYTE;             // GVL.aIn[0]
+    bByte1          : BYTE;             // GVL.aIn[1]
+    rK_mm           : LREAL := 0.476475;// mm / xung (D=54.6mm, 360 xung)
+    rCycleTime      : LREAL := 0.01;    // 10ms
+END_VAR
+VAR_OUTPUT
+    nRawPulse       : UINT;             // Xung tức thời
+    nDeltaPulse     : INT;              // Lệch xung mỗi 10ms
+    rSpeed_mm_s     : LREAL;            // VẬN TỐC LỌC MƯỢT (mm/s)
+    rSpeed_m_min    : LREAL;            // Vận tốc hiển thị (m/phút)
+    rTotalDist_mm   : LREAL;            // TỔNG QUÃNG ĐƯỜNG (mm)
+END_VAR
+VAR
+    nPrev           : UINT;
+    bInit           : BOOL := TRUE;
+    // 10 scan * 10ms = 100ms (theo interface contract)
+    aDeltaBuf       : ARRAY[0..9] OF INT;
+    nBufIdx         : INT := 0;
+    nSumDelta       : DINT; // DINT để tránh tràn khi cộng nhiều xung
+    nDelta32        : DINT;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// 1. Ghép 2 byte thành số xung 16-bit
+nRawPulse := BYTE_TO_UINT(bByte1) * 256 + BYTE_TO_UINT(bByte0);
+
+IF bInit THEN
+    nPrev := nRawPulse;
+    bInit := FALSE;
+END_IF;
+
+// Sai phân modulo 16-bit: encoder đếm 65535 -> 0 vẫn là +1 xung.
+nDelta32 := UINT_TO_DINT(nRawPulse) - UINT_TO_DINT(nPrev);
+IF nDelta32 > 32767 THEN
+    nDelta32 := nDelta32 - 65536;
+ELSIF nDelta32 < -32768 THEN
+    nDelta32 := nDelta32 + 65536;
+END_IF;
+nDeltaPulse := DINT_TO_INT(nDelta32);
+nPrev := nRawPulse;
+
+// Rolling sum O(1), không quét cả bộ đệm trên mỗi scan.
+nSumDelta := nSumDelta - INT_TO_DINT(aDeltaBuf[nBufIdx]) + nDelta32;
+aDeltaBuf[nBufIdx] := nDeltaPulse;
+nBufIdx := (nBufIdx + 1) MOD 10;
+
+// Không làm tròn tốc độ sử dụng để tính tọa độ đón đầu.
+IF rCycleTime > 0.0 THEN
+    rSpeed_mm_s := DINT_TO_LREAL(nSumDelta) * rK_mm / (10.0 * rCycleTime);
+ELSE
+    rSpeed_mm_s := 0.0;
+END_IF;
+rSpeed_m_min := rSpeed_mm_s * 0.060;
+
+rTotalDist_mm := rTotalDist_mm + DINT_TO_LREAL(nDelta32) * rK_mm;]]></ST>
+    </Implementation>
+    <LineIds Name="FB_ConveyorEncoder">
+      <LineId Id="343" Count="38" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

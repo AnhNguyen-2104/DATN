@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="E_MelsecDevice" Id="{9f853dc8-7da7-4a25-b16a-bbb7b1387f9e}">
+    <Declaration><![CDATA[// Mã định danh vùng nhớ phần cứng Mitsubishi theo chuẩn MC Protocol Binary 3E Frame
+TYPE E_MelsecDevice :
+(
+    DEV_D   := 16#A8, // Thanh ghi dữ liệu D (Data Register) - Word
+    DEV_M   := 16#90, // Rơ-le nội bộ M (Internal Relay) - Bit / Word
+    DEV_W   := 16#B4, // Thanh ghi liên kết W (Link Register) - Word
+    DEV_R   := 16#AF, // Thanh ghi tệp R (File Register) - Word
+    DEV_ZR  := 16#B0, // Thanh ghi tệp liên tục ZR (File Register Consecutive) - Word
+    DEV_X   := 16#9C, // Ngõ vào vật lý X (Input) - Bit
+    DEV_Y   := 16#9D, // Ngõ ra vật lý Y (Output) - Bit
+    DEV_B   := 16#A0, // Rơ-le liên kết B (Link Relay) - Bit / Word
+    DEV_L   := 16#92, // Rơ-le chốt L (Latch Relay) - Bit
+    DEV_TN  := 16#C2, // Giá trị hiện tại Timer TN (Timer Current Value) - Word
+    DEV_CN  := 16#C5  // Giá trị hiện tại Counter CN (Counter Current Value) - Word
+);
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

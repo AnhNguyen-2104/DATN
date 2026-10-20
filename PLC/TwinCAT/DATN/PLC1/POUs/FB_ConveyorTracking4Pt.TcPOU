@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_ConveyorTracking4Pt" Id="{f45dd975-916c-42e3-9485-f5e77a4a0ab5}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ConveyorTracking4Pt
+VAR_INPUT
+    bResetSystem     : BOOL;
+    bCameraResult    : BOOL;
+    bAcceptCamera    : BOOL := TRUE;
+    rCenterX_mm      : LREAL;
+    rCenterY_mm      : LREAL;
+    rAngleDeg        : LREAL;
+    rLength_mm       : LREAL := 40.0;
+    rWidth_mm        : LREAL := 40.0;
+    nEncoderNow      : UINT;
+    rMmPerPulse      : LREAL := 0.476475;
+    rXMaxLimit_mm    : LREAL := 180.0;
+END_VAR
+
+VAR_OUTPUT
+    bProductValid    : BOOL;
+    nPulseAtCamera   : UINT;
+    nPulseTravel     : INT;
+    rTravel_mm       : LREAL;
+    aCornerBase      : ARRAY[1..4] OF ST_Point2D;
+    aCornerNow       : ARRAY[1..4] OF ST_Point2D;
+END_VAR
+
+VAR
+    fbCameraEdge     : R_TRIG;
+    rRad             : LREAL;
+    rCosA            : LREAL;
+    rSinA            : LREAL;
+    rHalfLength      : LREAL;
+    rHalfWidth       : LREAL;
+    nIndex           : INT;
+    bFirstScan       : BOOL := TRUE;
+    nTravelRaw       : DINT;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// Reset mốc phần mềm một lần khi PLC khởi động hoặc khi bResetSystem kích.
+IF bFirstScan OR bResetSystem THEN
+    bFirstScan     := FALSE;
+    bProductValid  := FALSE;
+    nPulseAtCamera := nEncoderNow;
+    nPulseTravel   := 0;
+    rTravel_mm     := 0.0;
+
+    FOR nIndex := 1 TO 4 DO
+        aCornerBase[nIndex].X := 0.0;
+        aCornerBase[nIndex].Y := 0.0;
+        aCornerNow[nIndex].X  := 0.0;
+        aCornerNow[nIndex].Y  := 0.0;
+    END_FOR;
+END_IF;
+
+fbCameraEdge(CLK := bCameraResult);
+
+// Camera chụp: chốt encoder và tính bốn góc gốc.
+IF fbCameraEdge.Q AND bAcceptCamera THEN
+    nPulseAtCamera := nEncoderNow;
+    nPulseTravel   := 0;
+    rTravel_mm     := 0.0;
+
+    rRad   := rAngleDeg * 3.141592653589793 / 180.0;
+    rCosA  := COS(rRad);
+    rSinA  := SIN(rRad);
+    rHalfLength := rLength_mm / 2.0;
+    rHalfWidth  := rWidth_mm / 2.0;
+
+    aCornerBase[1].X := rCenterX_mm + rHalfLength * rCosA - rHalfWidth * rSinA;
+    aCornerBase[1].Y := rCenterY_mm + rHalfLength * rSinA + rHalfWidth * rCosA;
+    aCornerBase[2].X := rCenterX_mm - rHalfLength * rCosA - rHalfWidth * rSinA;
+    aCornerBase[2].Y := rCenterY_mm - rHalfLength * rSinA + rHalfWidth * rCosA;
+    aCornerBase[3].X := rCenterX_mm - rHalfLength * rCosA + rHalfWidth * rSinA;
+    aCornerBase[3].Y := rCenterY_mm - rHalfLength * rSinA - rHalfWidth * rCosA;
+    aCornerBase[4].X := rCenterX_mm + rHalfLength * rCosA + rHalfWidth * rSinA;
+    aCornerBase[4].Y := rCenterY_mm + rHalfLength * rSinA - rHalfWidth * rCosA;
+
+    FOR nIndex := 1 TO 4 DO
+        aCornerNow[nIndex] := aCornerBase[nIndex];
+    END_FOR;
+    bProductValid := TRUE;
+END_IF;
+
+// Tracking thời gian thực theo encoder.
+IF bProductValid THEN
+    nTravelRaw := UINT_TO_DINT(nEncoderNow) - UINT_TO_DINT(nPulseAtCamera);
+    IF nTravelRaw > 32767 THEN
+        nTravelRaw := nTravelRaw - 65536;
+    ELSIF nTravelRaw < -32768 THEN
+        nTravelRaw := nTravelRaw + 65536;
+    END_IF;
+    nPulseTravel := DINT_TO_INT(nTravelRaw);
+    rTravel_mm   := TO_LREAL(nPulseTravel) * rMmPerPulse;
+
+    FOR nIndex := 1 TO 4 DO
+        aCornerNow[nIndex].X := aCornerBase[nIndex].X + rTravel_mm;
+        aCornerNow[nIndex].Y := aCornerBase[nIndex].Y;
+    END_FOR;
+
+    // Hủy sản phẩm nếu toàn bộ cạnh phía sau đã vượt vùng X của Gantry.
+    IF (aCornerNow[2].X > rXMaxLimit_mm) AND (aCornerNow[3].X > rXMaxLimit_mm) THEN
+        bProductValid := FALSE;
+        nPulseTravel  := 0;
+        rTravel_mm    := 0.0;
+    END_IF;
+END_IF;]]></ST>
+    </Implementation>
+    <LineIds Name="FB_ConveyorTracking4Pt">
+      <LineId Id="63" Count="75" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

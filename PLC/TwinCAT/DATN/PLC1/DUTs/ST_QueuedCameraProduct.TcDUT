@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="ST_QueuedCameraProduct" Id="{fb757947-8405-4434-93ef-eaa17d2ac37f}">
+    <Declaration><![CDATA[TYPE ST_QueuedCameraProduct :
+STRUCT
+    bValid                    : BOOL;
+    nProductID                : UDINT;
+    nState                    : INT; // 0 EMPTY, 1 WAIT_ROBOT, 2 GEOMETRIC_WINDOW
+    bAllCornersInside         : BOOL;
+    bForecastWindowOK         : BOOL;
+    rEncoderAtExposure_mm     : LREAL;
+    rCenterAtExposureX_mm     : LREAL;
+    rCenterAtExposureY_mm     : LREAL;
+    rThetaRobot_deg           : LREAL;
+    rTravel_mm                : LREAL;
+    rCenterNowX_mm            : LREAL;
+    rCenterNowY_mm            : LREAL;
+    aCornerBase               : ARRAY[1..4] OF ST_Point2D;
+    aCornerNow                : ARRAY[1..4] OF ST_Point2D;
+END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

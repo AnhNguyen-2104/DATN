@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_MelsecTcpConfig" Id="{2c1b3f6a-9514-446c-8292-33fe1d4b7aec}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_MelsecTcpConfig
+VAR_INPUT
+    bEnable         : BOOL := TRUE;                 // TRUE = duy trì kết nối
+    sRemoteHost     : STRING(15) := '192.168.3.39'; // IP PLC-Q
+    nRemotePort     : UDINT := 5010;               // Port MC Protocol
+END_VAR
+VAR_IN_OUT
+    stSession       : ST_MelsecSession;             // Session TCP dùng chung
+END_VAR
+VAR
+    fbConnect       : FB_SocketConnect;
+    fbClose         : FB_SocketClose;
+    tonRetry        : TON;
+
+    nState          : INT := 0;
+    bConnectError   : BOOL;
+    nConnectErrorID : UDINT;
+    bCloseError     : BOOL;
+    nCloseErrorID   : UDINT;
+    nReconnectCount : UDINT;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// State:
+// 0 = chờ reconnect
+// 1 = phát cạnh mở TCP
+// 2 = chờ kết quả kết nối
+// 10 = đã kết nối
+// 20 = đóng socket khi Disable
+
+CASE nState OF
+
+    0: // Wait before reconnect. Never discard a live socket handle.
+        stSession.bConnected := FALSE;
+
+        IF NOT bEnable THEN
+            tonRetry(IN := FALSE);
+            stSession.bError := FALSE;
+        ELSE
+            // Backoff avoids an endless stream of new SYN requests when PLC has no slot.
+            tonRetry(IN := TRUE, PT := T#5S);
+
+            IF tonRetry.Q THEN
+                tonRetry(IN := FALSE);
+                stSession.bError := FALSE;
+                nReconnectCount := nReconnectCount + 1;
+                nState := 1;
+            END_IF
+        END_IF
+
+
+    1: // Cạnh lên mở TCP Socket
+        fbConnect(
+            sSrvNetId   := '',
+            sRemoteHost := sRemoteHost,
+            nRemotePort := nRemotePort,
+            bExecute    := TRUE,
+            tTimeout    := T#35S,
+            bError      => bConnectError,
+            nErrId      => nConnectErrorID,
+            hSocket     => stSession.hSocket
+        );
+
+        stSession.bBusy := TRUE;
+        nState := 2;
+
+
+    2: // Chờ FB_SocketConnect hoàn thành
+        fbConnect(
+            sSrvNetId   := '',
+            sRemoteHost := sRemoteHost,
+            nRemotePort := nRemotePort,
+            bExecute    := FALSE,
+            tTimeout    := T#35S,
+            bError      => bConnectError,
+            nErrId      => nConnectErrorID,
+            hSocket     => stSession.hSocket
+        );
+
+        IF NOT fbConnect.bBusy THEN
+            stSession.bBusy := FALSE;
+
+            IF bConnectError THEN
+                stSession.bError := TRUE;
+                stSession.nErrorID := nConnectErrorID;
+                stSession.bConnected := FALSE;
+                // Do not zero a handle without trying to close it first.
+                IF stSession.hSocket.handle <> 0 THEN
+                    nState := 20;
+                ELSE
+                    nState := 0;
+                END_IF;
+            ELSE
+                stSession.bConnected := TRUE;
+                stSession.bError     := FALSE;
+                stSession.nErrorID := 0;
+                nState := 10;
+            END_IF
+        END_IF
+
+
+    10: // Reconnect only after the read/write transaction releases the socket.
+        IF NOT bEnable OR NOT stSession.bConnected THEN
+            IF NOT stSession.bBusy THEN
+                nState := 20;
+            END_IF;
+        END_IF
+
+
+    20: // Close stale or disabled socket before any reconnect attempt.
+        IF stSession.hSocket.handle = 0 THEN
+            stSession.bConnected := FALSE;
+            nState := 0;
+        ELSE
+            fbClose(
+                sSrvNetId := '',
+                hSocket := stSession.hSocket,
+                bExecute := TRUE,
+                tTimeout := T#5S,
+                bError => bCloseError,
+                nErrId => nCloseErrorID
+            );
+            nState := 21;
+        END_IF;
+
+
+    21: // Wait for close acknowledgement; keep an error for diagnostics.
+        fbClose(
+            sSrvNetId := '',
+            hSocket := stSession.hSocket,
+            bExecute := FALSE,
+            tTimeout := T#5S,
+            bError => bCloseError,
+            nErrId => nCloseErrorID
+        );
+
+        IF NOT fbClose.bBusy THEN
+            IF bCloseError THEN
+                stSession.bError := TRUE;
+                stSession.nErrorID := nCloseErrorID;
+            END_IF;
+            stSession.hSocket.handle := 0;
+            stSession.bConnected := FALSE;
+            nState := 0;
+        END_IF
+
+END_CASE]]></ST>
+    </Implementation>
+    <LineIds Name="FB_MelsecTcpConfig">
+      <LineId Id="27" Count="105" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

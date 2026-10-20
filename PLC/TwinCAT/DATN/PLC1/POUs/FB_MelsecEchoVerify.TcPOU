@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_MelsecEchoVerify" Id="{5b3c14e7-a9c0-4f68-9c15-23e94160fd01}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_MelsecEchoVerify
+VAR_INPUT
+    bExecute                : BOOL;          // Rising edge starts one write/read/restore cycle
+    bEnable                 : BOOL := FALSE; // OFF by default
+    bAddressVerifiedUnused  : BOOL := FALSE; // Operator approved address in real PLC/HMI
+    bMachineSafe            : BOOL := FALSE; // Operator confirmed safe machine state
+    bBitDevice              : BOOL := FALSE; // FALSE -> D word, TRUE -> M bit
+    nAddress                : UDINT := 0;    // D>=3000 or M>=2000; still requires approval
+    wTestValue              : WORD := 16#A55A;
+    bTestValue              : BOOL := TRUE;
+END_VAR
+VAR_IN_OUT
+    stSession               : ST_MelsecSession;
+END_VAR
+VAR_OUTPUT
+    bBusy                   : BOOL;
+    bDone                   : BOOL;          // Complete after restore verification
+    bError                  : BOOL;
+    bMatch                  : BOOL;          // Readback equals test value
+    bRestored               : BOOL;          // PLC reply confirms original value
+    bRestoreUncertain       : BOOL;          // A write may have happened before error
+    nErrorID                : UDINT;
+    nState                  : INT;
+    wOriginal               : WORD;
+    wReadBack               : WORD;
+    bOriginal               : BOOL;
+    bReadBack               : BOOL;
+END_VAR
+VAR
+    fbStart                 : R_TRIG;
+    fbRead                  : FB_MelsecRead;
+    fbWrite                 : FB_MelsecWrite;
+    tonCycle                : TON;
+    bReadReq                : BOOL;
+    bWriteReq               : BOOL;
+    bIsBit                  : BOOL;
+    nSafeAddress            : UDINT;
+    eSafeDevice             : E_MelsecDevice;
+    nBufferSize             : UDINT;
+    pReadBuffer             : PVOID;
+    pWriteBuffer            : PVOID;
+    wPayload                : WORD;
+    bPayload                : BOOL;
+    wCurrent                : WORD;
+    bCurrent                : BOOL;
+    wExpected               : WORD;
+    bExpected               : BOOL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbStart(CLK := bExecute);
+tonCycle(IN := bBusy, PT := T#25S);
+bReadReq := FALSE;
+bWriteReq := FALSE;
+
+// Never start automatically: all three authorizations and an explicit edge are required.
+IF (nState = 0) AND fbStart.Q THEN
+    bDone := FALSE;
+    bError := FALSE;
+    bMatch := FALSE;
+    bRestored := FALSE;
+    bRestoreUncertain := FALSE;
+    nErrorID := 0;
+    IF NOT bEnable OR NOT bAddressVerifiedUnused OR NOT bMachineSafe THEN
+        bError := TRUE; nErrorID := 16#E701; // Not authorized
+    ELSIF NOT stSession.bConnected OR stSession.bBusy THEN
+        bError := TRUE; nErrorID := 16#E702; // No free connected session
+    ELSIF (bBitDevice AND ((nAddress < 2000) OR (nAddress > 8191)))
+       OR ((NOT bBitDevice) AND ((nAddress < 3000) OR (nAddress > 7999))) THEN
+        bError := TRUE; nErrorID := 16#E703; // Reserve low ranges for machine
+    ELSE
+        bIsBit := bBitDevice;
+        nSafeAddress := nAddress;
+        wExpected := wTestValue;
+        bExpected := bTestValue;
+        IF bIsBit THEN
+            eSafeDevice := DEV_M;
+            nBufferSize := SIZEOF(bCurrent);
+            pReadBuffer := ADR(bCurrent);
+            pWriteBuffer := ADR(bPayload);
+        ELSE
+            eSafeDevice := DEV_D;
+            nBufferSize := SIZEOF(wCurrent);
+            pReadBuffer := ADR(wCurrent);
+            pWriteBuffer := ADR(wPayload);
+        END_IF;
+        bBusy := TRUE;
+        nState := 10;
+    END_IF;
+END_IF;
+
+IF bBusy AND tonCycle.Q THEN
+    bError := TRUE;
+    nErrorID := 16#E704; // Complete transaction did not finish in time
+    bBusy := FALSE;
+    nState := 0;
+END_IF;
+
+// One request at a time, with a scan gap between consecutive R_TRIG requests.
+CASE nState OF
+    10: // Read original before any write
+        bReadReq := TRUE;
+        nState := 11;
+    11:
+        IF fbRead.bError THEN
+            bError := TRUE; nErrorID := fbRead.nErrorID;
+            bBusy := FALSE; nState := 0;
+        ELSIF fbRead.bDone THEN
+            IF bIsBit THEN
+                bOriginal := bCurrent;
+                IF bOriginal = bExpected THEN
+                    bError := TRUE; nErrorID := 16#E707; // Must change the bit to prove WRITE
+                    bBusy := FALSE; nState := 0;
+                ELSE nState := 20; END_IF;
+            ELSE
+                wOriginal := wCurrent;
+                IF wOriginal = wExpected THEN
+                    bError := TRUE; nErrorID := 16#E707; // Must change the word to prove WRITE
+                    bBusy := FALSE; nState := 0;
+                ELSE nState := 20; END_IF;
+            END_IF;
+        END_IF;
+
+    20: // Write one approved device only
+        IF bIsBit THEN bPayload := bExpected;
+        ELSE wPayload := wExpected; END_IF;
+        bRestoreUncertain := TRUE; // From now on, a failed call might have modified PLC
+        bWriteReq := TRUE;
+        nState := 21;
+    21:
+        IF fbWrite.bError THEN
+            bError := TRUE; nErrorID := fbWrite.nErrorID;
+            bBusy := FALSE; nState := 0;
+        ELSIF fbWrite.bDone THEN
+            nState := 30;
+        END_IF;
+
+    30: // Read exact same address
+        bReadReq := TRUE;
+        nState := 31;
+    31:
+        IF fbRead.bError THEN
+            bError := TRUE; nErrorID := fbRead.nErrorID;
+            bBusy := FALSE; nState := 0;
+        ELSIF fbRead.bDone THEN
+            IF bIsBit THEN
+                bReadBack := bCurrent;
+                bMatch := (bReadBack = bExpected);
+            ELSE
+                wReadBack := wCurrent;
+                bMatch := (wReadBack = wExpected);
+            END_IF;
+            // Restore even after a mismatch, never leave the test value in the PLC.
+            nState := 40;
+        END_IF;
+
+    40: // Restore original
+        IF bIsBit THEN bPayload := bOriginal;
+        ELSE wPayload := wOriginal; END_IF;
+        bWriteReq := TRUE;
+        nState := 41;
+    41:
+        IF fbWrite.bError THEN
+            bError := TRUE; nErrorID := fbWrite.nErrorID;
+            bBusy := FALSE; nState := 0;
+        ELSIF fbWrite.bDone THEN
+            nState := 50;
+        END_IF;
+
+    50: // Verify restoration from PLC
+        bReadReq := TRUE;
+        nState := 51;
+    51:
+        IF fbRead.bError THEN
+            bError := TRUE; nErrorID := fbRead.nErrorID;
+            bBusy := FALSE; nState := 0;
+        ELSIF fbRead.bDone THEN
+            IF bIsBit THEN bRestored := (bCurrent = bOriginal);
+            ELSE bRestored := (wCurrent = wOriginal); END_IF;
+            bRestoreUncertain := NOT bRestored;
+            IF NOT bRestored THEN
+                bError := TRUE; nErrorID := 16#E706; // Restore readback differs
+            ELSIF NOT bMatch THEN
+                bError := TRUE; nErrorID := 16#E705; // Test readback differs
+            ELSE
+                bDone := TRUE;
+            END_IF;
+            bBusy := FALSE;
+            nState := 0;
+        END_IF;
+END_CASE;
+
+// Exclusive access through ST_MelsecSession.bBusy in the existing MC FBs.
+fbRead(
+    stSession := stSession, bExecute := bReadReq,
+    eDevice := eSafeDevice, nStartAddr := nSafeAddress,
+    nPoints := 1, bBitAccess := bIsBit,
+    pData := pReadBuffer, nDataSize := nBufferSize
+);
+fbWrite(
+    stSession := stSession, bExecute := bWriteReq,
+    eDevice := eSafeDevice, nStartAddr := nSafeAddress,
+    nPoints := 1, bBitAccess := bIsBit,
+    pData := pWriteBuffer, nDataSize := nBufferSize
+);
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

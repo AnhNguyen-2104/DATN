@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_CameraProductQueue" Id="{e6e550d4-41d1-4a7f-ac17-3534fa4be432}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_CameraProductQueue
+VAR_INPUT
+    bReset                  : BOOL;
+    bLiveExposure           : BOOL; // physical image-exposure signal (NOT camera result)
+    bLiveResult             : BOOL; // result contains calibrated X/Y mm + angle
+    bLiveBridgeVerified     : BOOL; // FALSE until real camera driver audited
+    bCalibrationConfirmed   : BOOL; // FALSE until camera -> robot calibration audited
+
+    // BENCH SIMULATION ONLY: not linked to robot publisher / M1000
+    bSimMode                : BOOL;
+    bSimExposure            : BOOL;
+    bSimResult              : BOOL;
+    bSimCompleteHead        : BOOL;
+
+    rCenterX_mm             : LREAL;
+    rCenterY_mm             : LREAL;
+    rAngle_deg              : LREAL;
+    rCameraToWorkStart_mm   : LREAL; // calibrated positive distance to ROBOT X=0
+    rCameraFineOffsetX_mm   : LREAL;
+    rCameraOffsetY_mm       : LREAL;
+    rCameraYaw_deg          : LREAL;
+    rLength_mm              : LREAL := 40.0;
+    rWidth_mm               : LREAL := 40.0;
+    rEncoderTotalDist_mm    : LREAL; // integrated distance, NOT 16-bit raw pulse
+    rConveyorSpeed_mm_s     : LREAL;
+    rXMin_mm                : LREAL := 0.0;
+    rXMax_mm                : LREAL := 180.0;
+    rYMin_mm                : LREAL := 0.0;
+    rYMax_mm                : LREAL := 170.0;
+    rMinCycleBudget_s       : LREAL := 1.2;  // planning estimate, NOT validated robot duration
+    rFlyTime_s              : LREAL := 0.12;
+    rSyncTime_s             : LREAL := 0.06;
+END_VAR
+VAR_OUTPUT
+    aQueue                  : ARRAY[1..8] OF ST_QueuedCameraProduct;
+    nQueueCount             : INT;
+    nHeadIndex              : INT := 1;
+    nTailIndex              : INT := 1;
+    nHeadProductID          : UDINT;
+    nHeadState              : INT;
+    nLastAcceptedProductID  : UDINT;
+    nAccepted               : UDINT;
+    nRejected               : UDINT;
+    nMissed                 : UDINT;
+    nSimCompleted           : UDINT; // BENCH simulator ONLY, not robot done
+    nExposureOverruns       : UDINT;
+    nErrorCode              : INT;
+    bInputFault             : BOOL; // latched until reset
+    bPendingExposure        : BOOL;
+    bQueueFull              : BOOL;
+    bHeadValid              : BOOL;
+    bHeadAllInside          : BOOL;
+    bHeadForecastOK         : BOOL; // geometry/timing estimate ONLY, no motion authorization
+    rHeadTravel_mm          : LREAL;
+    rHeadToWorkStart_mm     : LREAL;
+    rHeadCenterX_mm         : LREAL;
+    rHeadCenterY_mm         : LREAL;
+    aHeadCornerNow          : ARRAY[1..4] OF ST_Point2D;
+END_VAR
+VAR
+    fbExposureEdge          : R_TRIG;
+    fbResultEdge            : R_TRIG;
+    fbSimDoneEdge           : R_TRIG;
+    tonResultTTL            : TON;
+    bFirstScan              : BOOL := TRUE;
+    rPendingEncoder_mm      : LREAL;
+    rYawRad                 : LREAL;
+    rThetaRad               : LREAL;
+    rCosYaw                 : LREAL;
+    rSinYaw                 : LREAL;
+    rCosTheta               : LREAL;
+    rSinTheta               : LREAL;
+    rHalfL                  : LREAL;
+    rHalfW                  : LREAL;
+    rLocalX                 : LREAL;
+    rLocalY                 : LREAL;
+    rCenterRobotX           : LREAL;
+    rCenterRobotY           : LREAL;
+    rForecastMotion_mm      : LREAL;
+    bOut                    : BOOL;
+    i                       : INT;
+    j                       : INT;
+    nSlot                   : INT;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// STAGED DATA-ONLY FIFO: no MC writes, no M1000, no QD75 and no servo output.
+// A single unmatched exposure is allowed at a time because the camera has
+// not yet provided frame IDs. Overlapping exposures cause a latched fault.
+fbExposureEdge(CLK := (bLiveExposure AND bLiveBridgeVerified AND NOT bSimMode)
+                        OR (bSimExposure AND bSimMode));
+fbResultEdge(CLK := (bLiveResult AND bLiveBridgeVerified AND NOT bSimMode)
+                      OR (bSimResult AND bSimMode));
+fbSimDoneEdge(CLK := bSimCompleteHead AND bSimMode);
+tonResultTTL(IN := bPendingExposure, PT := T#5S);
+
+IF bFirstScan OR bReset THEN
+    bFirstScan := FALSE;
+    nQueueCount := 0;
+    nHeadIndex := 1;
+    nTailIndex := 1;
+    nHeadProductID := 0;
+    nHeadState := 0;
+    nLastAcceptedProductID := 0;
+    nAccepted := 0;
+    nRejected := 0;
+    nMissed := 0;
+    nSimCompleted := 0;
+    nExposureOverruns := 0;
+    nErrorCode := 0;
+    bInputFault := FALSE;
+    bPendingExposure := FALSE;
+    bQueueFull := FALSE;
+    bHeadValid := FALSE;
+    bHeadAllInside := FALSE;
+    bHeadForecastOK := FALSE;
+    rPendingEncoder_mm := 0.0;
+    rHeadTravel_mm := 0.0;
+    rHeadToWorkStart_mm := 0.0;
+    rHeadCenterX_mm := 0.0;
+    rHeadCenterY_mm := 0.0;
+    FOR i := 1 TO 8 DO
+        aQueue[i].bValid := FALSE;
+        aQueue[i].nState := 0;
+        aQueue[i].nProductID := 0;
+        aQueue[i].bAllCornersInside := FALSE;
+        aQueue[i].bForecastWindowOK := FALSE;
+        aQueue[i].rEncoderAtExposure_mm := 0.0;
+        aQueue[i].rCenterAtExposureX_mm := 0.0;
+        aQueue[i].rCenterAtExposureY_mm := 0.0;
+        aQueue[i].rThetaRobot_deg := 0.0;
+        aQueue[i].rTravel_mm := 0.0;
+        aQueue[i].rCenterNowX_mm := 0.0;
+        aQueue[i].rCenterNowY_mm := 0.0;
+        FOR j := 1 TO 4 DO
+            aQueue[i].aCornerBase[j].X := 0.0;
+            aQueue[i].aCornerBase[j].Y := 0.0;
+            aQueue[i].aCornerNow[j].X := 0.0;
+            aQueue[i].aCornerNow[j].Y := 0.0;
+        END_FOR;
+    END_FOR;
+END_IF;
+
+IF NOT bReset THEN
+    IF bPendingExposure AND tonResultTTL.Q THEN
+        bPendingExposure := FALSE;
+        bInputFault := TRUE;
+        nErrorCode := 110; // Camera processing result exceeded 5 seconds
+        nRejected := nRejected + 1;
+    END_IF;
+
+    IF fbExposureEdge.Q THEN
+        IF bInputFault OR bPendingExposure THEN
+            bInputFault := TRUE; // no frame-ID: cannot pair overlapping images
+            bPendingExposure := FALSE;
+            nExposureOverruns := nExposureOverruns + 1;
+            nErrorCode := 111;
+        ELSIF (rCameraToWorkStart_mm <= 0.0)
+            OR (rCameraToWorkStart_mm > 100000.0)
+            OR (NOT bCalibrationConfirmed AND NOT bSimMode) THEN
+            nRejected := nRejected + 1;
+            nErrorCode := 112; // no physically verified calibration
+        ELSE
+            rPendingEncoder_mm := rEncoderTotalDist_mm;
+            bPendingExposure := TRUE;
+        END_IF;
+    END_IF;
+
+    IF fbResultEdge.Q THEN
+        IF bInputFault OR NOT bPendingExposure THEN
+            nRejected := nRejected + 1;
+            nErrorCode := 113; // result without matching exposure
+        ELSIF (rLength_mm <= 0.0) OR (rWidth_mm <= 0.0)
+            OR (rLength_mm > 100.0) OR (rWidth_mm > 100.0)
+            OR (ABS(rCenterX_mm) > 100000.0)
+            OR (ABS(rCenterY_mm) > 100000.0)
+            OR (ABS(rAngle_deg) > 3600.0) THEN
+            nRejected := nRejected + 1;
+            nErrorCode := 114;
+            bPendingExposure := FALSE;
+        ELSIF nQueueCount >= 8 THEN
+            nRejected := nRejected + 1;
+            nErrorCode := 115; // full; never overwrite a live product
+            bQueueFull := TRUE;
+            bPendingExposure := FALSE;
+        ELSE
+            nSlot := nTailIndex;
+            rYawRad := rCameraYaw_deg * 3.141592653589793 / 180.0;
+            rCosYaw := COS(rYawRad);
+            rSinYaw := SIN(rYawRad);
+            rCenterRobotX := -rCameraToWorkStart_mm + rCameraFineOffsetX_mm
+                + rCenterX_mm * rCosYaw - rCenterY_mm * rSinYaw;
+            rCenterRobotY := rCameraOffsetY_mm
+                + rCenterX_mm * rSinYaw + rCenterY_mm * rCosYaw;
+            rThetaRad := (rAngle_deg + rCameraYaw_deg)
+                * 3.141592653589793 / 180.0;
+            rCosTheta := COS(rThetaRad);
+            rSinTheta := SIN(rThetaRad);
+            rHalfL := rLength_mm / 2.0;
+            rHalfW := rWidth_mm / 2.0;
+            aQueue[nSlot].bValid := TRUE;
+            aQueue[nSlot].nState := 1; // WAIT_ROBOT
+            nLastAcceptedProductID := nLastAcceptedProductID + 1;
+            aQueue[nSlot].nProductID := nLastAcceptedProductID;
+            aQueue[nSlot].rEncoderAtExposure_mm := rPendingEncoder_mm;
+            aQueue[nSlot].rCenterAtExposureX_mm := rCenterRobotX;
+            aQueue[nSlot].rCenterAtExposureY_mm := rCenterRobotY;
+            aQueue[nSlot].rThetaRobot_deg := rAngle_deg + rCameraYaw_deg;
+            aQueue[nSlot].rTravel_mm := 0.0;
+            aQueue[nSlot].rCenterNowX_mm := rCenterRobotX;
+            aQueue[nSlot].rCenterNowY_mm := rCenterRobotY;
+            FOR j := 1 TO 4 DO
+                CASE j OF
+                    1: rLocalX := rHalfL;  rLocalY := rHalfW;
+                    2: rLocalX := -rHalfL; rLocalY := rHalfW;
+                    3: rLocalX := -rHalfL; rLocalY := -rHalfW;
+                    4: rLocalX := rHalfL;  rLocalY := -rHalfW;
+                END_CASE;
+                aQueue[nSlot].aCornerBase[j].X := rCenterRobotX
+                    + rLocalX * rCosTheta - rLocalY * rSinTheta;
+                aQueue[nSlot].aCornerBase[j].Y := rCenterRobotY
+                    + rLocalX * rSinTheta + rLocalY * rCosTheta;
+                aQueue[nSlot].aCornerNow[j] := aQueue[nSlot].aCornerBase[j];
+            END_FOR;
+            nQueueCount := nQueueCount + 1;
+            nAccepted := nAccepted + 1;
+            nTailIndex := nTailIndex + 1;
+            IF nTailIndex > 8 THEN nTailIndex := 1; END_IF;
+            bPendingExposure := FALSE;
+            nErrorCode := 0;
+        END_IF;
+    END_IF;
+
+    // Tracking EVERY queued product each 10 ms using integrated encoder.
+    // Future margin is only a conservative planning estimate, not a robot start permit.
+    rForecastMotion_mm := 0.0;
+    IF rConveyorSpeed_mm_s > 0.0 THEN
+        rForecastMotion_mm := rConveyorSpeed_mm_s *
+            (rMinCycleBudget_s + rFlyTime_s + rSyncTime_s);
+    END_IF;
+    FOR i := 1 TO 8 DO
+        IF aQueue[i].bValid THEN
+            aQueue[i].rTravel_mm := rEncoderTotalDist_mm -
+                                      aQueue[i].rEncoderAtExposure_mm;
+            aQueue[i].rCenterNowX_mm := aQueue[i].rCenterAtExposureX_mm +
+                                        aQueue[i].rTravel_mm;
+            aQueue[i].rCenterNowY_mm := aQueue[i].rCenterAtExposureY_mm;
+            aQueue[i].bAllCornersInside := TRUE;
+            aQueue[i].bForecastWindowOK := TRUE;
+            FOR j := 1 TO 4 DO
+                aQueue[i].aCornerNow[j].X := aQueue[i].aCornerBase[j].X +
+                                            aQueue[i].rTravel_mm;
+                aQueue[i].aCornerNow[j].Y := aQueue[i].aCornerBase[j].Y;
+                IF (aQueue[i].aCornerNow[j].X < rXMin_mm)
+                   OR (aQueue[i].aCornerNow[j].X > rXMax_mm)
+                   OR (aQueue[i].aCornerNow[j].Y < rYMin_mm)
+                   OR (aQueue[i].aCornerNow[j].Y > rYMax_mm) THEN
+                    aQueue[i].bAllCornersInside := FALSE;
+                END_IF;
+                IF (aQueue[i].aCornerNow[j].X < rXMin_mm)
+                   OR (aQueue[i].aCornerNow[j].X + rForecastMotion_mm > rXMax_mm)
+                   OR (aQueue[i].aCornerNow[j].Y < rYMin_mm)
+                   OR (aQueue[i].aCornerNow[j].Y > rYMax_mm) THEN
+                    aQueue[i].bForecastWindowOK := FALSE;
+                END_IF;
+            END_FOR;
+            IF aQueue[i].bAllCornersInside THEN
+                aQueue[i].nState := 2; // all four corners geometrically in workspace
+            ELSE
+                aQueue[i].nState := 1;
+            END_IF;
+        END_IF;
+    END_FOR;
+
+    // Drop ONLY the oldest missed product; preserve FIFO order for later items.
+    IF nQueueCount > 0 THEN
+        bOut := TRUE;
+        FOR j := 1 TO 4 DO
+            IF aQueue[nHeadIndex].aCornerNow[j].X <= rXMax_mm THEN
+                bOut := FALSE;
+            END_IF;
+        END_FOR;
+        IF bOut THEN
+            aQueue[nHeadIndex].bValid := FALSE;
+            aQueue[nHeadIndex].nState := 0;
+            nMissed := nMissed + 1;
+            nQueueCount := nQueueCount - 1;
+            nHeadIndex := nHeadIndex + 1;
+            IF nHeadIndex > 8 THEN nHeadIndex := 1; END_IF;
+        END_IF;
+    END_IF;
+
+    // Offline/manual simulation of completion only; never constitutes M1001 ACK.
+    IF fbSimDoneEdge.Q AND (nQueueCount > 0) THEN
+        IF aQueue[nHeadIndex].bAllCornersInside THEN
+            aQueue[nHeadIndex].bValid := FALSE;
+            aQueue[nHeadIndex].nState := 0;
+            nSimCompleted := nSimCompleted + 1;
+            nQueueCount := nQueueCount - 1;
+            nHeadIndex := nHeadIndex + 1;
+            IF nHeadIndex > 8 THEN nHeadIndex := 1; END_IF;
+        ELSE
+            nErrorCode := 116; // Simulation completion outside geometric window
+        END_IF;
+    END_IF;
+END_IF;
+
+// Presentation: active head is distinct from historical/legacy corner values.
+bHeadValid := nQueueCount > 0;
+bHeadAllInside := FALSE;
+bHeadForecastOK := FALSE;
+nHeadProductID := 0;
+nHeadState := 0;
+rHeadTravel_mm := 0.0;
+rHeadToWorkStart_mm := 0.0;
+rHeadCenterX_mm := 0.0;
+rHeadCenterY_mm := 0.0;
+FOR j := 1 TO 4 DO
+    aHeadCornerNow[j].X := 0.0;
+    aHeadCornerNow[j].Y := 0.0;
+END_FOR;
+IF bHeadValid THEN
+    nHeadProductID := aQueue[nHeadIndex].nProductID;
+    nHeadState := aQueue[nHeadIndex].nState;
+    bHeadAllInside := aQueue[nHeadIndex].bAllCornersInside;
+    bHeadForecastOK := aQueue[nHeadIndex].bForecastWindowOK;
+    rHeadTravel_mm := aQueue[nHeadIndex].rTravel_mm;
+    rHeadCenterX_mm := aQueue[nHeadIndex].rCenterNowX_mm;
+    rHeadCenterY_mm := aQueue[nHeadIndex].rCenterNowY_mm;
+    IF rHeadCenterX_mm < 0.0 THEN
+        rHeadToWorkStart_mm := -rHeadCenterX_mm;
+    END_IF;
+    FOR j := 1 TO 4 DO
+        aHeadCornerNow[j] := aQueue[nHeadIndex].aCornerNow[j];
+    END_FOR;
+END_IF;
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_CameraProductQueue"><LineId Id="9" Count="0" /></LineIds>
+  </POU>
+</TcPlcObject>

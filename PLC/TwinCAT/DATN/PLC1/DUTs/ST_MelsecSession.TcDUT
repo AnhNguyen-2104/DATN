@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="ST_MelsecSession" Id="{b4004d4f-9d95-4239-a00d-cfda0619eecc}">
+    <Declaration><![CDATA[TYPE ST_MelsecSession :
+STRUCT
+    hSocket     : T_HSOCKET; // Socket TCP dùng chung
+    bConnected  : BOOL;      // TRUE khi đã kết nối PLC
+    bBusy       : BOOL;      // TRUE khi Read hoặc Write đang giao dịch
+    bError      : BOOL;      // Lỗi cuối cùng
+    nErrorID    : UDINT;     // Mã lỗi cuối cùng
+END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

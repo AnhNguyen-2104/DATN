@@ -1,1 +1,81 @@
-# DATN
+# DATN / LINE CONTROL — DU AN CHINH AML-IPC
+
+## MOT THU MUC CHINH
+Root: C:\Users\aml\Desktop\DATN
+Double-click: START_DATN.cmd
+C# source: App\Vision\PlateVision50.csproj
+Third-party Camera wrappers: Dependencies\BaslerCamera, Dependencies\Devices
+Runtime output: Release\PlateVision50_V2.dll
+Embedded .NET 8 runtime: Runtime\DotNet8\dotnet.exe
+TwinCAT stage copy: PLC\TwinCAT\DATN.sln
+Operating contracts: Docs\TAG_MATRIX.md, Docs\build_single_instance.log
+
+## UI / Automation architecture
+1. MAIN / line status: TwinCAT port 851 ADS (read-only telemetry).
+   One EStop overall: GVL_MD200_IO.bEStopFeedback, reflected into MAIN.bSystemEStopOK.
+   This standard Crevis ST-1228 DI0 is NOT a safety input. Safety-rated hardware
+   chain must independently stop hazardous energy at MD200 and Gantry drives.
+2. Shared conveyor: START/STOP operator button, 0..25Hz MD200 reference.
+   Controls OFF by default; manual operator unlock and confirmation required.
+   Program only writes MAIN.bMD200_Start and MAIN.rMD200_SetFrequency_Hz.
+   STOP button is normal STOP, NOT physical E-STOP.
+3. GANTRY+Camera1: HIK/Basler/video detection, trigger 50% FOV, PID tracking,
+   read live FIFO and Mitsubishi PLC-Q status. Robot start/move not enabled
+   by dashboard; real M1000/M1001 handshake and calibration require commissioning.
+4. SCARA+Camera2: RESERVED, disabled/no fake ONLINE state, future deployment.
+   Share same conveyor encoder; maintain own camera, robot queue and acknowledgements.
+   SCARA PLC commands must be separated from Gantry and never reuse M1000 blindly.
+
+## CAMERA
+Use existing 'Vận hành' and 'Camera / Nguồn ảnh' tabs to connect Hikrobot,
+Basler or local video. A --demo startup opens C:\Users\aml\Desktop\DEMO\1.avi
+for test; standard START_DATN.cmd opens Dashboard without simulation by default.
+Video is IMAGE-only and does not synchronize product with physical Encoder.
+
+## RUN / SAFETY
+- Build 0 errors; 11 compiler warnings inherited from third-party Hik SDK wrappers.
+- ADS status displayed is the PLC symbol value, not proof of field wiring safety.
+- Dashboard currently recognizes these existing PLC tags only.
+- PLC TwinCAT stage under DATN is COPY for maintenance; current running
+  controller has not been changed or deployed in this C# dashboard task.
+- System runs one DATN instance via Local named Mutex.
+- When PLC ADS is unavailable, dashboard shows OFFLINE and disables commands.
+- Default HMI writes are disarmed; START confirmation is required every time;
+  STOP can be sent as a normal PLC stop, not a certified safety stop.
+
+## CLEANUP / RECOVERY
+Old PlateVision50 folders were moved (NOT PERMANENTLY DELETED) from Desktop to
+D:\DATN_ARCHIVE_20261020\DATN_LEGACY_ARCHIVE_20261019
+Manifest: Docs\legacy_folder_inventory.csv and Docs\legacy_folder_moves.csv.
+Two original directories PlateVision50_V2 and PlateVision50_V2_Tests reported
+Access Denied on relocation and were intentionally left unchanged.
+Do NOT delete WpfYolo sample project, original DATN_TwinCat3, live PLC project,
+camera drivers, TwinCAT Boot, or original contracts without separate review.
+
+## DASHBOARD PREVIEW — 2026-10-20
+Bản Dashboard công nghiệp mới đang thử nghiệm tại `ReleaseCandidate\Dashboard_20261020`.
+Mở bằng `START_DATN_PREVIEW.cmd`; bản `START_DATN.cmd` và `Release` gốc chưa đổi.
+Gồm Tổng quan, Gantry/Camera1, SCARA/Camera2 (RESERVED), Băng tải chung, TAGS/ADS và các tab vận hành/camera/cài đặt cũ.
+Bảng TAGS/ADS chỉ đọc, hiển thị chất lượng LIVE/READ_FAIL/RESERVED. Không có lệnh robot mới.
+Xem `Docs\DASHBOARD_IMPL_CHECKPOINT_20261020.md` và `Docs\BUILD_DASHBOARD_FINAL_20261020.log` để xem xác minh, hạn chế và bước cần nghiệm thu trước release.
+
+## STATION OVERVIEW / 2026-10-20 — BAN THU MOI NHAT
+- Mo `START_DATN_STATION_PREVIEW.cmd` de xem Dashboard moi, mac dinh KHONG phat lenh robot va KHONG tu mo video DEMO.
+- Tong quan co Camera1/live-video, Track ID, X/Y/theta, trigger log va sensor edge log; Tram2/SCARA van RESERVED.
+- Tab Gantry co dieu khien START/STOP NHAN DANG ANH tren PC; tab Bang tai co HMI MD200 rieng (mac dinh khoa, thao tac vat ly can nguoi van hanh cho phep).
+- START/STOP TONG tren overview CHUA CO HANDSHAKE PLC: click chi mo thong tin, KHONG gui lenh. E-STOP tren HMI chi la huong dan; dung nut EStop PHAN CUNG khi nguy hiem.
+- Candidate: `ReleaseCandidate\StationOverview_SensorLog_20261020`. Test video chi dung voi `--demo`, khong dong bo encoder vat ly.
+- Xem `Docs\STATION_OVERVIEW_CHECKPOINT_20261020.md` va `Docs\GLOBAL_COMMAND_CONTRACT_PENDING_20261020.md` de tiep tuc, khong lap lai thao tac da thanh cong.
+
+## GIT SOURCE CONTROL
+GitHub: https://github.com/AnhNguyen-2104/DATN
+- App/Vision and App/PlateVision50.sln: one C# WPF/vision application (not the retired copies).
+- Dependencies: camera integration code; Basler Pylon 8 SDK must be installed locally (vendor DLL is not committed).
+- PLC/TwinCAT: TwinCAT 3 master PLC solution and IO mappings, source only.
+- PLC/Mitsubishi/Sources_20261019/GXWorks2/Candidates: Mitsubishi Gantry candidates, not verified online against the live PLC-Q.
+- Docs/TwinCAT_Stage_20261019: verified copied operating documents.
+- Release, ReleaseCandidate, Runtime, PLC historical backups and local video are intentionally NOT in Git.
+- Build with: dotnet build App/Vision/PlateVision50.csproj -c Release (Windows + .NET 8 SDK + Basler Pylon SDK + vendor camera drivers).
+- Clone of repository is SOURCE ONLY: START_DATN*.cmd require locally built Release/ReleaseCandidate and .NET runtime.
+- Do not download/activate TwinCAT PLC or write to physical devices merely to verify the repository.
+- Old historical code and archives preserved on D: D:/DATN_ARCHIVE_20261020 after hash verification.

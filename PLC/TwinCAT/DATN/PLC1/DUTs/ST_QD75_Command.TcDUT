@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="ST_QD75_Command" Id="{b8555c59-d4d4-468c-a89b-f3ba13a856e8}">
+    <Declaration><![CDATA[TYPE ST_QD75_Command :
+STRUCT
+    Target_X       : DINT; // D100..D101: Tọa độ đón đầu trục X (0.1 um)
+    Target_Y       : DINT; // D102..D103: Tọa độ trục Y đỉnh (0.1 um)
+    Target_Z_Down  : DINT; // D104..D105: Độ cao hạ chấm keo (0.1 um, 4.0mm = 40000)
+    Speed_Approach : DINT; // D106..D107: Vận tốc bay nội suy 3 trục (0.01 mm/min, 500mm/s = 3000000)
+    Speed_Sync     : DINT; // D108..D109: Vận tốc đồng tốc trục X khi chấm keo (= V_conv * 6000)
+    DeltaX_Sync    : DINT; // D110..D111: Quãng đường trượt đồng tốc 60ms (0.1 um)
+    Target_Z_Safe  : DINT; // D112..D113: Độ cao an toàn khi rút kim (0.1 um, 0.0mm = 0)
+    Vertex_Index   : INT;  // D114: Thứ tự đỉnh đang làm (1..4)
+    Cmd_Start      : BOOL; // M1000: Kích chạy đỉnh đang nạp (TwinCAT -> PLC-Q)
+END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

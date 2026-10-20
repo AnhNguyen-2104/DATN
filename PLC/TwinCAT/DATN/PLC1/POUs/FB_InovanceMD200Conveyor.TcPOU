@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_InovanceMD200Conveyor" Id="{a1bd2662-1bc9-4f5e-88d8-f2efc1dd1ee3}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_InovanceMD200Conveyor
+VAR_INPUT
+    bEStopOK            : BOOL := FALSE; // NC safety chain feedback TRUE only when healthy
+    bStart              : BOOL := FALSE; // operator START request, rising edge required
+    rFrequencySet_Hz    : LREAL := 0.0;  // desired frequency, internally limited 0..25Hz
+END_VAR
+VAR_OUTPUT
+    bDO_RunForward      : BOOL;          // ST-2318 Module 10 DO0 / pin 0
+    nAO_12bitRaw        : INT;           // ST-4424 Module 11 AO1 12-bit 0..4095
+    rAO_Volts           : LREAL;         // displayed expected 0..5V for 0..25Hz
+    rTarget_Hz          : LREAL;
+    rRamped_Hz          : LREAL;
+    bAtTarget           : BOOL;
+    bLimited25Hz        : BOOL;
+    nStatus             : UINT;          // 0=STOP,1=RUN,2=ESTOP,3=RESTART_REQUIRED,4=BAD_FREQ
+END_VAR
+VAR
+    fbStartRise         : R_TRIG;
+    bFirstScan          : BOOL := TRUE;
+    bStopSeen           : BOOL := FALSE;
+    bRunGranted         : BOOL := FALSE;
+    rStep               : LREAL;
+    rDelta              : LREAL;
+END_VAR
+VAR CONSTANT
+    cMaxFrequency_Hz    : LREAL := 25.0;  // fixed application limit
+    cAnalogFullScale_Hz : LREAL := 50.0;  // verify MD200 0..10V => 0..50Hz
+    cRampUp_HzPerS      : LREAL := 2.0;   // application reference ramp
+    cTaskCycle_s        : LREAL := 0.01;  // must match PLC task period (10ms)
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// Simplified MD200 controls: EStopOK + Start + Hz setpoint only.
+// Safety-warning: EStopOK is an auxiliary status MONITOR, NOT a safety function.
+// The machine's hardwired E-stop safety circuit must stop the drive independently.
+// This FB is intentionally staged offline; do not Activate from a remote session.
+//
+// PLC boot, EStop loss or zero setpoint all revoke running authorization.
+// Releasing EStop alone NEVER restarts a conveyor with START stuck TRUE.
+// STOP must be observed and then START newly asserted.
+fbStartRise(CLK := bStart);
+IF bFirstScan THEN
+    bFirstScan := FALSE;
+    bStopSeen := FALSE;
+    bRunGranted := FALSE;
+    rRamped_Hz := 0.0;
+END_IF;
+
+// Outputs default safe every scan.
+bDO_RunForward := FALSE;
+nAO_12bitRaw := 0;
+rAO_Volts := 0.0;
+bAtTarget := FALSE;
+bLimited25Hz := FALSE;
+nStatus := 0;
+rTarget_Hz := 0.0;
+
+// Reject NaN: comparisons against NaN are invalid.
+IF (rFrequencySet_Hz <> rFrequencySet_Hz) THEN
+    bRunGranted := FALSE;
+    rRamped_Hz := 0.0;
+    nStatus := 4;
+ELSE
+    IF rFrequencySet_Hz > cMaxFrequency_Hz THEN
+        rTarget_Hz := cMaxFrequency_Hz;
+        bLimited25Hz := TRUE;
+    ELSIF rFrequencySet_Hz > 0.0 THEN
+        rTarget_Hz := rFrequencySet_Hz;
+    ELSE
+        rTarget_Hz := 0.0;
+    END_IF;
+
+    IF NOT bStart THEN
+        bStopSeen := TRUE;
+        bRunGranted := FALSE;
+    END_IF;
+    IF NOT bEStopOK OR (rTarget_Hz < 0.05) THEN
+        bRunGranted := FALSE;
+    END_IF;
+    IF fbStartRise.Q AND bStopSeen AND bEStopOK AND (rTarget_Hz >= 0.05) THEN
+        bRunGranted := TRUE;
+    END_IF;
+
+    IF NOT bEStopOK THEN
+        nStatus := 2; // EStop healthy feedback missing
+        rRamped_Hz := 0.0;
+    ELSIF NOT bStart OR (rTarget_Hz < 0.05) THEN
+        nStatus := 0;
+        rRamped_Hz := 0.0;
+    ELSIF NOT bRunGranted THEN
+        nStatus := 3; // wait for STOP then fresh START edge
+        rRamped_Hz := 0.0;
+    ELSE
+        nStatus := 1;
+        rDelta := rTarget_Hz - rRamped_Hz;
+        rStep := cRampUp_HzPerS * cTaskCycle_s;
+        IF ABS(rDelta) <= rStep THEN
+            rRamped_Hz := rTarget_Hz;
+        ELSIF rDelta > 0.0 THEN
+            rRamped_Hz := rRamped_Hz + rStep;
+        ELSE
+            rRamped_Hz := rRamped_Hz - rStep;
+        END_IF;
+        IF rRamped_Hz > cMaxFrequency_Hz THEN
+            rRamped_Hz := cMaxFrequency_Hz;
+        ELSIF rRamped_Hz < 0.0 THEN
+            rRamped_Hz := 0.0;
+        END_IF;
+        rAO_Volts := (rRamped_Hz / cAnalogFullScale_Hz) * 10.0;
+        nAO_12bitRaw := LREAL_TO_INT((rRamped_Hz / cAnalogFullScale_Hz) * 4095.0);
+        IF nAO_12bitRaw > 4095 THEN nAO_12bitRaw := 4095; END_IF;
+        IF nAO_12bitRaw < 0 THEN nAO_12bitRaw := 0; END_IF;
+        bDO_RunForward := TRUE;
+        bAtTarget := ABS(rTarget_Hz - rRamped_Hz) <= 0.0001;
+    END_IF;
+END_IF;]]></ST>
+    </Implementation>
+    <LineIds Name="FB_InovanceMD200Conveyor"><LineId Id="1" Count="0"/></LineIds>
+  </POU>
+</TcPlcObject>

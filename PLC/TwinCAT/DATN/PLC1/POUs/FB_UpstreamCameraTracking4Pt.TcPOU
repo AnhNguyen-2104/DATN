@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_UpstreamCameraTracking4Pt" Id="{8b38e67a-306d-4b39-98cc-51306c4eb09e}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_UpstreamCameraTracking4Pt
+VAR_INPUT
+    bReset               : BOOL;
+    bCameraResult        : BOOL;  // Single rising edge: camera provides center and angle ONLY
+    bAcceptCamera        : BOOL;
+    bCalibrationConfirmed: BOOL;  // NEVER assume Camera and Robot coordinates coincide
+    bExposureEncoderValid : BOOL; // Capture encoder synchronized with IMAGE EXPOSURE, not processing result
+    rEncoderAtExposure_mm : LREAL; // Encoder latched by TwinCAT when camera takes the image
+    rCameraCenterX_mm    : LREAL; // Already calibrated from pixels into millimeters
+    rCameraCenterY_mm    : LREAL;
+    rCameraAngleDeg      : LREAL;
+    rCameraToWorkStart_mm : LREAL; // USER INPUT after calibration: Camera trigger station to ROBOT X=0, positive mm
+    rCameraToRobotX_mm   : LREAL; // Fine X calibration correction only; NOT the Camera->Robot distance
+    rCameraToRobotY_mm   : LREAL;
+    rCameraToRobotYawDeg : LREAL; // Calibrated camera-to-robot axis angle
+    rEncoderTotalDist_mm : LREAL; // Continuous integrated encoder distance, not 16-bit count
+    rLength_mm           : LREAL := 40.0;
+    rWidth_mm            : LREAL := 40.0;
+    rRobotXMin_mm        : LREAL := 0.0;
+    rRobotXMax_mm        : LREAL := 180.0;
+    rRobotYMin_mm        : LREAL := 0.0;
+    rRobotYMax_mm        : LREAL := 170.0;
+END_VAR
+VAR_OUTPUT
+    bCaptured            : BOOL; // Product retained while travelling FROM camera to robot
+    bInRobotWorkspace    : BOOL; // At least one corner in workspace (diagnostic only)
+    bAllCornersPastRobot : BOOL;
+    bCalibrationMissing  : BOOL;
+    nCaptureCount        : UDINT;
+    nRejectedCount       : UDINT;
+    nErrorCode           : INT;
+    rEncoderAtCapture_mm : LREAL;
+    rEncoderTravel_mm    : LREAL;
+    rCenterAtCaptureX_mm : LREAL; // Robot reference frame at camera trigger time
+    rCenterAtCaptureY_mm : LREAL;
+    rThetaRobotDeg       : LREAL;
+    rCenterNowX_mm       : LREAL; // Current center position in robot frame, negative upstream
+    rCenterNowY_mm       : LREAL;
+    rToRobotWorkStart_mm : LREAL; // Positive while center still upstream; 0 once X>=0
+    aCornerAtCamera      : ARRAY[1..4] OF ST_Point2D;
+    aCornerNow           : ARRAY[1..4] OF ST_Point2D;
+END_VAR
+VAR
+    fbCameraEdge         : R_TRIG;
+    bFirstScan           : BOOL := TRUE;
+    bStartupReset        : BOOL;
+    rFrameRad            : LREAL;
+    rPhiC                : LREAL;
+    rPhiS                : LREAL;
+    rThetaRad            : LREAL;
+    rC                  : LREAL;
+    rS                  : LREAL;
+    rHx                 : LREAL;
+    rHy                 : LREAL;
+    aLocalX             : ARRAY[1..4] OF LREAL;
+    aLocalY             : ARRAY[1..4] OF LREAL;
+    i                    : INT;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbCameraEdge(CLK := bCameraResult);
+bCalibrationMissing := NOT bCalibrationConfirmed
+    OR (rCameraToWorkStart_mm <= 0.0) OR (rCameraToWorkStart_mm > 100000.0);
+
+// Startup: zero LOGICAL state only. Do NOT reset physical encoder/servo.
+// bReset can also be issued deliberately while offline/idle.
+bStartupReset := bFirstScan OR bReset;
+IF bStartupReset THEN
+    bFirstScan := FALSE;
+    bCaptured := FALSE;
+    bInRobotWorkspace := FALSE;
+    bAllCornersPastRobot := FALSE;
+    nCaptureCount := 0;
+    nRejectedCount := 0;
+    nErrorCode := 0;
+    rEncoderAtCapture_mm := 0.0;
+    rEncoderTravel_mm := 0.0;
+    rCenterAtCaptureX_mm := 0.0;
+    rCenterAtCaptureY_mm := 0.0;
+    rCenterNowX_mm := 0.0;
+    rCenterNowY_mm := 0.0;
+    rToRobotWorkStart_mm := 0.0;
+    rThetaRobotDeg := 0.0;
+    FOR i := 1 TO 4 DO
+        aCornerAtCamera[i].X := 0.0;
+        aCornerAtCamera[i].Y := 0.0;
+        aCornerNow[i].X := 0.0;
+        aCornerNow[i].Y := 0.0;
+    END_FOR;
+END_IF;
+
+IF fbCameraEdge.Q AND NOT bStartupReset THEN
+    IF bCalibrationMissing OR NOT bAcceptCamera OR bCaptured OR NOT bExposureEncoderValid THEN
+        nRejectedCount := nRejectedCount + 1;
+        nErrorCode := 101; // Invalid calibration or previously tracked product
+    ELSIF (rLength_mm <= 0.0) OR (rWidth_mm <= 0.0)
+       OR (rLength_mm > 100.0) OR (rWidth_mm > 100.0)
+       OR (ABS(rCameraCenterX_mm) > 100000.0)
+       OR (ABS(rCameraCenterY_mm) > 100000.0) THEN
+        nRejectedCount := nRejectedCount + 1;
+        nErrorCode := 102;
+    ELSE
+        // Frame transform: coordinates in camera physical mm, to robot mm.
+        // Pixel -> mm calibration must happen BEFORE this FB.
+        rFrameRad := rCameraToRobotYawDeg * 3.141592653589793 / 180.0;
+        rPhiC := COS(rFrameRad);
+        rPhiS := SIN(rFrameRad);
+        rCenterAtCaptureX_mm :=
+            -rCameraToWorkStart_mm + rCameraToRobotX_mm
+            + rCameraCenterX_mm * rPhiC - rCameraCenterY_mm * rPhiS;
+        rCenterAtCaptureY_mm :=
+            rCameraToRobotY_mm + rCameraCenterX_mm * rPhiS + rCameraCenterY_mm * rPhiC;
+        rThetaRobotDeg := rCameraAngleDeg + rCameraToRobotYawDeg;
+        rThetaRad := rThetaRobotDeg * 3.141592653589793 / 180.0;
+        rC := COS(rThetaRad);
+        rS := SIN(rThetaRad);
+        rHx := rLength_mm / 2.0;
+        rHy := rWidth_mm / 2.0;
+
+        aLocalX[1] := rHx;  aLocalY[1] := rHy;
+        aLocalX[2] := -rHx; aLocalY[2] := rHy;
+        aLocalX[3] := -rHx; aLocalY[3] := -rHy;
+        aLocalX[4] := rHx;  aLocalY[4] := -rHy;
+        FOR i := 1 TO 4 DO
+            aCornerAtCamera[i].X := rCenterAtCaptureX_mm +
+                aLocalX[i] * rC - aLocalY[i] * rS;
+            aCornerAtCamera[i].Y := rCenterAtCaptureY_mm +
+                aLocalX[i] * rS + aLocalY[i] * rC;
+            aCornerNow[i] := aCornerAtCamera[i];
+        END_FOR;
+        rEncoderAtCapture_mm := rEncoderAtExposure_mm;
+        rEncoderTravel_mm := 0.0;
+        bCaptured := TRUE;
+        bAllCornersPastRobot := FALSE;
+        nCaptureCount := nCaptureCount + 1;
+        nErrorCode := 0;
+    END_IF;
+END_IF;
+
+IF bCaptured THEN
+    rEncoderTravel_mm := rEncoderTotalDist_mm - rEncoderAtCapture_mm;
+    rCenterNowX_mm := rCenterAtCaptureX_mm + rEncoderTravel_mm;
+    rCenterNowY_mm := rCenterAtCaptureY_mm;
+    IF rCenterNowX_mm < 0.0 THEN
+        rToRobotWorkStart_mm := -rCenterNowX_mm;
+    ELSE
+        rToRobotWorkStart_mm := 0.0;
+    END_IF;
+    bInRobotWorkspace := FALSE;
+    bAllCornersPastRobot := TRUE;
+    FOR i := 1 TO 4 DO
+        aCornerNow[i].X := aCornerAtCamera[i].X + rEncoderTravel_mm;
+        aCornerNow[i].Y := aCornerAtCamera[i].Y;
+        IF (aCornerNow[i].X >= rRobotXMin_mm)
+           AND (aCornerNow[i].X <= rRobotXMax_mm)
+           AND (aCornerNow[i].Y >= rRobotYMin_mm)
+           AND (aCornerNow[i].Y <= rRobotYMax_mm) THEN
+            bInRobotWorkspace := TRUE;
+        END_IF;
+        IF aCornerNow[i].X <= rRobotXMax_mm THEN
+            bAllCornersPastRobot := FALSE;
+        END_IF;
+    END_FOR;
+    // Unlike the old FB, upstream negative-X locations remain valid!
+    IF bAllCornersPastRobot THEN
+        bCaptured := FALSE;
+        nErrorCode := 103; // Product exited workspace
+    END_IF;
+END_IF;
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_UpstreamCameraTracking4Pt"><LineId Id="9" Count="0" /></LineIds>
+  </POU>
+</TcPlcObject>

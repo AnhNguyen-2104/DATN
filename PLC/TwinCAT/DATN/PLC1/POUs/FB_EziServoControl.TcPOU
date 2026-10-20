@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="FB_EziServoControl" Id="{fdecb1d2-61f3-46e2-afa9-a8b3a522effc}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_EziServoControl
+VAR_INPUT
+    bEnable         : BOOL := FALSE;
+    bResetFault     : BOOL := FALSE;
+    bJogFwd         : BOOL := FALSE;
+    bJogBwd         : BOOL := FALSE;
+    rTargetVelocity : LREAL := 100.0;
+    rAcc            : LREAL := 400.0;
+    rDec            : LREAL := 400.0;
+END_VAR
+VAR_IN_OUT
+    Axis            : AXIS_REF;
+END_VAR
+VAR_OUTPUT
+    bReady          : BOOL;
+    rActPos_Deg     : LREAL;
+    rActVel_Deg     : LREAL;
+END_VAR
+VAR
+    fbPower         : MC_Power;
+    fbMoveVelocity  : MC_MoveVelocity;
+    fbHalt          : MC_Halt;
+    fbReset         : MC_Reset;
+
+    rTargetVel_Prev : LREAL;
+    bVelChanged     : BOOL;
+    fbTrigFwd       : R_TRIG;
+    fbTrigBwd       : R_TRIG;
+    fbTrigStop      : R_TRIG;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbReset(Axis := Axis, Execute := bResetFault);
+
+fbPower(
+    Axis            := Axis,
+    Enable          := bEnable,
+    Enable_Positive := TRUE,
+    Enable_Negative := TRUE,
+    Override        := 100.0,
+    Status          => bReady
+);
+
+fbTrigFwd(CLK := bEnable AND bJogFwd AND NOT bJogBwd);
+fbTrigBwd(CLK := bEnable AND bJogBwd AND NOT bJogFwd);
+fbTrigStop(CLK := NOT bEnable OR (NOT bJogFwd AND NOT bJogBwd) OR (bJogFwd AND bJogBwd));
+
+IF rTargetVelocity <> rTargetVel_Prev THEN
+    bVelChanged     := TRUE;
+    rTargetVel_Prev := rTargetVelocity;
+ELSE
+    bVelChanged     := FALSE;
+END_IF
+
+fbMoveVelocity(
+    Axis         := Axis,
+    Execute      := (fbTrigFwd.Q OR fbTrigBwd.Q OR (bVelChanged AND (bJogFwd OR bJogBwd))),
+    Velocity     := rTargetVelocity,
+    Acceleration := rAcc,
+    Deceleration := rDec,
+    Jerk         := 10000.0,
+    Direction    := SEL(bJogBwd, MC_Positive_Direction, MC_Negative_Direction)
+);
+
+fbHalt(
+    Axis         := Axis,
+    Execute      := fbTrigStop.Q,
+    Deceleration := rDec,
+    Jerk         := 10000.0
+);
+
+rActPos_Deg := Axis.NcToPlc.ActPos;
+rActVel_Deg := Axis.NcToPlc.ActVelo;]]></ST>
+    </Implementation>
+    <LineIds Name="FB_EziServoControl">
+      <LineId Id="108" Count="39" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

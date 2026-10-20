@@ -1,0 +1,877 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="PlateVision50.MainWindow" Title="DATN | Line Control · TwinCAT Master" Width="1600" Height="990" MinWidth="1180" MinHeight="730" WindowStartupLocation="CenterScreen" Background="{DynamicResource VDTheme001}" Foreground="{DynamicResource VDTheme002}" FontFamily="Segoe UI">
+  <Window.Resources>
+    <SolidColorBrush x:Key="Panel" Color="#F7F8FA" />
+    <SolidColorBrush x:Key="Field" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="Stroke" Color="#C5CED7" />
+    <Style TargetType="Button">
+      <Setter Property="Background" Value="{DynamicResource VDTheme003}" />
+      <Setter Property="Foreground" Value="{DynamicResource VDTheme004}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="11,5" />
+      <Setter Property="Margin" Value="2" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="Normal" />
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Background="{TemplateBinding Background}" CornerRadius="0" Padding="{TemplateBinding Padding}" BorderBrush="{DynamicResource VDTheme005}" BorderThickness="1">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.45" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="TextBox">
+      <Setter Property="Background" Value="{StaticResource Field}" />
+      <Setter Property="Foreground" Value="{DynamicResource VDTheme006}" />
+      <Setter Property="CaretBrush" Value="{DynamicResource VDTheme007}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="7,4" />
+      <Setter Property="Margin" Value="3" />
+      <Setter Property="MinHeight" Value="29" />
+      <Setter Property="BorderBrush" Value="{DynamicResource VDTheme008}" />
+    </Style>
+    <Style TargetType="ComboBox">
+      <Setter Property="Background" Value="{DynamicResource VDTheme009}" />
+      <Setter Property="Foreground" Value="{DynamicResource VDTheme010}" />
+      <Setter Property="Margin" Value="3" />
+      <Setter Property="MinHeight" Value="29" />
+    </Style>
+    <Style TargetType="TextBlock">
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style x:Key="SectionHeading" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource VDTheme011}" />
+      <Setter Property="Margin" Value="0,0,0,9" />
+    </Style>
+    <Style x:Key="FieldLabel" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource VDTheme012}" />
+      <Setter Property="Margin" Value="4,4,0,3" />
+    </Style>
+    <SolidColorBrush x:Key="VDTheme001" Color="#E8EBEF" />
+    <SolidColorBrush x:Key="VDTheme002" Color="#23313E" />
+    <SolidColorBrush x:Key="VDTheme003" Color="#2E6E95" />
+    <SolidColorBrush x:Key="VDTheme004" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="VDTheme005" Color="#AEB9C3" />
+    <SolidColorBrush x:Key="VDTheme006" Color="#293845" />
+    <SolidColorBrush x:Key="VDTheme007" Color="#253544" />
+    <SolidColorBrush x:Key="VDTheme008" Color="#ABB7C3" />
+    <SolidColorBrush x:Key="VDTheme009" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="VDTheme010" Color="#263440" />
+    <SolidColorBrush x:Key="VDTheme011" Color="#3C5365" />
+    <SolidColorBrush x:Key="VDTheme012" Color="#63727E" />
+    <SolidColorBrush x:Key="VDTheme013" Color="#253544" />
+    <SolidColorBrush x:Key="VDTheme014" Color="#647381" />
+    <SolidColorBrush x:Key="VDTheme015" Color="#47687D" />
+    <SolidColorBrush x:Key="VDTheme016" Color="#985F29" />
+    <SolidColorBrush x:Key="VDTheme017" Color="#536A7C" />
+    <SolidColorBrush x:Key="VDTheme018" Color="#E7EBEF" />
+    <SolidColorBrush x:Key="VDTheme019" Color="#445563" />
+    <SolidColorBrush x:Key="VDTheme020" Color="#EDF1F4" />
+    <SolidColorBrush x:Key="VDTheme021" Color="#CBD3DA" />
+    <SolidColorBrush x:Key="VDTheme022" Color="#D5E3EC" />
+    <SolidColorBrush x:Key="VDTheme023" Color="#1E4E6B" />
+    <SolidColorBrush x:Key="VDTheme024" Color="#27698F" />
+    <SolidColorBrush x:Key="VDTheme025" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="VDTheme026" Color="#367760" />
+    <SolidColorBrush x:Key="VDTheme027" Color="#727D85" />
+    <SolidColorBrush x:Key="VDTheme028" Color="#E3E8ED" />
+    <SolidColorBrush x:Key="VDTheme029" Color="#263743" />
+    <SolidColorBrush x:Key="VDTheme030" Color="#7F602E" />
+    <SolidColorBrush x:Key="VDTheme031" Color="#687780" />
+    <SolidColorBrush x:Key="VDTheme032" Color="#DD101E31" />
+    <SolidColorBrush x:Key="VDTheme033" Color="#D8E6EF" />
+    <SolidColorBrush x:Key="VDTheme034" Color="#E1E6EB" />
+    <SolidColorBrush x:Key="VDTheme035" Color="#DA101E31" />
+    <SolidColorBrush x:Key="VDTheme036" Color="#E0B465" />
+    <SolidColorBrush x:Key="VDTheme037" Color="#E5E9EF" />
+    <SolidColorBrush x:Key="VDTheme038" Color="#2D3E49" />
+    <SolidColorBrush x:Key="VDTheme039" Color="#DFE5EA" />
+    <SolidColorBrush x:Key="VDTheme040" Color="#2E3E49" />
+    <SolidColorBrush x:Key="VDTheme041" Color="#C0CAD2" />
+    <SolidColorBrush x:Key="VDTheme042" Color="#677987" />
+    <SolidColorBrush x:Key="VDTheme043" Color="#315D76" />
+    <SolidColorBrush x:Key="VDTheme044" Color="#586D7C" />
+    <SolidColorBrush x:Key="VDTheme045" Color="#5B7082" />
+    <SolidColorBrush x:Key="VDTheme046" Color="#243F52" />
+    <SolidColorBrush x:Key="VDTheme047" Color="#786539" />
+    <SolidColorBrush x:Key="VDTheme048" Color="#657785" />
+    <SolidColorBrush x:Key="VDTheme049" Color="#8998A3" />
+    <SolidColorBrush x:Key="VDTheme050" Color="#647889" />
+    <SolidColorBrush x:Key="VDTheme051" Color="#2B5B5A" />
+    <SolidColorBrush x:Key="VDTheme052" Color="#466776" />
+    <SolidColorBrush x:Key="VDTheme053" Color="#6C7D8A" />
+    <SolidColorBrush x:Key="VDTheme054" Color="#304454" />
+    <SolidColorBrush x:Key="VDTheme055" Color="#70808C" />
+    <SolidColorBrush x:Key="VDTheme056" Color="#25333E" />
+    <SolidColorBrush x:Key="VDTheme057" Color="#607587" />
+    <SolidColorBrush x:Key="VDTheme058" Color="#627483" />
+    <SolidColorBrush x:Key="VDTheme059" Color="#536D80" />
+    <SolidColorBrush x:Key="VDTheme060" Color="#347386" />
+    <SolidColorBrush x:Key="VDTheme061" Color="#5E7788" />
+    <SolidColorBrush x:Key="VDTheme062" Color="#9C6D33" />
+    <SolidColorBrush x:Key="VDTheme063" Color="#657887" />
+    <SolidColorBrush x:Key="VDTheme064" Color="#98662F" />
+    <SolidColorBrush x:Key="VDTheme065" Color="#577181" />
+    <SolidColorBrush x:Key="VDTheme066" Color="#9B682B" />
+    <SolidColorBrush x:Key="VDTheme067" Color="#314858" />
+    <SolidColorBrush x:Key="VDTheme068" Color="#9C6B2D" />
+    <SolidColorBrush x:Key="VDTheme069" Color="#866746" />
+    <SolidColorBrush x:Key="VDTheme070" Color="#667683" />
+    <SolidColorBrush x:Key="VDTheme071" Color="#59778A" />
+    <SolidColorBrush x:Key="VDTheme072" Color="#354B5D" />
+    <SolidColorBrush x:Key="VDTheme073" Color="#63727E" />
+    <SolidColorBrush x:Key="VDTheme074" Color="#986832" />
+    <SolidColorBrush x:Key="VDTheme075" Color="#70808D" />
+    <SolidColorBrush x:Key="VDTheme076" Color="#95652D" />
+    <SolidColorBrush x:Key="VDTheme077" Color="#283743" />
+    <SolidColorBrush x:Key="VDTheme078" Color="#94652D" />
+    <SolidColorBrush x:Key="VDTheme079" Color="#DCE2E7" />
+    <SolidColorBrush x:Key="VDTheme080" Color="#C4CDD6" />
+    <SolidColorBrush x:Key="VDTheme081" Color="#304A5F" />
+    <Style TargetType="ComboBoxItem">
+      <Setter Property="Background" Value="{DynamicResource VDThemeComboBg}" />
+      <Setter Property="Foreground" Value="{DynamicResource VDThemeComboFg}" />
+    </Style>
+    <SolidColorBrush x:Key="VDThemeComboBg" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="VDThemeComboFg" Color="#263440" />
+  </Window.Resources>
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="54" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="30" />
+    </Grid.RowDefinitions>
+    <Grid Grid.Row="0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <StackPanel Margin="0,0,0,0">
+          <TextBlock Text="DATN / LINE CONTROL" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource VDTheme013}" />
+          <TextBlock Text="GANTRY DISPENSING  ·  SCARA PICK-PLACE  ·  CONVEYOR TRACKING" Foreground="{DynamicResource VDTheme014}" FontSize="11" />
+        </StackPanel>
+      </StackPanel>
+      <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+        <TextBlock Text="NGUỒN  /  TRACKING  /  PLC" Foreground="{DynamicResource VDTheme015}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right" />
+        <TextBlock x:Name="ControlSafetyBanner" Text="ADS: CHỈ ĐỌC MẶC ĐỊNH  |  ROBOT: KHÔNG ĐIỀU KHIỂN" Foreground="{DynamicResource VDTheme016}" FontSize="11" HorizontalAlignment="Right" />
+        <CheckBox x:Name="DarkModeBox" Content="Giao diện tối" Checked="DarkModeChanged" Unchecked="DarkModeChanged" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource VDTheme017}" HorizontalAlignment="Right" Margin="0,3,0,0" />
+      </StackPanel>
+    </Grid>
+    <TabControl x:Name="MainNavigation" Grid.Row="1" TabStripPlacement="Left" Background="{DynamicResource VDTheme018}" BorderThickness="0" Margin="0,3,0,2" SelectedIndex="0">
+      <TabControl.Resources>
+        <Style TargetType="TabItem">
+          <Setter Property="MinWidth" Value="162" />
+          <Setter Property="Padding" Value="13,10" />
+          <Setter Property="Margin" Value="0,0,7,1" />
+          <Setter Property="Foreground" Value="{DynamicResource VDTheme019}" />
+          <Setter Property="Background" Value="{DynamicResource VDTheme020}" />
+          <Setter Property="FontSize" Value="12" />
+          <Setter Property="FontWeight" Value="Normal" />
+          <Setter Property="Template">
+            <Setter.Value>
+              <ControlTemplate TargetType="TabItem">
+                <Border Background="{TemplateBinding Background}" CornerRadius="0" BorderThickness="0,0,1,1" BorderBrush="{DynamicResource VDTheme021}" Padding="{TemplateBinding Padding}">
+                  <ContentPresenter ContentSource="Header" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                </Border>
+                <ControlTemplate.Triggers>
+                  <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource VDTheme022}" />
+                    <Setter Property="Foreground" Value="{DynamicResource VDTheme023}" />
+                  </Trigger>
+                </ControlTemplate.Triggers>
+              </ControlTemplate>
+            </Setter.Value>
+          </Setter>
+        </Style>
+      </TabControl.Resources>
+      <TabItem Header="TỔNG QUAN" x:Name="DashboardTab">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="#0B1723">
+          <StackPanel Margin="18,15,18,20">
+            <Grid Margin="0,0,0,13">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="TRUNG TÂM ĐIỀU KHIỂN DÂY CHUYỀN" FontSize="23" FontWeight="Bold" Foreground="#EDF5FA"/>
+                <TextBlock Text="DATN   /   TwinCAT 3 MASTER   /   Gantry · Conveyor · SCARA" FontSize="11" Foreground="#87A0B7" Margin="0,5,0,0"/>
+              </StackPanel>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                <TextBlock x:Name="DashUpdated" Text="Đang đọc PLC..." FontSize="11" Foreground="#A1B6C5" HorizontalAlignment="Right"/>
+                <TextBlock Text="Giám sát ADS 851 · không tự phát lệnh robot" FontSize="11" Foreground="#63BDCF" Margin="0,4,0,0"/>
+              </StackPanel>
+            </Grid>
+            <!-- Global dashboard controls are deliberately request-only until the PLC safety contract is commissioned. -->
+            <Border Background="#172A3A" BorderBrush="#456077" BorderThickness="1" CornerRadius="7" Padding="12,10" Margin="0,0,0,12">
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock Text="ĐIỀU KHIỂN TỔNG / LINE COMMAND" FontSize="13" FontWeight="Bold" Foreground="#E6F4FD"/>
+                  <TextBlock x:Name="OverviewGlobalAuthority" Text="CHƯA NGHIỆM THU LỆNH TOÀN DÂY CHUYỀN · CÁC NÚT CHỈ HIỂN THỊ HƯỚNG DẪN" FontSize="11" Foreground="#F4D18D" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+                <WrapPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0,0,0">
+                  <Button Content="START TỔNG · CHỜ PLC" Tag="START" Click="DashGlobalCommand_Click" MinWidth="155" MinHeight="41" Margin="0,0,7,0" Background="#1D726A" Foreground="White" ToolTip="Chưa kết nối handshake START tổng; click để xem yêu cầu tích hợp, không gửi ADS."/>
+                  <Button Content="STOP TỔNG · CHỜ PLC" Tag="STOP" Click="DashGlobalCommand_Click" MinWidth="150" MinHeight="41" Margin="0,0,7,0" Background="#A36C35" Foreground="White" ToolTip="Chưa có lệnh STOP tổng được nghiệm thu; click để xem thông tin, không gửi ADS."/>
+                  <Button Content="E-STOP / HƯỚNG DẪN" Tag="ESTOP" Click="DashGlobalCommand_Click" MinWidth="147" MinHeight="41" Background="#953C45" Foreground="White" FontWeight="Bold" ToolTip="Chỉ hiển thị hướng dẫn. Mạch E-Stop vật lý phải dừng thiết bị độc lập với HMI."/>
+                </WrapPanel>
+              </Grid>
+            </Border>
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Background="#142739" BorderBrush="#274158" BorderThickness="1" CornerRadius="7" Padding="13" Margin="0,0,8,0">
+                <StackPanel><TextBlock Text="HỆ THỐNG / E-STOP" FontSize="10" Foreground="#92A8BA"/><TextBlock x:Name="DashEStop" Text="CHƯA XÁC NHẬN" FontSize="18" FontWeight="Bold" Foreground="#EAC17E" Margin="0,9,0,4"/><TextBlock Text="Phản hồi ST-1228 · DI0" FontSize="10" Foreground="#91A2B3"/></StackPanel>
+              </Border>
+              <Border Grid.Column="1" Background="#142739" BorderBrush="#274158" BorderThickness="1" CornerRadius="7" Padding="13" Margin="0,0,8,0">
+                <StackPanel><TextBlock Text="TWINCAT / PLC" FontSize="10" Foreground="#92A8BA"/><TextBlock x:Name="DashPlc" Text="ĐANG KẾT NỐI" FontSize="18" FontWeight="Bold" Foreground="#EAC17E" Margin="0,9,0,4"/><TextBlock Text="ADS port 851 · MASTER" FontSize="10" Foreground="#91A2B3"/></StackPanel>
+              </Border>
+              <Border Grid.Column="2" Background="#142739" BorderBrush="#274158" BorderThickness="1" CornerRadius="7" Padding="13" Margin="0,0,8,0">
+                <StackPanel><TextBlock Text="BĂNG TẢI DÙNG CHUNG" FontSize="10" Foreground="#92A8BA"/><TextBlock x:Name="DashSpeed" Text="— mm/s" FontSize="18" FontWeight="Bold" Foreground="#E5F2FA" Margin="0,9,0,4"/><TextBlock x:Name="DashFrequency" Text="Đặt: — Hz" FontSize="10" Foreground="#91A2B3"/></StackPanel>
+              </Border>
+              <Border Grid.Column="3" Background="#142739" BorderBrush="#274158" BorderThickness="1" CornerRadius="7" Padding="13">
+                <StackPanel><TextBlock Text="HÀNG ĐỢI SẢN PHẨM" FontSize="10" Foreground="#92A8BA"/><TextBlock x:Name="DashQueue" Text="— / 8" FontSize="18" FontWeight="Bold" Foreground="#E5F2FA" Margin="0,9,0,4"/><TextBlock x:Name="DashQueueInfo" Text="Đang chờ PLC..." FontSize="10" Foreground="#91A2B3"/></StackPanel>
+              </Border>
+            </Grid>
+            <Border Background="#1C2B35" CornerRadius="6" Padding="12,10" Margin="0,0,0,14" BorderBrush="#375065" BorderThickness="1">
+              <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <TextBlock x:Name="DashMachineMessage" Text="Trạng thái toàn hệ thống đang được đọc qua ADS..." Foreground="#E3EAF0" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap"/>
+                <TextBlock Grid.Column="1" Text="HMI / THÔNG TIN VẬN HÀNH" Foreground="#8DA9B8" FontSize="10" Margin="12,0,0,0" VerticalAlignment="Center"/>
+              </Grid>
+            </Border>
+            <TextBlock Text="TRẠM 01 / GANTRY  —  TRẠM 02 / SCARA" Foreground="#D6E5ED" FontSize="12" FontWeight="Bold" Margin="0,0,0,9"/>
+            <Grid Margin="0,0,0,15">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Background="#132639" BorderBrush="#2D546C" BorderThickness="1" CornerRadius="8" Margin="0,0,8,0" Padding="16">
+                <StackPanel>
+                  <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel><TextBlock Text="01 / GANTRY DISPENSING" Foreground="#62CEE5" FontSize="11" FontWeight="Bold"/><TextBlock Text="Chấm keo 4 điểm" Foreground="#F3F8FC" FontSize="19" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                    <Border Grid.Column="1" Background="#183E4A" CornerRadius="3" Padding="9,5"><TextBlock Text="GIAI ĐOẠN 1" Foreground="#79D9D4" FontSize="10" FontWeight="Bold"/></Border>
+                  </Grid>
+                  <Separator Background="#3D5668" Margin="0,13,0,11"/>
+                  <!-- Same WPF bitmap from Camera 1 operating view, not a second camera SDK session. -->
+                  <Border Height="192" Background="#071420" BorderBrush="#37556B" BorderThickness="1" CornerRadius="4" ClipToBounds="True">
+                    <Grid>
+                      <Image x:Name="OverviewCam1Image" Source="{Binding Source,ElementName=Preview}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                      <Border VerticalAlignment="Top" HorizontalAlignment="Left" Background="#B9091A2A" Padding="7,4" Margin="8">
+                        <TextBlock x:Name="OverviewCam1Quality" Text="CAMERA 1 / KHÔNG CÓ FRAME" Foreground="#DAEEF7" FontSize="11" FontWeight="SemiBold"/>
+                      </Border>
+                      <TextBlock x:Name="OverviewCam1Empty" Text="Chưa có nguồn Camera 1 / Xem tab Camera để kết nối" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#A5BDCD" TextWrapping="Wrap" TextAlignment="Center" Margin="18" FontSize="12"/>
+                    </Grid>
+                  </Border>
+                  <Grid Margin="0,9,0,9">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBlock Text="SẢN PHẨM ĐANG THEO DÕI" Foreground="#8EADBF" FontSize="10"/>
+                      <TextBlock x:Name="OverviewCam1Track" Text="Track ID: --" Foreground="#F1F8FC" FontSize="13" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                      <TextBlock Text="TỌA ĐỘ ẢNH / mm · θ" Foreground="#8EADBF" FontSize="10"/>
+                      <TextBlock x:Name="OverviewCam1Pose" Text="X --  Y --  θ --" Foreground="#F1F8FC" FontSize="13" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                    </StackPanel>
+                  </Grid>
+                  <TextBlock Text="LỊCH SỬ VẬT / TRIGGER CAMERA 1 (từ tracking C#)" Foreground="#88BDCD" FontSize="10" FontWeight="Bold" Margin="0,1,0,5"/>
+                  <DataGrid x:Name="OverviewGantryLog" Height="92" IsReadOnly="True" AutoGenerateColumns="False" HeadersVisibility="None" Background="#102738" Foreground="#E6F2FB" RowBackground="#102738" AlternatingRowBackground="#203C4B" BorderThickness="0" RowHeight="27" CanUserAddRows="False">
+                    <DataGrid.Columns>
+                      <DataGridTextColumn Header="Giờ" Binding="{Binding Time}" Width="75"/>
+                      <DataGridTextColumn Header="Track" Binding="{Binding TrackId}" Width="44"/>
+                      <DataGridTextColumn Header="Tọa độ" Binding="{Binding Position}" Width="135"/>
+                      <DataGridTextColumn Header="Sự kiện" Binding="{Binding Delivery}" Width="*"/>
+                    </DataGrid.Columns>
+                  </DataGrid>
+                  <TextBlock x:Name="OverviewGantrySensors" Text="SENSORS / chờ PLC..." TextWrapping="Wrap" Foreground="#9DC7CF" FontSize="11" Margin="0,9,0,7"/>
+
+                  <TextBlock x:Name="DashGantryState" Text="Robot: đang đọc..." Foreground="#E9F0F5" FontWeight="SemiBold" FontSize="13"/>
+                  <TextBlock x:Name="DashGantryPlc" Text="Mitsubishi QD75: —" Foreground="#ADC0CE" Margin="0,6,0,0"/>
+                  <TextBlock x:Name="DashGantryVertex" Text="Đỉnh hiện tại: — / 4" Foreground="#ADC0CE" Margin="0,5,0,0"/>
+                  <TextBlock x:Name="DashCamera1" Text="Camera 1: —" Foreground="#ADC0CE" Margin="0,5,0,0"/>
+                  <TextBlock x:Name="DashGantryStats" Text="FIFO: — | Hoàn thành: — | Bỏ lỡ: —" Foreground="#ADC0CE" Margin="0,5,0,9"/>
+                  <WrapPanel Margin="0,7,0,0">
+                    <Button Content="MỞ TRẠM 01 / ĐIỀU KHIỂN" Click="DashOpenGantry_Click" Background="#236F8C" Foreground="White" MinHeight="32" Margin="0,0,7,0"/>
+                    <Button Content="TRẠNG THÁI PLC" Click="DashPLC_Click" Background="#294053" Foreground="#EDF6FA" MinHeight="32"/>
+                  </WrapPanel>
+                  <TextBlock Text="Chưa cấp quyền chuyển động robot từ HMI. M1000/M1001 theo PLC-Q." TextWrapping="Wrap" Foreground="#8EA5B6" FontSize="10" Margin="0,10,0,0"/>
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="1" Background="#142330" BorderBrush="#33485C" BorderThickness="1" CornerRadius="8" Padding="16">
+                <StackPanel>
+                  <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel><TextBlock Text="02 / SCARA PICK &amp; PLACE" Foreground="#B0C1D0" FontSize="11" FontWeight="Bold"/><TextBlock Text="Gắp sản phẩm vào khay" Foreground="#E6EFF5" FontSize="19" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                    <Border Grid.Column="1" Background="#35414C" CornerRadius="3" Padding="9,5"><TextBlock Text="DỰ KIẾN" Foreground="#E3D3A0" FontSize="10" FontWeight="Bold"/></Border>
+                  </Grid>
+                  <Separator Background="#3D5668" Margin="0,13,0,11"/>
+                  <Border Height="192" Background="#091520" BorderBrush="#37556B" BorderThickness="1" CornerRadius="4">
+                    <Grid>
+                      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="CAMERA 02" FontSize="18" FontWeight="Bold" Foreground="#7B96A8" HorizontalAlignment="Center"/>
+                        <TextBlock Text="CHƯA KẾT NỐI / CHƯA TRIỂN KHAI" FontSize="11" Foreground="#E4BB78" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                        <TextBlock Text="Không dùng hình hoặc tọa độ mô phỏng như dữ liệu thật" FontSize="10" Foreground="#93A7B8" Margin="0,9,0,0" HorizontalAlignment="Center"/>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                  <Grid Margin="0,9,0,9">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <StackPanel><TextBlock Text="TRACK / KHAY" Foreground="#8EADBF" FontSize="10"/><TextBlock Text="-- / RESERVED" Foreground="#E4D5AA" FontSize="13" Margin="0,4,0,0"/></StackPanel>
+                    <StackPanel Grid.Column="1"><TextBlock Text="X / Y / θ" Foreground="#8EADBF" FontSize="10"/><TextBlock Text="-- / -- / --" Foreground="#E4D5AA" FontSize="13" Margin="0,4,0,0"/></StackPanel>
+                  </Grid>
+                  <Border Height="92" Background="#102330" BorderBrush="#253C4F" BorderThickness="1" Padding="10">
+                    <StackPanel><TextBlock Text="LOG SCARA" Foreground="#8BB1C2" FontSize="11" FontWeight="SemiBold"/><TextBlock Text="Chưa có dữ liệu robot, cảm biến hoặc sản phẩm tại trạm 2." TextWrapping="Wrap" Foreground="#9BB1C0" FontSize="11" Margin="0,8,0,0"/></StackPanel>
+                  </Border>
+                  <TextBlock Text="SENSORS / Camera 2, robot ready, khay: CHƯA TÍCH HỢP" Foreground="#A3AEB9" FontSize="11" TextWrapping="Wrap" Margin="0,9,0,7"/>
+
+                  <TextBlock Text="PLC SCARA: CHƯA TÍCH HỢP" Foreground="#E3D3A0" FontSize="13" FontWeight="SemiBold"/>
+                  <TextBlock Text="Camera 2: chưa cài đặt" Foreground="#ADC0CE" Margin="0,7,0,0"/>
+                  <TextBlock Text="Tracking: dùng chung encoder băng tải" Foreground="#ADC0CE" Margin="0,5,0,0"/>
+                  <TextBlock Text="Hàng đợi riêng: chưa kích hoạt" Foreground="#ADC0CE" Margin="0,5,0,0"/>
+                  <TextBlock Text="Trạng thái khay: chờ kết nối" Foreground="#ADC0CE" Margin="0,5,0,9"/>
+                  <WrapPanel Margin="0,7,0,0">
+                    <Button Content="MỞ TRẠM 02 / DỰ KIẾN" Click="DashOpenScara_Click" ToolTip="Mở màn hình chi tiết để xem thiết kế SCARA tương lai; không phát lệnh." Background="#34485B" Foreground="#EDF6FA" MinHeight="32"/>
+                  </WrapPanel>
+                  <TextBlock Text="Module dành sẵn: camera 2, tọa độ phôi, khay, robot và handshake riêng." TextWrapping="Wrap" Foreground="#8EA5B6" FontSize="10" Margin="0,10,0,0"/>
+                </StackPanel>
+              </Border>
+            </Grid>
+            <Border Background="#132639" BorderBrush="#2D4C63" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,12">
+              <StackPanel>
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                  <StackPanel><TextBlock Text="BĂNG TẢI CHUNG / CONVEYOR 01" Foreground="#EAF4F9" FontWeight="Bold" FontSize="14"/><TextBlock Text="Một encoder cấp tọa độ và vận tốc cho Gantry &amp; SCARA" Foreground="#8DA8BB" FontSize="11" Margin="0,4,0,0"/></StackPanel>
+                  <TextBlock Grid.Column="1" x:Name="DashBeltState" Text="STOP" Foreground="#EAC17E" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
+                </Grid>
+                <Grid Margin="0,8,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <StackPanel Grid.Column="0"><TextBlock Text="ENCODER" Foreground="#92A8BA" FontSize="10"/><TextBlock x:Name="DashDistance" Text="— mm" Foreground="#F1F7FA" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                  <StackPanel Grid.Column="1"><TextBlock Text="TỐC ĐỘ ĐO" Foreground="#92A8BA" FontSize="10"/><TextBlock x:Name="DashBeltMmS" Text="— mm/s" Foreground="#F1F7FA" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                  <StackPanel Grid.Column="2"><TextBlock Text="MD200 / THAM CHIẾU" Foreground="#92A8BA" FontSize="10"/><TextBlock x:Name="DashHzReal" Text="— Hz" Foreground="#F1F7FA" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                  <StackPanel Grid.Column="3"><TextBlock Text="AO ST-4424" Foreground="#92A8BA" FontSize="10"/><TextBlock x:Name="DashAnalog" Text="— V" Foreground="#F1F7FA" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                </Grid>
+                <Button Content="MỞ BĂNG TẢI / CHI TIẾT &amp; ĐIỀU KHIỂN" Click="DashOpenConveyor_Click" HorizontalAlignment="Left" Background="#236F8C" Foreground="White" MinHeight="35" Margin="0,7,0,0"/>
+
+              </StackPanel>
+            </Border>
+            <Border Background="#152D3B" BorderBrush="#32586E" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,12">
+              <StackPanel>
+                <TextBlock Text="CẢM BIẾN &amp; LIÊN ĐỘNG / GIÁM SÁT PLC" FontSize="12" FontWeight="Bold" Foreground="#88D1DC"/>
+                <TextBlock x:Name="OverviewSensors" Text="ADS: đang đọc dữ liệu. Các trạng thái không chứng minh mạch an toàn vật lý." Foreground="#E3F1F8" FontSize="12" TextWrapping="Wrap" Margin="0,9,0,3"/>
+                <TextBlock x:Name="OverviewRecentEvent" Text="LOG: chưa có sự kiện vật / lệnh HMI." Foreground="#B6C9D6" FontSize="11" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                <TextBlock Text="NHẬT KÝ CHUYỂN TRẠNG THÁI CẢM BIẾN / PLC" FontSize="10" FontWeight="Bold" Foreground="#8EBBCD" Margin="0,9,0,3"/>
+                <ListBox x:Name="OverviewSensorLog" Height="98" Background="#102535" Foreground="#E2F1F9" BorderThickness="0" FontSize="11" Padding="7,4"/>
+
+              </StackPanel>
+            </Border>
+            <TextBlock Text="CHUỖI SẢN XUẤT     CAMERA 1  →  GANTRY 4 ĐIỂM  →  CAMERA 2 / SCARA  →  KHAY" Foreground="#6ABFCE" FontSize="12" FontWeight="SemiBold" Margin="4,0,0,4"/>
+            <TextBlock Text="Dữ liệu robot Scara chưa được triển khai. Chỉ Camera 1/Gantry có tag đọc thực tế; không suy diễn trạng thái robot từ ADS kết nối." Foreground="#869CAD" FontSize="11" TextWrapping="Wrap"/>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Vận hành">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <Border Background="{StaticResource Panel}" CornerRadius="0" BorderBrush="{StaticResource Stroke}" BorderThickness="1" Padding="8" Margin="0,2,0,10" Grid.Row="0">
+            <WrapPanel VerticalAlignment="Center">
+              <Button Content="KẾT NỐI CAMERA" Click="ConnectCameraIp_Click" Background="{DynamicResource VDTheme024}" ToolTip="Sử dụng IP đã chọn ở Camera &amp; Nguồn ảnh" MinHeight="30" Foreground="{DynamicResource VDTheme025}" />
+              <Button x:Name="StartTrackingButton" Content="START NHẬN DẠNG" Click="StartTracking_Click" Background="{DynamicResource VDTheme026}" IsEnabled="False" ToolTip="Bắt đầu nhận dạng, bám Track ID và chỉ trigger khi tâm vượt 50% FOV. Không phát lệnh Robot." MinHeight="30" Foreground="{DynamicResource VDTheme025}" />
+              <Button x:Name="StopTrackingButton" Content="DỪNG NHẬN DẠNG" Click="StopTracking_Click" Background="{DynamicResource VDTheme027}" IsEnabled="False" ToolTip="Dừng nhận dạng và trigger, giữ Live View camera." MinHeight="30" Foreground="{DynamicResource VDTheme025}" />
+              <Button Content="Ngắt camera" Click="DisconnectCameras_Click" Background="{DynamicResource VDTheme028}" MinHeight="30" Foreground="{DynamicResource VDTheme029}" />
+              <Button Content="Cài đặt" Click="OpenSettingsPage_Click" Background="{DynamicResource VDTheme028}" MinHeight="30" Foreground="{DynamicResource VDTheme029}" />
+              <TextBlock x:Name="TrackingModeText" Text="CHƯA CÓ NGUỒN | BẮT VẬT: TẮT" TextWrapping="Wrap" Foreground="{DynamicResource VDTheme030}" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Margin="8,0,0,0" />
+            </WrapPanel>
+          </Border>
+          <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="3.1*" />
+              <ColumnDefinition Width="1.35*" />
+            </Grid.ColumnDefinitions>
+            <Grid Grid.Column="0" Margin="0,0,12,0">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="235" />
+              </Grid.RowDefinitions>
+              <Border Grid.Row="0" Background="#11161C" CornerRadius="0" BorderBrush="{DynamicResource VDTheme031}" BorderThickness="1">
+                <Grid>
+                  <Image x:Name="Preview" Stretch="Uniform" />
+                  <Canvas x:Name="PlateOverlay" IsHitTestVisible="False" ClipToBounds="True" Panel.ZIndex="1" SizeChanged="PlateOverlay_SizeChanged" />
+                  <Border VerticalAlignment="Top" HorizontalAlignment="Left" Background="{DynamicResource VDTheme032}" Margin="13" Padding="9" CornerRadius="0">
+                    <StackPanel>
+                      <TextBlock Text="HÌNH ẢNH CAMERA / VIDEO" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource VDTheme033}" />
+                      <TextBlock x:Name="FrameInfo" Text="Chưa có nguồn ảnh" Foreground="{DynamicResource VDTheme034}" FontSize="11" Margin="0,3,0,0" />
+                    </StackPanel>
+                  </Border>
+                  <Border Background="{DynamicResource VDTheme035}" Padding="8" CornerRadius="0" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="13">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="—" Foreground="{DynamicResource VDTheme036}" FontWeight="Bold" />
+                      <TextBlock Text="  ĐƯỜNG TRIGGER: TÂM VƯỢT VẠCH GIỮA" Foreground="{DynamicResource VDTheme037}" />
+                    </StackPanel>
+                  </Border>
+                  <Border Background="#D0192837" BorderBrush="#648399" BorderThickness="1" Padding="7,4" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,13,13" Panel.ZIndex="3">
+                    <TextBlock x:Name="BeltDirectionInfo" Text="BĂNG TẢI ↑ (Y−)" FontFamily="Segoe UI" FontSize="12" FontWeight="SemiBold" Foreground="#F9E29B" />
+                  </Border>
+                </Grid>
+              </Border>
+              <Border Grid.Row="1" Background="{StaticResource Panel}" BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="0" Margin="0,12,0,0" Padding="12">
+                <Grid>
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                  </Grid.RowDefinitions>
+                  <TextBlock Text="SỰ KIỆN THEO DÕI / TRIGGER" Style="{StaticResource SectionHeading}" />
+                  <Grid Grid.Row="2" Margin="0,4,0,0">
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="*" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DataGrid Grid.Row="0" x:Name="PipelineTable" EnableRowVirtualization="True" EnableColumnVirtualization="True" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" RowHeight="28" Background="{DynamicResource VDTheme009}" Foreground="{DynamicResource VDTheme038}" AlternatingRowBackground="#F2F5F7" BorderThickness="0" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#D7DFE5" ColumnHeaderHeight="31" FontSize="12" SelectionMode="Single" SelectionUnit="FullRow" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                      <DataGrid.ColumnHeaderStyle>
+                        <Style TargetType="DataGridColumnHeader">
+                          <Setter Property="Background" Value="{DynamicResource VDTheme039}" />
+                          <Setter Property="Foreground" Value="{DynamicResource VDTheme040}" />
+                          <Setter Property="FontWeight" Value="SemiBold" />
+                          <Setter Property="BorderBrush" Value="{DynamicResource VDTheme041}" />
+                          <Setter Property="BorderThickness" Value="0,0,1,1" />
+                          <Setter Property="Padding" Value="5,2" />
+                        </Style>
+                      </DataGrid.ColumnHeaderStyle>
+                      <DataGrid.Columns>
+                        <DataGridTextColumn Header="Giờ" Binding="{Binding Time}" Width="90" />
+                        <DataGridTextColumn Header="Nguồn" Binding="{Binding Source}" Width="100" />
+                        <DataGridTextColumn Header="Track" Binding="{Binding TrackId}" Width="50" />
+                        <DataGridTextColumn Header="Tâm trước → sau / đường giữa (px)" Binding="{Binding Crossing}" Width="225" />
+                        <DataGridTextColumn Header="X / Y / góc (mm, °)" Binding="{Binding Position}" Width="185" />
+                        <DataGridTextColumn Header="Trạng thái sự kiện" Binding="{Binding Delivery}" Width="175" />
+                        <DataGridTextColumn Header="TwinCAT / FIFO ACK" Binding="{Binding Plc}" Width="230" />
+                      </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Grid.Row="1" x:Name="TriggerLog" Text="Chưa có trigger. Bảng chỉ tạo hàng khi tâm vật vượt đường giữa." Foreground="{DynamicResource VDTheme042}" FontSize="10" Margin="3,3,0,0" TextTrimming="CharacterEllipsis" />
+                  </Grid>
+                  <StackPanel Orientation="Horizontal" Margin="2,2,0,6" Grid.Row="1">
+                    <TextBlock Text="ĐƯỜNG TRIGGER" Foreground="{DynamicResource VDTheme043}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
+                    <TextBlock Text="Y↑  ·  50% FOV  ·  điều chỉnh trong Cài đặt" Foreground="{DynamicResource VDTheme044}" FontSize="12" Margin="13,0,20,0" VerticalAlignment="Center" x:Name="TriggerSettingsSummary" />
+                    <TextBlock Text="TỔNG TRIGGER" Foreground="{DynamicResource VDTheme045}" Margin="0,0,12,0" VerticalAlignment="Center" />
+                    <TextBlock x:Name="TriggerCounter" Text="0" Foreground="{DynamicResource VDTheme046}" FontWeight="SemiBold" FontSize="18" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="13,0,0,0" FontFamily="Consolas" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </Grid>
+            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+              <StackPanel>
+                <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="0" Padding="12" Margin="0,0,0,10">
+                  <StackPanel>
+                    <TextBlock Text="KẾT QUẢ NHẬN DẠNG" Style="{StaticResource SectionHeading}" />
+                    <TextBlock x:Name="DetectState" Text="ĐANG CHỜ START" Foreground="{DynamicResource VDTheme047}" FontSize="11" FontWeight="Bold" />
+                    <Grid Margin="0,10,0,3">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <StackPanel>
+                        <TextBlock Text="CENTER X (mm)" Style="{StaticResource FieldLabel}" />
+                        <TextBlock x:Name="CenterX" Text="—" FontSize="25" FontWeight="SemiBold" Foreground="{DynamicResource VDTheme046}" FontFamily="Consolas" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1">
+                        <TextBlock Text="CENTER Y (mm)" Style="{StaticResource FieldLabel}" />
+                        <TextBlock x:Name="CenterY" Text="—" FontSize="25" FontWeight="SemiBold" Foreground="{DynamicResource VDTheme046}" FontFamily="Consolas" />
+                      </StackPanel>
+                    </Grid>
+                    <TextBlock Text="GÓC CẠNH SO VỚI TRỤC X" Style="{StaticResource FieldLabel}" />
+                    <TextBlock x:Name="AngleValue" Text="—" FontSize="25" FontWeight="SemiBold" Foreground="{DynamicResource VDTheme046}" FontFamily="Consolas" />
+                    <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+                      <TextBlock x:Name="ConfidenceText" Text="Quality —" Foreground="{DynamicResource VDTheme048}" FontSize="11" />
+                      <TextBlock Text="   /   " Foreground="{DynamicResource VDTheme049}" />
+                      <TextBlock x:Name="ScaleText" Text="Scale —" Foreground="{DynamicResource VDTheme048}" FontSize="11" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+                <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="0" Padding="12" Margin="0,0,0,10">
+                  <StackPanel>
+                    <TextBlock Text="TRẠNG THÁI PLC / ENCODER" Style="{StaticResource SectionHeading}" />
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <StackPanel>
+                        <TextBlock Text="ĐỘ SÂU HÀNG ĐỢI" Style="{StaticResource FieldLabel}" />
+                        <TextBlock x:Name="FifoCount" Text="—" FontSize="25" FontWeight="SemiBold" Foreground="{DynamicResource VDTheme046}" FontFamily="Consolas" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1">
+                        <TextBlock Text="HEAD PRODUCT ID" Style="{StaticResource FieldLabel}" />
+                        <TextBlock x:Name="FifoProduct" Text="—" FontSize="25" FontWeight="SemiBold" Foreground="{DynamicResource VDTheme046}" FontFamily="Consolas" />
+                      </StackPanel>
+                    </Grid>
+                    <TextBlock x:Name="FifoProgress" Text="Tracking: chưa kết nối ADS" Foreground="{DynamicResource VDTheme050}" TextWrapping="Wrap" Margin="0,8,0,6" />
+                    <TextBlock Text="4 GLUE POINTS / PLC LIVE" Style="{StaticResource FieldLabel}" />
+                    <TextBlock x:Name="FifoGluePoints" Text="No active tracking" Foreground="{DynamicResource VDTheme051}" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" Margin="3,3,0,8" />
+                    <TextBlock x:Name="AdsStatus" Text="ADS chưa kiểm tra" Foreground="{DynamicResource VDTheme052}" TextWrapping="Wrap" FontSize="11" />
+                  </StackPanel>
+                </Border>
+                <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="0" Padding="12" Margin="0,0,0,10">
+                  <StackPanel>
+                    <TextBlock Text="TỌA ĐỘ 4 ĐIỂM KEO" Style="{StaticResource SectionHeading}" />
+                    <TextBlock Text="P1–P4 TÍNH TỪ HÌNH HỌC  •  Pitch 40 × 40 mm" FontSize="11" Foreground="{DynamicResource VDTheme053}" />
+                    <TextBlock x:Name="HoleCoordinates" Text="Chưa có phôi" FontFamily="Consolas" FontSize="12" Foreground="{DynamicResource VDTheme054}" Margin="0,8,0,0" TextWrapping="Wrap" />
+                    <TextBlock Text="Video chỉ kiểm tra nhận dạng và gửi tọa độ tới TwinCAT ở BENCH có giám sát; không điều khiển Gantry." TextWrapping="Wrap" FontSize="10" Foreground="{DynamicResource VDTheme055}" Margin="0,9,0,0" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </ScrollViewer>
+          </Grid>
+        </Grid>
+      </TabItem>
+      <TabItem Header="Camera / Nguồn ảnh">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Padding="12">
+          <StackPanel MaxWidth="1080" HorizontalAlignment="Left">
+            <TextBlock Text="THIẾT BỊ &amp; NGUỒN HÌNH" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource VDTheme056}" Margin="0,3,0,8" />
+            <TextBlock Text="Cấu hình camera một lần; về Vận hành để xem trực tiếp và START/STOP nhận dạng." Foreground="{DynamicResource VDTheme057}" TextWrapping="Wrap" Margin="0,0,0,18" />
+            <Border Background="{StaticResource Panel}" CornerRadius="0" BorderBrush="{StaticResource Stroke}" BorderThickness="1" Padding="12" Margin="0,0,0,14">
+              <StackPanel>
+                <TextBlock Text="Thiết bị Camera / GigE Vision" Style="{StaticResource SectionHeading}" FontSize="14" />
+                <TextBlock Text="Dùng camera IP hiện có trên AML-IPC. Quét mạng GVCP hoặc nhập địa chỉ IP thủ công; không đổi IP của thiết bị." Foreground="{DynamicResource VDTheme058}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12" />
+                <WrapPanel Margin="0,4,0,6">
+                  <Button Content="Quét camera" Click="ScanCameras_Click" Background="{DynamicResource VDTheme028}" MinHeight="30" Foreground="{DynamicResource VDTheme029}" />
+                  <ComboBox x:Name="CameraPicker" Width="260" DisplayMemberPath="Name" />
+                  <Button Content="Kết nối" Click="ConnectCamera_Click" MinHeight="30" Foreground="{DynamicResource VDTheme025}" />
+                  <Button Content="Kết nối tất cả" Click="ConnectAll_Click" Background="{DynamicResource VDTheme028}" MinHeight="30" Foreground="{DynamicResource VDTheme029}" />
+                </WrapPanel>
+                <WrapPanel Margin="0,4,0,6">
+                  <TextBlock Text="IP camera" Foreground="{DynamicResource VDTheme059}" VerticalAlignment="Center" Margin="7,0,0,0" />
+                  <TextBox x:Name="CameraIpBox" Width="174" Text="169.254.113.1" ToolTip="Địa chỉ IPv4 Hikrobot GigE Vision" />
+                  <TextBlock Text="IP PC" Foreground="{DynamicResource VDTheme059}" VerticalAlignment="Center" />
+                  <TextBox x:Name="HostIpBox" Width="174" Text="169.254.113.10" ToolTip="IPv4 Ethernet 2, cùng subnet camera" />
+                  <Button Content="Kết nối IP" Click="ConnectCameraIp_Click" Background="{DynamicResource VDTheme060}" ToolTip="Kết nối qua Hikrobot SDK không cần quét MVS" MinHeight="30" Foreground="{DynamicResource VDTheme025}" />
+                </WrapPanel>
+                <TextBlock Text="Ví dụ đang sử dụng: camera 169.254.113.1, PC Ethernet 2: 169.254.113.10. Kết nối chỉ bật Live View, không tự nhận dạng." Foreground="{DynamicResource VDTheme061}" TextWrapping="Wrap" Margin="0,8,0,0" />
+              </StackPanel>
+            </Border>
+            <Border Background="{StaticResource Panel}" CornerRadius="0" BorderBrush="{StaticResource Stroke}" BorderThickness="1" Padding="12" Margin="0,0,0,14">
+              <StackPanel>
+                <TextBlock Text="Nguồn Video / Kiểm thử" Style="{StaticResource SectionHeading}" FontSize="14" />
+                <TextBlock Text="Chọn nguồn video để kiểm thử thuật toán khi không đặt phôi thật dưới camera." Foreground="{DynamicResource VDTheme058}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12" />
+                <WrapPanel Margin="0,4,0,6">
+                  <ComboBox x:Name="VideoPicker" Width="260" DisplayMemberPath="Name" />
+                  <Button Content="Phát video" Click="OpenDemo_Click" MinHeight="30" Foreground="{DynamicResource VDTheme025}" />
+                  <Button Content="Mở tệp..." Click="OpenFile_Click" Background="{DynamicResource VDTheme028}" MinHeight="30" Foreground="{DynamicResource VDTheme029}" />
+                  <Button Content="Tạm dừng video" Click="Pause_Click" Background="{DynamicResource VDTheme028}" MinHeight="30" Foreground="{DynamicResource VDTheme029}" />
+                </WrapPanel>
+                <TextBlock Text="DEMO không đồng bộ encoder thật. Nút START trên trang Vận hành mới kích hoạt tracking." Foreground="{DynamicResource VDTheme062}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <Border Background="{StaticResource Panel}" CornerRadius="0" BorderBrush="{StaticResource Stroke}" BorderThickness="1" Padding="12" Margin="0,0,0,14">
+              <StackPanel>
+                <TextBlock Text="Thông tin kết nối" Style="{StaticResource SectionHeading}" FontSize="14" />
+                <TextBlock Text="Trạng thái nguồn ảnh và bước tiếp theo được hiển thị liên tục ở thanh trạng thái phía dưới." Foreground="{DynamicResource VDTheme058}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12" />
+                <Button Content="Về vận hành" Click="OpenMonitorPage_Click" Background="{DynamicResource VDTheme028}" HorizontalAlignment="Left" MinHeight="30" Foreground="{DynamicResource VDTheme029}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="Cài đặt">
+        <Grid>
+          <TabControl TabStripPlacement="Top" Background="{DynamicResource VDTheme001}" BorderThickness="0" Margin="10,10,5,8">
+            <TabItem Header="Nhận dạng / Trigger">
+              <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Padding="12">
+                <StackPanel MaxWidth="1080" HorizontalAlignment="Left">
+                  <TextBlock Text="THAM SỐ NHẬN DẠNG" Foreground="{DynamicResource VDTheme056}" FontSize="18" FontWeight="Bold" Margin="0,0,0,13" />
+                  <Border Background="{StaticResource Panel}" CornerRadius="0" BorderBrush="{StaticResource Stroke}" BorderThickness="1" Padding="12" Margin="0,0,0,14">
+                    <StackPanel>
+                      <TextBlock Text="Đường Trigger / Hướng băng tải" Style="{StaticResource SectionHeading}" FontSize="14" />
+                      <TextBlock Text="Vật phải được theo dõi từ trước khi tâm vượt đường định vị. Mỗi Track ID phát trigger một lần." Foreground="{DynamicResource VDTheme058}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12" />
+                      <WrapPanel Margin="0,4,0,6">
+                        <TextBlock VerticalAlignment="Center" Foreground="{DynamicResource VDTheme063}" Text="Hướng băng tải" />
+                        <ComboBox x:Name="LineDirectionPicker" SelectionChanged="LineDirection_Changed" Width="190">
+                          <ComboBoxItem Content="X →" />
+                          <ComboBoxItem Content="X ←" />
+                          <ComboBoxItem Content="Y ↓" />
+                          <ComboBoxItem Content="Y ↑" IsSelected="True" />
+                        </ComboBox>
+                        <TextBlock VerticalAlignment="Center" Foreground="{DynamicResource VDTheme063}" Margin="9,0,0,0" Text="Vị trí (%)" />
+                        <TextBox x:Name="LineFractionBox" Text="50" Width="86" />
+                        <Button Content="Áp dụng" Click="ApplyLine_Click" Background="{DynamicResource VDTheme028}" MinHeight="30" Foreground="{DynamicResource VDTheme029}" />
+                      </WrapPanel>
+                      <TextBlock Text="Đổi hướng hoặc vị trí đường cắt sẽ reset dữ liệu tracking hiện tại để tránh trigger nhầm." Foreground="{DynamicResource VDTheme064}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                  <Border Background="{StaticResource Panel}" CornerRadius="0" BorderBrush="{StaticResource Stroke}" BorderThickness="1" Padding="12" Margin="0,0,0,14">
+                    <StackPanel>
+                      <TextBlock Text="Ngưỡng &amp; thông số hình học" Style="{StaticResource SectionHeading}" FontSize="14" />
+                      <TextBlock Text="Thông số màu/ngưỡng và thước chuẩn nằm ở mục Hiệu chuẩn. Các bộ thuật toán mở rộng sẽ được thêm thành nhóm riêng tại đây." Foreground="{DynamicResource VDTheme058}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12" />
+                      <TextBlock Text="Mặc định: vật 50×50 mm, 4 vị trí keo cách nhau 40×40 mm." Foreground="{DynamicResource VDTheme065}" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Hiệu chuẩn">
+              <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Padding="12">
+                <StackPanel MaxWidth="1080" HorizontalAlignment="Left">
+                  <TextBlock Text="HIỆU CHUẨN &amp; TỌA ĐỘ" Foreground="{DynamicResource VDTheme056}" FontSize="18" FontWeight="Bold" Margin="0,0,0,10" />
+                  <TextBlock Text="Tham số hiệu chuẩn phục vụ tọa độ ảnh → băng tải. Không dùng tỷ lệ DEMO để điều khiển robot thật." Foreground="{DynamicResource VDTheme066}" TextWrapping="Wrap" Margin="0,0,0,12" />
+                  <Expander Header="Hiệu chuẩn &amp; ADS thủ công" Foreground="{DynamicResource VDTheme067}" Background="{StaticResource Panel}" Margin="0,0,0,10" IsExpanded="True">
+                    <StackPanel Margin="12">
+                      <TextBlock Text="mm/pixel (0 = ước tính hình học)" Style="{StaticResource FieldLabel}" />
+                      <TextBox x:Name="ScaleBox" Text="0" />
+                      <TextBlock Text="Chế độ ngưỡng" Style="{StaticResource FieldLabel}" />
+                      <ComboBox x:Name="ThresholdPicker">
+                        <ComboBoxItem Content="Tự động" IsSelected="True" />
+                        <ComboBoxItem Content="Vật tối" />
+                        <ComboBoxItem Content="Vật sáng" />
+                      </ComboBox>
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                          <TextBlock Text="Origin X (px)" Style="{StaticResource FieldLabel}" />
+                          <TextBox x:Name="OriginXBox" Text="Auto" />
+                          <TextBlock Text="Offset X (mm)" Style="{StaticResource FieldLabel}" />
+                          <TextBox x:Name="OffsetXBox" Text="0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                          <TextBlock Text="Origin Y (px)" Style="{StaticResource FieldLabel}" />
+                          <TextBox x:Name="OriginYBox" Text="Auto" />
+                          <TextBlock Text="Offset Y (mm)" Style="{StaticResource FieldLabel}" />
+                          <TextBox x:Name="OffsetYBox" Text="0" />
+                        </StackPanel>
+                      </Grid>
+                      <Button Content="Áp dụng hiệu chuẩn" Click="ApplyCalibration_Click" MinHeight="30" Foreground="{DynamicResource VDTheme025}" />
+                      <CheckBox x:Name="EnableWriteBox" Visibility="Collapsed" Foreground="{DynamicResource VDTheme068}" Content="Tôi cho phép ghi thủ công 3 giá trị X/Y/θ" />
+                      <Button Visibility="Collapsed" Content="Ghi thử X/Y/θ (không trigger)" Click="WritePose_Click" Background="{DynamicResource VDTheme069}" MinHeight="30" Foreground="{DynamicResource VDTheme025}" />
+                      <TextBlock Text="Ghi tọa độ PLC: sử dụng Cài đặt → PLC/TwinCAT → FIFO BENCH có giám sát. Ghi ADS trực tiếp đã khóa; không cấp quyền Robot." TextWrapping="Wrap" FontSize="10" Foreground="{DynamicResource VDTheme070}" />
+                    </StackPanel>
+                  </Expander>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+            <TabItem Header="PLC / TwinCAT">
+              <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="12">
+                <StackPanel MaxWidth="1180" HorizontalAlignment="Stretch">
+                  <TextBlock Text="PLC / ADS - PHÂN QUYỀN" Foreground="{DynamicResource VDTheme056}" FontSize="18" FontWeight="Bold" Margin="0,0,0,12" />
+                  <Border Background="{StaticResource Panel}" CornerRadius="0" BorderBrush="{StaticResource Stroke}" BorderThickness="1" Padding="12" Margin="0,0,0,14">
+                    <StackPanel>
+                      <TextBlock Text="Giám sát ADS — mặc định CHỈ ĐỌC" Style="{StaticResource SectionHeading}" FontSize="14" />
+                      <TextBlock Text="Đọc trạng thái từ PLC; không gửi lệnh chuyển động hay thay đổi bit Robot." Foreground="{DynamicResource VDTheme058}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12" />
+                      <WrapPanel Margin="0,4,0,6">
+                        <Button Content="Đọc trạng thái ADS" Click="TestAds_Click" Background="{DynamicResource VDTheme028}" MinHeight="30" Foreground="{DynamicResource VDTheme029}" />
+                      </WrapPanel>
+                      <TextBlock Text="PLC / FIFO trạng thái vẫn xem được trên trang Vận hành." Foreground="{DynamicResource VDTheme071}" />
+                    </StackPanel>
+                  </Border>
+                  <Border Background="{StaticResource Panel}" Padding="14" Margin="0,4,0,14" BorderThickness="1" BorderBrush="{StaticResource Stroke}">
+                    <StackPanel>
+                      <TextBlock Text="ĐÁNH GIÁ SẴN SÀNG TWINCAT THẬT (READ ONLY)" Style="{StaticResource SectionHeading}" />
+                      <Button Content="Kiểm tra trạng thái ADS / điều kiện gửi" Click="CheckLiveReadiness_Click" Background="#2E6E95" HorizontalAlignment="Left" MinHeight="30" />
+                      <TextBlock x:Name="ReadinessStatus" Text="Chưa kiểm tra. Cần hiệu chuẩn thật, kiểm chứng FrameID/encoder và giám sát robot." TextWrapping="Wrap" Margin="2,8,0,3" Foreground="{DynamicResource VDTheme014}" />
+                    </StackPanel>
+                  </Border>
+                  <Border Background="{StaticResource Panel}" Padding="14" Margin="0,8,0,14" BorderThickness="1" BorderBrush="{StaticResource Stroke}" Visibility="Collapsed">
+                    <StackPanel>
+                      <TextBlock Text="KIỂM THỬ CAMERA → FIFO (MÔ PHỎNG OFFLINE)" Style="{StaticResource SectionHeading}" />
+                      <TextBlock Text="Xác minh X/Y, góc, FIFO và bốn điểm trên bộ mô phỏng độc lập. Không tạo ADS WRITE đến PLC thực." TextWrapping="Wrap" Foreground="{DynamicResource VDTheme057}" Margin="0,0,0,10" />
+                      <CheckBox x:Name="OfflinePipelineBox" Content="Đưa trigger vào FIFO ảo khi nhấn START (không tác động PLC)" Foreground="{DynamicResource VDTheme072}" IsChecked="False" Margin="6,3,0,9" Checked="OfflinePipelineChanged" Unchecked="OfflinePipelineChanged" />
+                      <Button Content="TỰ KIỂM THỬ 4 ĐIỂM / ACK / ENCODER" Click="TestOfflinePipeline_Click" HorizontalAlignment="Left" Background="{DynamicResource VDTheme003}" />
+                      <TextBlock x:Name="PipelineMockStatus" Text="FIFO ảo chưa chạy; TwinCAT ADS vẫn chỉ đọc." TextWrapping="Wrap" Foreground="{DynamicResource VDTheme073}" Margin="5,9,0,0" />
+                    </StackPanel>
+                  </Border>
+                  <Border Background="{StaticResource Panel}" CornerRadius="0" BorderBrush="{StaticResource Stroke}" BorderThickness="1" Padding="12" Margin="0,0,0,14">
+                    <StackPanel>
+                      <TextBlock Text="TRUYỀN TỌA ĐỘ VIDEO → TWINCAT (BENCH)" Style="{StaticResource SectionHeading}" FontSize="14" />
+                      <TextBlock Text="Tính năng này chỉ được thử sau khi đã hiệu chuẩn và xác nhận các điều kiện an toàn." Foreground="{DynamicResource VDTheme058}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12" />
+                      <CheckBox x:Name="BenchQueueBox" Foreground="{DynamicResource VDTheme074}" Content="GỬI TỌA ĐỘ VIDEO → TWINCAT FIFO BENCH (không chạy robot)" Margin="5,8,0,0" Checked="BenchQueue_Click" Unchecked="BenchQueue_Click" />
+                      <Button x:Name="SendPausedVideoFrameButton" Content="GỬI 1 FRAME VIDEO ĐÃ DỪNG → TWINCAT" Click="SendPausedVideoFrame_Click" Margin="4,9,4,1" HorizontalAlignment="Left" Background="{DynamicResource VDTheme003}" />
+                      <TextBlock Text="Chỉ gửi tâm X/Y và góc θ vào TwinCAT. PLC tự tính P1–P4; bắt buộc bQueueSimMode=TRUE, mọi quyền chuyển động OFF, có hiệu chuẩn mm/px và xác nhận người vận hành." FontSize="10" TextWrapping="Wrap" Foreground="{DynamicResource VDTheme075}" Margin="4,4,0,0" />
+                    </StackPanel>
+                  </Border>
+                  <TextBlock Text="START chỉ nhận dạng; chuyển tọa độ ADS phải được cho phép riêng bằng FIFO BENCH an toàn." Foreground="{DynamicResource VDTheme076}" FontWeight="Bold" Margin="4,8,0,0" />
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+          </TabControl>
+        </Grid>
+      </TabItem>
+      <TabItem Header="Nhật ký">
+        <Grid Margin="16,14,12,12">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <TextBlock Text="NHẬT KÝ XỬ LÝ VẬT" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource VDTheme077}" />
+          <DataGrid x:Name="PipelineHistoryTable" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" RowHeight="28" Background="{DynamicResource VDTheme009}" Foreground="{DynamicResource VDTheme038}" AlternatingRowBackground="#F2F5F7" BorderThickness="0" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#D7DFE5" ColumnHeaderHeight="31" FontSize="12" SelectionMode="Single" SelectionUnit="FullRow" ScrollViewer.HorizontalScrollBarVisibility="Auto" Margin="0,10,0,5" MinHeight="360" Grid.Row="1">
+            <DataGrid.ColumnHeaderStyle>
+              <Style TargetType="DataGridColumnHeader">
+                <Setter Property="Background" Value="{DynamicResource VDTheme039}" />
+                <Setter Property="Foreground" Value="{DynamicResource VDTheme040}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="BorderBrush" Value="{DynamicResource VDTheme041}" />
+                <Setter Property="BorderThickness" Value="0,0,1,1" />
+                <Setter Property="Padding" Value="5,2" />
+              </Style>
+            </DataGrid.ColumnHeaderStyle>
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Giờ" Binding="{Binding Time}" Width="90" />
+              <DataGridTextColumn Header="Nguồn" Binding="{Binding Source}" Width="100" />
+              <DataGridTextColumn Header="Track" Binding="{Binding TrackId}" Width="50" />
+              <DataGridTextColumn Header="Tâm trước → sau / đường giữa (px)" Binding="{Binding Crossing}" Width="225" />
+              <DataGridTextColumn Header="X / Y / góc (mm, °)" Binding="{Binding Position}" Width="185" />
+              <DataGridTextColumn Header="Trạng thái sự kiện" Binding="{Binding Delivery}" Width="175" />
+              <DataGridTextColumn Header="TwinCAT / FIFO ACK" Binding="{Binding Plc}" Width="230" />
+            </DataGrid.Columns>
+          </DataGrid>
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,4" Grid.Row="2">
+            <Button Content="Mở nhật ký CSV" Click="OpenResults_Click" Background="{DynamicResource VDTheme028}" MinHeight="30" Foreground="{DynamicResource VDTheme029}" />
+            <TextBlock Text="Log CSV lưu theo từng sự kiện; không đồng nghĩa đã gửi PLC." Foreground="{DynamicResource VDTheme078}" VerticalAlignment="Center" Margin="12,0" />
+          </StackPanel>
+        </Grid>
+      </TabItem>
+
+      <!-- SAFE LIVE STATUS: the added cell views are read-only, never send robot commands. -->
+      <TabItem Header="GANTRY / CAM 1" x:Name="GantryDetailTab">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="22,18,22,22">
+            <TextBlock Text="GANTRY / GLUE DISPENSING" FontSize="22" FontWeight="Bold" Foreground="#62CEE5"/>
+            <TextBlock Text="Camera 1 &#x2192; TwinCAT ADS &#x2192; Mitsubishi PLC-Q / QD75. Giám sát, không khởi động robot từ màn hình này." TextWrapping="Wrap" Foreground="#ABC0CF" Margin="0,5,0,16"/>
+            <Border Background="#112534" BorderBrush="#315164" BorderThickness="1" Padding="12" Margin="0,0,0,12">
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="3*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>
+                <Border Height="290" Background="#071420" BorderBrush="#37556B" BorderThickness="1">
+                  <Image Source="{Binding Source,ElementName=Preview}" Stretch="Uniform"/>
+                </Border>
+                <StackPanel Grid.Column="1" Margin="18,4,4,4">
+                  <TextBlock Text="CAMERA 1 / TRACKING" FontSize="14" FontWeight="Bold" Foreground="#80D7E6"/>
+                  <TextBlock x:Name="StationCam1Status" Text="Chờ nguồn camera" Foreground="#EAF4FA" Margin="0,9,0,5" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="StationCam1Coords" Text="Track --  |  X -- / Y -- / θ --" Foreground="#D7F0F5" Margin="0,5,0,14" TextWrapping="Wrap"/>
+                  <Button Content="START NHẬN DẠNG ẢNH" Click="StationVisionStart_Click" Background="#1C766C" Foreground="White" MinHeight="34" Margin="0,0,0,7"/>
+                  <Button Content="STOP NHẬN DẠNG ẢNH" Click="StationVisionStop_Click" Background="#A26C38" Foreground="White" MinHeight="34" Margin="0,0,0,7"/>
+                  <Button Content="CÀI ĐẶT / MỞ CAMERA" Click="DashCamera_Click" Background="#2A526A" Foreground="White" MinHeight="34"/>
+                  <TextBlock Text="Các nút trên chỉ thay đổi xử lý ảnh ở PC, KHÔNG chạy robot." TextWrapping="Wrap" FontSize="10" Foreground="#E5C68D" Margin="0,10,0,0"/>
+                </StackPanel>
+              </Grid>
+            </Border>
+            <Border Background="#172735" Padding="18" BorderBrush="#315164" BorderThickness="1">
+              <StackPanel>
+                <TextBlock Text="CHẤT LƯỢNG DỮ LIỆU" Foreground="#9CB6C8" FontSize="11"/>
+                <TextBlock x:Name="CellGantryQuality" Text="Đang đọc ADS..." FontSize="17" FontWeight="SemiBold" Foreground="#EAC17E" Margin="0,6,0,14"/>
+                <TextBlock x:Name="CellGantryLink" Text="PLC-Q: chờ dữ liệu" FontSize="14" Foreground="#EAF2F7" Margin="0,4"/>
+                <TextBlock x:Name="CellGantryCycle" Text="Gantry: chờ dữ liệu" FontSize="14" Foreground="#EAF2F7" Margin="0,4"/>
+                <TextBlock x:Name="CellGantryQueue" Text="FIFO: chờ dữ liệu" FontSize="14" Foreground="#EAF2F7" Margin="0,4"/>
+                <TextBlock x:Name="CellGantryVision" Text="Camera 1: chờ dữ liệu" FontSize="14" Foreground="#EAF2F7" Margin="0,4"/>
+                <TextBlock x:Name="CellGantryAck" Text="M1000/M1001: chỉ giám sát qua hợp đồng PLC-Q" FontSize="12" Foreground="#9CB6C8" Margin="0,8,0,0" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+            <TextBlock Text="Tag cụm Gantry: MAIN.bPlcQConnected, MAIN.nQueueCount, MAIN.nQueueHeadProductID, MAIN.bGlueCycleBusy, MAIN.nGlueCurVertex, MAIN.bGlueCycleError. Xem tab TAGS / ADS để kiểm tra chất lượng từng symbol." Foreground="#A5BDCB" Margin="0,14,0,12" TextWrapping="Wrap"/>
+            <WrapPanel Margin="0,14,0,0">
+              <Button Content="AUTO GANTRY (CHƯA NGHIỆM THU)" IsEnabled="False" Margin="0,0,6,0" ToolTip="Chưa có quyền điều khiển chuyển động từ HMI"/>
+              <Button Content="JOG / HOME (KHÓA)" IsEnabled="False" Margin="0,0,6,0" ToolTip="Cần interlock và commissioning"/>
+              <Button Content="TEST VAN KEO (KHÓA)" IsEnabled="False" ToolTip="Không tác động van thật"/>
+            </WrapPanel>
+            <Button Content="MỞ CAMERA 1 / VẬN HÀNH" Click="DashCamera_Click" Width="250" HorizontalAlignment="Left" Background="#246782" Foreground="White" MinHeight="36"/>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="SCARA / CAM 2" x:Name="ScaraDetailTab">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="22,18,22,22">
+            <TextBlock Text="SCARA / TRAY PICK &amp; PLACE" FontSize="22" FontWeight="Bold" Foreground="#9CB6C8"/>
+            <TextBlock Text="CỤM DỰ KIẾN / CHƯA TRIỂN KHAI" FontWeight="Bold" FontSize="16" Foreground="#EAC17E" Margin="0,12,0,12"/>
+            <Border Background="#172735" Padding="18" BorderBrush="#315164" BorderThickness="1">
+              <StackPanel>
+                <TextBlock Text="Robot SCARA: CHƯA KẾT NỐI" Foreground="#EAF2F7" FontSize="14" Margin="0,4"/>
+                <TextBlock Text="Camera 2: CHƯA TÍCH HỢP" Foreground="#EAF2F7" FontSize="14" Margin="0,4"/>
+                <TextBlock Text="Queue / ProductID / khay: RESERVED" Foreground="#EAF2F7" FontSize="14" Margin="0,4"/>
+                <TextBlock Text="Sử dụng chung encoder băng tải; tracking và ACK sẽ tách biệt hoàn toàn với Gantry." Foreground="#A9C0CF" FontSize="12" Margin="0,12,0,0" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+            <Border Background="#0A1825" BorderBrush="#37556B" BorderThickness="1" Height="230" Margin="0,0,0,12">
+              <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <TextBlock Text="CAMERA 2 / RESERVED" FontSize="18" Foreground="#A9BBCA" FontWeight="Bold"/>
+                <TextBlock Text="Chưa có luồng hình ảnh · Chưa có tọa độ thật" Foreground="#D5B97E" Margin="0,12,0,0"/>
+              </StackPanel>
+            </Border>
+            <WrapPanel Margin="0,3,0,10">
+              <Button Content="AUTO PICK (KHÓA)" IsEnabled="False" Margin="0,0,6,0"/>
+              <Button Content="JOG / HOME (KHÓA)" IsEnabled="False" Margin="0,0,6,0"/>
+              <Button Content="TRAY RESET (KHÓA)" IsEnabled="False"/>
+            </WrapPanel>
+            <TextBlock Text="Dự kiến: GVL_SCARA.*, GVL_CAMERA2.*. Các tag này CHƯA tồn tại trong PLC được xác nhận; ứng dụng không đọc giả, không phát lệnh SCARA." Foreground="#A5BDCB" TextWrapping="Wrap" Margin="0,14,0,0"/>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="BĂNG TẢI CHUNG" x:Name="ConveyorDetailTab">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="22,18,22,22">
+            <TextBlock Text="CONVEYOR / ENCODER 01" FontSize="22" FontWeight="Bold" Foreground="#62CEE5"/>
+            <TextBlock Text="Một băng tải và một nguồn tọa độ encoder cấp dữ liệu tracking thời gian thực cho cả Gantry lẫn SCARA." Foreground="#A5BDCB" TextWrapping="Wrap" Margin="0,5,0,16"/>
+            <Border Background="#172735" Padding="18" BorderBrush="#315164" BorderThickness="1">
+              <StackPanel>
+                <TextBlock x:Name="CellConveyorQuality" Text="Đang đọc ADS..." FontSize="16" FontWeight="SemiBold" Foreground="#EAC17E" Margin="0,0,0,12"/>
+                <TextBlock x:Name="CellConveyorRun" Text="RUN DO: chưa đọc" FontSize="14" Foreground="#EAF2F7" Margin="0,4"/>
+                <TextBlock x:Name="CellConveyorSpeed" Text="Tốc độ encoder: chưa đọc" FontSize="14" Foreground="#EAF2F7" Margin="0,4"/>
+                <TextBlock x:Name="CellConveyorDistance" Text="Quãng đường encoder: chưa đọc" FontSize="14" Foreground="#EAF2F7" Margin="0,4"/>
+                <TextBlock x:Name="CellConveyorHz" Text="MD200 tần số: chưa đọc" FontSize="14" Foreground="#EAF2F7" Margin="0,4"/>
+                <TextBlock x:Name="CellConveyorAo" Text="ST-4424 AO: chưa đọc" FontSize="14" Foreground="#EAF2F7" Margin="0,4"/>
+              </StackPanel>
+            </Border>
+            <TextBlock Text="ĐIỀU KHIỂN MD200 / CHỈ MỞ KHI VẬN HÀNH CHO PHÉP" Foreground="#87CFDD" FontSize="14" FontWeight="SemiBold" Margin="0,16,0,8"/>
+                <Border Background="#1B3041" CornerRadius="4" Padding="9" Margin="0,7,0,0">
+                  <StackPanel>
+                    <WrapPanel VerticalAlignment="Center">
+                      <CheckBox x:Name="DashControlArm" Content="Cho phép lệnh băng tải từ HMI (phiên hiện tại)" Foreground="#E3EDF2" Checked="DashArmChanged" Unchecked="DashArmChanged" Margin="0,3,14,0"/>
+                      <TextBlock Text="Hz:" Foreground="#CFDFE8" Margin="6,6,2,0"/>
+                      <TextBox x:Name="DashHzInput" Width="80" Text="5.0" HorizontalContentAlignment="Center" ToolTip="Giới hạn 0–25 Hz"/>
+                      <Button x:Name="DashStartButton" Content="START" Click="DashStart_Click" Background="#167B69" Foreground="White" IsEnabled="False" Margin="8,0,3,0"/>
+                      <Button x:Name="DashStopButton" Content="STOP" Click="DashStop_Click" Background="#8E4147" Foreground="White" IsEnabled="False" Margin="3,0"/>
+                    </WrapPanel>
+                    <TextBlock x:Name="DashControlNote" Text="Lệnh HMI mặc định khóa; STOP thường không thay thế nút E-Stop phần cứng." Foreground="#B8CAD4" Margin="0,6,0,0" FontSize="11" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Border>
+            <TextBlock Text="Giá trị AO volts là THAM CHIẾU TÍNH TOÁN, không phải điện áp đo thực. Trạng thái DO là ảnh IO, không xác nhận băng tải đã chuyển động." Foreground="#EAC17E" TextWrapping="Wrap" Margin="0,14,0,0"/>
+            <TextBlock Text="Điều khiển START/STOP thường và 0–25 Hz nằm tại trang Băng tải chi tiết, mặc định khóa và cần người vận hành xác nhận. E-Stop bắt buộc được xử lý bởi mạch an toàn phần cứng." Foreground="#A5BDCB" TextWrapping="Wrap" Margin="0,10,0,0"/>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="TAGS / ADS" x:Name="TagMatrixTab">
+        <Grid Margin="20,16,20,16">
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+          <TextBlock Text="BẢNG TAG / TwinCAT ADS 851" FontSize="20" FontWeight="Bold" Foreground="#62CEE5"/>
+          <TextBlock Grid.Row="1" Text="Nhóm TỔNG / BĂNG TẢI / GANTRY / SCARA. LIVE nghĩa là đọc được symbol; READ_FAIL là không đọc được tag (thiếu symbol hoặc lỗi đọc ADS); RESERVED là tương lai. Không phát lệnh ở tab này." Foreground="#A5BDCB" TextWrapping="Wrap" Margin="0,7,0,12"/>
+          <DataGrid Grid.Row="2" x:Name="TagMatrixTable" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" RowHeight="30" ColumnHeaderHeight="33" Background="#172735" Foreground="#EAF2F7" RowBackground="#173043" AlternatingRowBackground="#214052" BorderBrush="#315164" BorderThickness="1" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#315164" SelectionMode="Single">
+            <DataGrid.ColumnHeaderStyle>
+              <Style TargetType="DataGridColumnHeader">
+                <Setter Property="Background" Value="#2A4D62"/>
+                <Setter Property="Foreground" Value="#F2FAFE"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="BorderBrush" Value="#40677E"/>
+                <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                <Setter Property="Padding" Value="7,3"/>
+              </Style>
+            </DataGrid.ColumnHeaderStyle>
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="NHÓM" Binding="{Binding Group}" Width="110"/>
+              <DataGridTextColumn Header="TWINCAT SYMBOL" Binding="{Binding Tag}" Width="*"/>
+              <DataGridTextColumn Header="GIÁ TRỊ" Binding="{Binding Value}" Width="180"/>
+              <DataGridTextColumn Header="QUALITY" Binding="{Binding Quality}" Width="100"/>
+              <DataGridTextColumn Header="R/W" Binding="{Binding Access}" Width="90"/>
+              <DataGridTextColumn Header="ĐỌC LÚC" Binding="{Binding Timestamp}" Width="85"/>
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+      </TabItem>
+    </TabControl>
+    <Border Grid.Row="2" Background="{DynamicResource VDTheme079}" CornerRadius="0" Margin="0,9,0,0" BorderBrush="{DynamicResource VDTheme080}" BorderThickness="1,1,1,1">
+      <TextBlock x:Name="StatusText" VerticalAlignment="Center" Margin="12,0" Text="Bắt đầu từ video DEMO. Không điều khiển PLC motion." Foreground="{DynamicResource VDTheme081}" FontSize="11" />
+    </Border>
+  </Grid>
+</Window>

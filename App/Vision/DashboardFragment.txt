@@ -1,0 +1,108 @@
+      <TabItem Header="TỔNG QUAN" x:Name="DashboardTab">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="#0B1723">
+          <StackPanel Margin="18,15,18,20">
+            <Grid Margin="0,0,0,13">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="TRUNG TÂM ĐIỀU KHIỂN DÂY CHUYỀN" FontSize="23" FontWeight="Bold" Foreground="#EDF5FA"/>
+                <TextBlock Text="DATN   /   TwinCAT 3 MASTER   /   Gantry · Conveyor · SCARA" FontSize="11" Foreground="#87A0B7" Margin="0,5,0,0"/>
+              </StackPanel>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                <TextBlock x:Name="DashUpdated" Text="Đang đọc PLC..." FontSize="11" Foreground="#A1B6C5" HorizontalAlignment="Right"/>
+                <TextBlock Text="Giám sát ADS 851 · không tự phát lệnh robot" FontSize="11" Foreground="#63BDCF" Margin="0,4,0,0"/>
+              </StackPanel>
+            </Grid>
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Background="#142739" BorderBrush="#274158" BorderThickness="1" CornerRadius="7" Padding="13" Margin="0,0,8,0">
+                <StackPanel><TextBlock Text="HỆ THỐNG / E-STOP" FontSize="10" Foreground="#92A8BA"/><TextBlock x:Name="DashEStop" Text="CHƯA XÁC NHẬN" FontSize="18" FontWeight="Bold" Foreground="#EAC17E" Margin="0,9,0,4"/><TextBlock Text="Phản hồi ST-1228 · DI0" FontSize="10" Foreground="#91A2B3"/></StackPanel>
+              </Border>
+              <Border Grid.Column="1" Background="#142739" BorderBrush="#274158" BorderThickness="1" CornerRadius="7" Padding="13" Margin="0,0,8,0">
+                <StackPanel><TextBlock Text="TWINCAT / PLC" FontSize="10" Foreground="#92A8BA"/><TextBlock x:Name="DashPlc" Text="ĐANG KẾT NỐI" FontSize="18" FontWeight="Bold" Foreground="#EAC17E" Margin="0,9,0,4"/><TextBlock Text="ADS port 851 · MASTER" FontSize="10" Foreground="#91A2B3"/></StackPanel>
+              </Border>
+              <Border Grid.Column="2" Background="#142739" BorderBrush="#274158" BorderThickness="1" CornerRadius="7" Padding="13" Margin="0,0,8,0">
+                <StackPanel><TextBlock Text="BĂNG TẢI DÙNG CHUNG" FontSize="10" Foreground="#92A8BA"/><TextBlock x:Name="DashSpeed" Text="— mm/s" FontSize="18" FontWeight="Bold" Foreground="#E5F2FA" Margin="0,9,0,4"/><TextBlock x:Name="DashFrequency" Text="Đặt: — Hz" FontSize="10" Foreground="#91A2B3"/></StackPanel>
+              </Border>
+              <Border Grid.Column="3" Background="#142739" BorderBrush="#274158" BorderThickness="1" CornerRadius="7" Padding="13">
+                <StackPanel><TextBlock Text="HÀNG ĐỢI SẢN PHẨM" FontSize="10" Foreground="#92A8BA"/><TextBlock x:Name="DashQueue" Text="— / 8" FontSize="18" FontWeight="Bold" Foreground="#E5F2FA" Margin="0,9,0,4"/><TextBlock x:Name="DashQueueInfo" Text="Đang chờ PLC..." FontSize="10" Foreground="#91A2B3"/></StackPanel>
+              </Border>
+            </Grid>
+            <Border Background="#1C2B35" CornerRadius="6" Padding="12,10" Margin="0,0,0,14" BorderBrush="#375065" BorderThickness="1">
+              <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <TextBlock x:Name="DashMachineMessage" Text="Trạng thái toàn hệ thống đang được đọc qua ADS..." Foreground="#E3EAF0" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap"/>
+                <TextBlock Grid.Column="1" Text="HMI / THÔNG TIN VẬN HÀNH" Foreground="#8DA9B8" FontSize="10" Margin="12,0,0,0" VerticalAlignment="Center"/>
+              </Grid>
+            </Border>
+            <TextBlock Text="CÁC CỤM CÔNG NGHỆ" Foreground="#D6E5ED" FontSize="12" FontWeight="Bold" Margin="0,0,0,9"/>
+            <Grid Margin="0,0,0,15">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Background="#132639" BorderBrush="#2D546C" BorderThickness="1" CornerRadius="8" Margin="0,0,8,0" Padding="16">
+                <StackPanel>
+                  <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel><TextBlock Text="01 / GANTRY DISPENSING" Foreground="#62CEE5" FontSize="11" FontWeight="Bold"/><TextBlock Text="Chấm keo 4 điểm" Foreground="#F3F8FC" FontSize="19" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                    <Border Grid.Column="1" Background="#183E4A" CornerRadius="3" Padding="9,5"><TextBlock Text="GIAI ĐOẠN 1" Foreground="#79D9D4" FontSize="10" FontWeight="Bold"/></Border>
+                  </Grid>
+                  <Separator Background="#3D5668" Margin="0,13,0,11"/>
+                  <TextBlock x:Name="DashGantryState" Text="Robot: đang đọc..." Foreground="#E9F0F5" FontWeight="SemiBold" FontSize="13"/>
+                  <TextBlock x:Name="DashGantryPlc" Text="Mitsubishi QD75: —" Foreground="#ADC0CE" Margin="0,6,0,0"/>
+                  <TextBlock x:Name="DashGantryVertex" Text="Đỉnh hiện tại: — / 4" Foreground="#ADC0CE" Margin="0,5,0,0"/>
+                  <TextBlock x:Name="DashCamera1" Text="Camera 1: —" Foreground="#ADC0CE" Margin="0,5,0,0"/>
+                  <TextBlock x:Name="DashGantryStats" Text="FIFO: — | Hoàn thành: — | Bỏ lỡ: —" Foreground="#ADC0CE" Margin="0,5,0,9"/>
+                  <WrapPanel Margin="0,7,0,0">
+                    <Button Content="CAMERA 1 / VISION" Click="DashCamera_Click" Background="#236F8C" Foreground="White" MinHeight="32" Margin="0,0,7,0"/>
+                    <Button Content="TRẠNG THÁI PLC" Click="DashPLC_Click" Background="#294053" Foreground="#EDF6FA" MinHeight="32"/>
+                  </WrapPanel>
+                  <TextBlock Text="Chưa cấp quyền chuyển động robot từ HMI. M1000/M1001 theo PLC-Q." TextWrapping="Wrap" Foreground="#8EA5B6" FontSize="10" Margin="0,10,0,0"/>
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="1" Background="#142330" BorderBrush="#33485C" BorderThickness="1" CornerRadius="8" Padding="16">
+                <StackPanel>
+                  <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel><TextBlock Text="02 / SCARA PICK &amp; PLACE" Foreground="#B0C1D0" FontSize="11" FontWeight="Bold"/><TextBlock Text="Gắp sản phẩm vào khay" Foreground="#E6EFF5" FontSize="19" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                    <Border Grid.Column="1" Background="#35414C" CornerRadius="3" Padding="9,5"><TextBlock Text="DỰ KIẾN" Foreground="#E3D3A0" FontSize="10" FontWeight="Bold"/></Border>
+                  </Grid>
+                  <Separator Background="#3D5668" Margin="0,13,0,11"/>
+                  <TextBlock Text="PLC SCARA: CHƯA TÍCH HỢP" Foreground="#E3D3A0" FontSize="13" FontWeight="SemiBold"/>
+                  <TextBlock Text="Camera 2: chưa cài đặt" Foreground="#ADC0CE" Margin="0,7,0,0"/>
+                  <TextBlock Text="Tracking: dùng chung encoder băng tải" Foreground="#ADC0CE" Margin="0,5,0,0"/>
+                  <TextBlock Text="Hàng đợi riêng: chưa kích hoạt" Foreground="#ADC0CE" Margin="0,5,0,0"/>
+                  <TextBlock Text="Trạng thái khay: chờ kết nối" Foreground="#ADC0CE" Margin="0,5,0,9"/>
+                  <WrapPanel Margin="0,7,0,0">
+                    <Button Content="CẤU HÌNH SCARA" IsEnabled="False" ToolTip="Chưa triển khai PLC/Camera 2; tránh hiển thị trạng thái giả." Background="#34485B" Foreground="#EDF6FA" MinHeight="32"/>
+                  </WrapPanel>
+                  <TextBlock Text="Module dành sẵn: camera 2, tọa độ phôi, khay, robot và handshake riêng." TextWrapping="Wrap" Foreground="#8EA5B6" FontSize="10" Margin="0,10,0,0"/>
+                </StackPanel>
+              </Border>
+            </Grid>
+            <Border Background="#132639" BorderBrush="#2D4C63" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,12">
+              <StackPanel>
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                  <StackPanel><TextBlock Text="BĂNG TẢI CHUNG / CONVEYOR 01" Foreground="#EAF4F9" FontWeight="Bold" FontSize="14"/><TextBlock Text="Một encoder cấp tọa độ và vận tốc cho Gantry &amp; SCARA" Foreground="#8DA8BB" FontSize="11" Margin="0,4,0,0"/></StackPanel>
+                  <TextBlock Grid.Column="1" x:Name="DashBeltState" Text="STOP" Foreground="#EAC17E" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
+                </Grid>
+                <Grid Margin="0,8,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <StackPanel Grid.Column="0"><TextBlock Text="ENCODER" Foreground="#92A8BA" FontSize="10"/><TextBlock x:Name="DashDistance" Text="— mm" Foreground="#F1F7FA" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                  <StackPanel Grid.Column="1"><TextBlock Text="TỐC ĐỘ ĐO" Foreground="#92A8BA" FontSize="10"/><TextBlock x:Name="DashBeltMmS" Text="— mm/s" Foreground="#F1F7FA" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                  <StackPanel Grid.Column="2"><TextBlock Text="MD200 / THAM CHIẾU" Foreground="#92A8BA" FontSize="10"/><TextBlock x:Name="DashHzReal" Text="— Hz" Foreground="#F1F7FA" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                  <StackPanel Grid.Column="3"><TextBlock Text="AO ST-4424" Foreground="#92A8BA" FontSize="10"/><TextBlock x:Name="DashAnalog" Text="— V" Foreground="#F1F7FA" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                </Grid>
+                <Border Background="#1B3041" CornerRadius="4" Padding="9" Margin="0,7,0,0">
+                  <StackPanel>
+                    <WrapPanel VerticalAlignment="Center">
+                      <CheckBox x:Name="DashControlArm" Content="Cho phép lệnh băng tải từ HMI (phiên hiện tại)" Foreground="#E3EDF2" Checked="DashArmChanged" Unchecked="DashArmChanged" Margin="0,3,14,0"/>
+                      <TextBlock Text="Hz:" Foreground="#CFDFE8" Margin="6,6,2,0"/>
+                      <TextBox x:Name="DashHzInput" Width="80" Text="5.0" HorizontalContentAlignment="Center" ToolTip="Giới hạn 0–25 Hz"/>
+                      <Button x:Name="DashStartButton" Content="START" Click="DashStart_Click" Background="#167B69" Foreground="White" IsEnabled="False" Margin="8,0,3,0"/>
+                      <Button x:Name="DashStopButton" Content="STOP" Click="DashStop_Click" Background="#8E4147" Foreground="White" IsEnabled="False" Margin="3,0"/>
+                    </WrapPanel>
+                    <TextBlock x:Name="DashControlNote" Text="Lệnh HMI mặc định khóa; STOP thường không thay thế nút E-Stop phần cứng." Foreground="#B8CAD4" Margin="0,6,0,0" FontSize="11" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </Border>
+            <TextBlock Text="CHUỖI SẢN XUẤT     CAMERA 1  →  GANTRY 4 ĐIỂM  →  CAMERA 2 / SCARA  →  KHAY" Foreground="#6ABFCE" FontSize="12" FontWeight="SemiBold" Margin="4,0,0,4"/>
+            <TextBlock Text="Dữ liệu robot Scara chưa được triển khai. Chỉ Camera 1/Gantry có tag đọc thực tế; không suy diễn trạng thái robot từ ADS kết nối." Foreground="#869CAD" FontSize="11" TextWrapping="Wrap"/>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>

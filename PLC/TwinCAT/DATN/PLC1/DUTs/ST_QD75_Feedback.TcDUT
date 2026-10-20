@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <DUT Name="ST_QD75_Feedback" Id="{ac3c3b41-af2c-41cb-9886-dfca3f826c6d}">
+    <Declaration><![CDATA[TYPE ST_QD75_Feedback :
+STRUCT
+    Ack_Done    : BOOL; // M1001: PLC-Q báo Point 3 hoàn tất
+    Robot_Busy  : BOOL; // M102: PLC-Q đang kiểm tra/nạp/chạy
+    In_Position : BOOL; // M103: Đỉnh đã hoàn tất, chờ Master hạ M1000
+    Robot_Alarm : BOOL; // M104: QD75 hoặc kiểm tra biên báo lỗi
+END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>NVKProject.DotNet.BaslerCamera</RootNamespace>
+    <AssemblyName>NVKProject.DotNet.BaslerCamera</AssemblyName>
+    <ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
+    <PylonRoot Condition="'$(PylonRoot)' == ''">C:\Program Files\Basler\pylon 8</PylonRoot>
+    <PylonManagedDll>$(PylonRoot)\Development\Assemblies\Basler.Pylon\x64\Basler.Pylon.dll</PylonManagedDll>
+    <PylonRuntimeDir>$(PylonRoot)\Runtime\x64</PylonRuntimeDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Basler.Pylon" Condition="Exists('$(PylonManagedDll)')">
+      <HintPath>$(PylonManagedDll)</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Basler.Pylon" Condition="!Exists('$(PylonManagedDll)')">
+      <HintPath>libs\Basler.Pylon.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260214" />
+    <PackageReference Include="OpenCvSharp4.Windows" Version="4.13.0.20260214" />
+  </ItemGroup>
+
+  <!-- Copy pylon managed + native runtime beside output (Always overwrites stale libs copy). -->
+  <ItemGroup Condition="Exists('$(PylonManagedDll)')">
+    <Content Include="$(PylonManagedDll)">
+      <Link>Basler.Pylon.dll</Link>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(PylonRuntimeDir)')">
+    <PylonNativeDll Include="$(PylonRuntimeDir)\*.dll" />
+    <Content Include="@(PylonNativeDll)">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </Content>
+  </ItemGroup>
+
+</Project>

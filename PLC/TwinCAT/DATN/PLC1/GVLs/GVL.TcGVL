@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <GVL Name="GVL" Id="{bdb62bb0-8c97-4a62-9045-c1544f9d2e00}">
+    <Declaration><![CDATA[VAR_GLOBAL
+    aIn  AT %I* : ARRAY[0..15] OF BYTE;  // TxPDO 16 byte
+    aOut AT %Q* : ARRAY[0..3]  OF BYTE;  // RxPDO 4 byte
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>
