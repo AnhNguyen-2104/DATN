@@ -197,13 +197,14 @@
           </Setter>
         </Style>
       </TabControl.Resources>
+      <!-- LARGE_CAMERA_OVERVIEW_V2: camera+station I/O dominate the first screen. -->
       <TabItem Header="OVERVIEW" x:Name="DashboardTab">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="#0B1723">
-          <StackPanel Margin="18,15,18,20">
+          <StackPanel Margin="12,8,12,14">
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <StackPanel>
-                <TextBlock Text="PRODUCTION LINE OVERVIEW" FontSize="19" FontWeight="Bold" Foreground="#EDF5FA"/>
+                <TextBlock Text="CAMERA &amp; I/O MONITOR" FontSize="18" FontWeight="Bold" Foreground="#EDF5FA"/>
                 <TextBlock Text="DATN   /   TwinCAT 3 MASTER   /   Gantry · Conveyor · SCARA" FontSize="11" Foreground="#87A0B7" Margin="0,5,0,0"/>
               </StackPanel>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
@@ -229,15 +230,15 @@
             <TextBlock Text="STATION 01 / GANTRY    —    STATION 02 / SCARA" Foreground="#D6E5ED" FontSize="12" FontWeight="Bold" Margin="0,0,0,9"/>
             <Grid Margin="0,0,0,10">
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-              <Border Grid.Column="0" Background="#132639" BorderBrush="#2D546C" BorderThickness="1" CornerRadius="8" Margin="0,0,8,0" Padding="11">
+              <Border Grid.Column="0" Background="#132639" BorderBrush="#2D546C" BorderThickness="1" CornerRadius="8" Margin="0,0,6,0" Padding="9">
                 <StackPanel>
                   <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <StackPanel><TextBlock Text="01 / GANTRY DISPENSING" Foreground="#62CEE5" FontSize="11" FontWeight="Bold"/><TextBlock Text="4-POINT GLUE DISPENSING" Foreground="#F3F8FC" FontSize="19" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                    <StackPanel><TextBlock Text="01 / GANTRY DISPENSING" Foreground="#62CEE5" FontSize="11" FontWeight="Bold"/><TextBlock Text="4-POINT GLUE DISPENSING" Foreground="#F3F8FC" FontSize="15" FontWeight="Bold" Margin="0,2,0,0"/></StackPanel>
                     <Border Grid.Column="1" Background="#183E4A" CornerRadius="3" Padding="9,5"><TextBlock Text="PHASE 1" Foreground="#79D9D4" FontSize="10" FontWeight="Bold"/></Border>
                   </Grid>
-                  <Separator Background="#3D5668" Margin="0,13,0,11"/>
+                  <Separator Background="#3D5668" Margin="0,6,0,7"/>
                   <!-- Same WPF bitmap from Camera 1 operating view, not a second camera SDK session. -->
-                  <Border Height="280" Background="#071420" BorderBrush="#37556B" BorderThickness="1" CornerRadius="4" ClipToBounds="True">
+                  <Border Height="450" Background="#071420" BorderBrush="#37556B" BorderThickness="1" CornerRadius="4" ClipToBounds="True">
                     <Grid>
                       <Image x:Name="OverviewCam1Image" Source="{Binding Source,ElementName=Preview}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                       <Border VerticalAlignment="Top" HorizontalAlignment="Left" Background="#B9091A2A" Padding="7,4" Margin="8">
@@ -246,21 +247,21 @@
                       <TextBlock x:Name="OverviewCam1Empty" Text="Camera 1 disconnected / Open Camera Source to connect" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#A5BDCD" TextWrapping="Wrap" TextAlignment="Center" Margin="18" FontSize="12"/>
                     </Grid>
                   </Border>
-                  <Border Background="#0A1B28" BorderBrush="#315569" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,8,0,6">
+                  <Border Background="#0A1B28" BorderBrush="#315569" BorderThickness="1" CornerRadius="4" Padding="6" Margin="0,5,0,4">
                     <StackPanel>
                       <TextBlock Text="STATION 01  /  LIVE I/O AND PLC SIGNALS" Foreground="#75C6D8" FontSize="10" FontWeight="SemiBold" Margin="0,0,0,5"/>
                       <UniformGrid Columns="3" Rows="2">
-                        <TextBlock x:Name="OverviewIoEstop" Text="ST-1228 DI0  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11" Margin="3,4" ToolTip="Auxiliary E-Stop input feedback, NOT a certified safety circuit"/>
-                        <TextBlock x:Name="OverviewIoServo" Text="SERVO READY  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11" Margin="3,4"/>
-                        <TextBlock x:Name="OverviewIoPlcQ" Text="PLC-Q LINK  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11" Margin="3,4"/>
-                        <TextBlock x:Name="OverviewIoGantryBusy" Text="GANTRY BUSY  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11" Margin="3,4"/>
-                        <TextBlock x:Name="OverviewIoGantryAlarm" Text="GANTRY ALARM  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11" Margin="3,4"/>
-                        <TextBlock x:Name="OverviewIoVision" Text="VISION BRIDGE  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11" Margin="3,4"/>
+                        <TextBlock x:Name="OverviewIoEstop" Text="ST-1228 DI0  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11" Margin="2,2" ToolTip="Auxiliary E-Stop input feedback, NOT a certified safety circuit"/>
+                        <TextBlock x:Name="OverviewIoServo" Text="SERVO READY  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11" Margin="2,2"/>
+                        <TextBlock x:Name="OverviewIoPlcQ" Text="PLC-Q LINK  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11" Margin="2,2"/>
+                        <TextBlock x:Name="OverviewIoGantryBusy" Text="GANTRY BUSY  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11" Margin="2,2"/>
+                        <TextBlock x:Name="OverviewIoGantryAlarm" Text="GANTRY ALARM  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11" Margin="2,2"/>
+                        <TextBlock x:Name="OverviewIoVision" Text="VISION BRIDGE  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11" Margin="2,2"/>
                       </UniformGrid>
                     </StackPanel>
                   </Border>
                   <Grid Margin="0,9,0,9">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel>
                       <TextBlock Text="TRACKED PRODUCT" Foreground="#8EADBF" FontSize="10"/>
                       <TextBlock x:Name="OverviewCam1Track" Text="Track ID: --" Foreground="#F1F8FC" FontSize="13" FontWeight="SemiBold" Margin="0,4,0,0"/>
@@ -269,8 +270,9 @@
                       <TextBlock Text="IMAGE POSITION / mm · θ" Foreground="#8EADBF" FontSize="10"/>
                       <TextBlock x:Name="OverviewCam1Pose" Text="X --  Y --  θ --" Foreground="#F1F8FC" FontSize="13" FontWeight="SemiBold" Margin="0,4,0,0"/>
                     </StackPanel>
+                  <Button Grid.Column="2" Content="STATION DETAILS  ›" Click="DashOpenGantry_Click" MinHeight="30" Margin="8,0,0,0" Padding="9,3" Background="#236F8C" Foreground="#EDF6FA" VerticalAlignment="Center"/>
                   </Grid>
-                  <TextBlock Text="CAMERA 1 / PRODUCT TRACKING EVENTS" Foreground="#88BDCD" FontSize="10" FontWeight="Bold" Margin="0,1,0,5"/>
+                  <TextBlock Text="CAMERA 1 / PRODUCT TRACKING EVENTS" Foreground="#88BDCD" FontSize="10" FontWeight="Bold" Margin="0,1,0,5" Visibility="Collapsed"/>
                   <DataGrid x:Name="OverviewGantryLog" Height="92" IsReadOnly="True" AutoGenerateColumns="False" HeadersVisibility="None" Background="#102738" Foreground="#E6F2FB" RowBackground="#102738" AlternatingRowBackground="#203C4B" BorderThickness="0" RowHeight="27" CanUserAddRows="False">
                     <DataGrid.Columns>
                       <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="75"/>
@@ -279,28 +281,28 @@
                       <DataGridTextColumn Header="Event" Binding="{Binding Delivery}" Width="*"/>
                     </DataGrid.Columns>
                   </DataGrid>
-                  <TextBlock x:Name="OverviewGantrySensors" Text="I/O / waiting for PLC..." TextWrapping="Wrap" Foreground="#9DC7CF" FontSize="11" Margin="0,9,0,7"/>
+                  <TextBlock x:Name="OverviewGantrySensors" Text="I/O / waiting for PLC..." TextWrapping="Wrap" Foreground="#9DC7CF" FontSize="11" Margin="0,9,0,7" Visibility="Collapsed"/>
 
-                  <TextBlock x:Name="DashGantryState" Text="Robot: reading status..." Foreground="#E9F0F5" FontWeight="SemiBold" FontSize="13"/>
-                  <TextBlock x:Name="DashGantryPlc" Text="Mitsubishi QD75: —" Foreground="#ADC0CE" Margin="0,6,0,0"/>
-                  <TextBlock x:Name="DashGantryVertex" Text="Current vertex: — / 4" Foreground="#ADC0CE" Margin="0,5,0,0"/>
-                  <TextBlock x:Name="DashCamera1" Text="Camera 1: —" Foreground="#ADC0CE" Margin="0,5,0,0"/>
-                  <TextBlock x:Name="DashGantryStats" Text="FIFO: — | Accepted: — | Missed: —" Foreground="#ADC0CE" Margin="0,5,0,9"/>
+                  <TextBlock x:Name="DashGantryState" Text="Robot: reading status..." Foreground="#E9F0F5" FontWeight="SemiBold" FontSize="13" Visibility="Collapsed"/>
+                  <TextBlock x:Name="DashGantryPlc" Text="Mitsubishi QD75: —" Foreground="#ADC0CE" Margin="0,6,0,0" Visibility="Collapsed"/>
+                  <TextBlock x:Name="DashGantryVertex" Text="Current vertex: — / 4" Foreground="#ADC0CE" Margin="0,5,0,0" Visibility="Collapsed"/>
+                  <TextBlock x:Name="DashCamera1" Text="Camera 1: —" Foreground="#ADC0CE" Margin="0,5,0,0" Visibility="Collapsed"/>
+                  <TextBlock x:Name="DashGantryStats" Text="FIFO: — | Accepted: — | Missed: —" Foreground="#ADC0CE" Margin="0,5,0,9" Visibility="Collapsed"/>
                   <WrapPanel Margin="0,7,0,0">
-                    <Button Content="OPEN STATION 01 DETAILS" Click="DashOpenGantry_Click" Background="#236F8C" Foreground="White" MinHeight="32" Margin="0,0,7,0"/>
-                    <Button Content="PLC STATUS" Click="DashPLC_Click" Background="#294053" Foreground="#EDF6FA" MinHeight="32"/>
+                    <Button Content="OPEN STATION 01 DETAILS" Click="DashOpenGantry_Click" Background="#236F8C" Foreground="White" MinHeight="32" Margin="0,0,7,0" Visibility="Collapsed"/>
+                    <Button Content="PLC STATUS" Click="DashPLC_Click" Background="#294053" Foreground="#EDF6FA" MinHeight="32" Visibility="Collapsed"/>
                   </WrapPanel>
-                  <TextBlock Text="Robot motion disabled from HMI. M1000/M1001 remain PLC-Q-controlled." TextWrapping="Wrap" Foreground="#8EA5B6" FontSize="10" Margin="0,10,0,0"/>
+                  <TextBlock Text="Robot motion disabled from HMI. M1000/M1001 remain PLC-Q-controlled." TextWrapping="Wrap" Foreground="#8EA5B6" FontSize="10" Margin="0,10,0,0" Visibility="Collapsed"/>
                 </StackPanel>
               </Border>
-              <Border Grid.Column="1" Background="#142330" BorderBrush="#33485C" BorderThickness="1" CornerRadius="8" Padding="11">
+              <Border Grid.Column="1" Background="#142330" BorderBrush="#33485C" BorderThickness="1" CornerRadius="8" Padding="9">
                 <StackPanel>
                   <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <StackPanel><TextBlock Text="02 / SCARA PICK &amp; PLACE" Foreground="#B0C1D0" FontSize="11" FontWeight="Bold"/><TextBlock Text="TRAY PICK AND PLACE" Foreground="#E6EFF5" FontSize="19" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                    <StackPanel><TextBlock Text="02 / SCARA PICK &amp; PLACE" Foreground="#B0C1D0" FontSize="11" FontWeight="Bold"/><TextBlock Text="TRAY PICK AND PLACE" Foreground="#E6EFF5" FontSize="15" FontWeight="Bold" Margin="0,2,0,0"/></StackPanel>
                     <Border Grid.Column="1" Background="#35414C" CornerRadius="3" Padding="9,5"><TextBlock Text="PLANNED" Foreground="#E3D3A0" FontSize="10" FontWeight="Bold"/></Border>
                   </Grid>
-                  <Separator Background="#3D5668" Margin="0,13,0,11"/>
-                  <Border Height="280" Background="#091520" BorderBrush="#37556B" BorderThickness="1" CornerRadius="4">
+                  <Separator Background="#3D5668" Margin="0,6,0,7"/>
+                  <Border Height="450" Background="#091520" BorderBrush="#37556B" BorderThickness="1" CornerRadius="4">
                     <Grid>
                       <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock Text="CAMERA 02" FontSize="18" FontWeight="Bold" Foreground="#7B96A8" HorizontalAlignment="Center"/>
@@ -309,38 +311,39 @@
                       </StackPanel>
                     </Grid>
                   </Border>
-                  <Border Background="#0E1E2B" BorderBrush="#334455" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,8,0,6">
+                  <Border Background="#0E1E2B" BorderBrush="#334455" BorderThickness="1" CornerRadius="4" Padding="6" Margin="0,5,0,4">
                     <StackPanel>
                       <TextBlock Text="STATION 02  /  I/O NOT COMMISSIONED" Foreground="#DABF8B" FontSize="10" FontWeight="SemiBold" Margin="0,0,0,5"/>
                       <UniformGrid Columns="3" Rows="2">
-                        <TextBlock Text="CAMERA 2  |  NOT INSTALLED" Foreground="#9AA9B7" FontSize="11" Margin="3,4"/>
-                        <TextBlock Text="ROBOT READY  |  UNMAPPED" Foreground="#9AA9B7" FontSize="11" Margin="3,4"/>
-                        <TextBlock Text="GRIPPER  |  UNMAPPED" Foreground="#9AA9B7" FontSize="11" Margin="3,4"/>
-                        <TextBlock Text="TRAY SENSOR  |  UNMAPPED" Foreground="#9AA9B7" FontSize="11" Margin="3,4"/>
-                        <TextBlock Text="SCARA ALARM  |  UNMAPPED" Foreground="#9AA9B7" FontSize="11" Margin="3,4"/>
-                        <TextBlock Text="QUEUE ACK  |  UNMAPPED" Foreground="#9AA9B7" FontSize="11" Margin="3,4"/>
+                        <TextBlock Text="CAMERA 2  |  NOT INSTALLED" Foreground="#9AA9B7" FontSize="11" Margin="2,2"/>
+                        <TextBlock Text="ROBOT READY  |  UNMAPPED" Foreground="#9AA9B7" FontSize="11" Margin="2,2"/>
+                        <TextBlock Text="GRIPPER  |  UNMAPPED" Foreground="#9AA9B7" FontSize="11" Margin="2,2"/>
+                        <TextBlock Text="TRAY SENSOR  |  UNMAPPED" Foreground="#9AA9B7" FontSize="11" Margin="2,2"/>
+                        <TextBlock Text="SCARA ALARM  |  UNMAPPED" Foreground="#9AA9B7" FontSize="11" Margin="2,2"/>
+                        <TextBlock Text="QUEUE ACK  |  UNMAPPED" Foreground="#9AA9B7" FontSize="11" Margin="2,2"/>
                       </UniformGrid>
                     </StackPanel>
                   </Border>
                   <Grid Margin="0,9,0,9">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel><TextBlock Text="TRACK / TRAY" Foreground="#8EADBF" FontSize="10"/><TextBlock Text="-- / RESERVED" Foreground="#E4D5AA" FontSize="13" Margin="0,4,0,0"/></StackPanel>
                     <StackPanel Grid.Column="1"><TextBlock Text="X / Y / θ" Foreground="#8EADBF" FontSize="10"/><TextBlock Text="-- / -- / --" Foreground="#E4D5AA" FontSize="13" Margin="0,4,0,0"/></StackPanel>
+                  <Button Grid.Column="2" Content="STATION DETAILS  ›" Click="DashOpenScara_Click" MinHeight="30" Margin="8,0,0,0" Padding="9,3" Background="#34485B" Foreground="#EDF6FA" VerticalAlignment="Center"/>
                   </Grid>
-                  <Border Height="92" Background="#102330" BorderBrush="#253C4F" BorderThickness="1" Padding="10">
+                  <Border Height="92" Visibility="Collapsed" Background="#102330" BorderBrush="#253C4F" BorderThickness="1" Padding="10">
                     <StackPanel><TextBlock Text="LOG SCARA" Foreground="#8BB1C2" FontSize="11" FontWeight="SemiBold"/><TextBlock Text="No robot, sensor or product data available at Station 02." TextWrapping="Wrap" Foreground="#9BB1C0" FontSize="11" Margin="0,8,0,0"/></StackPanel>
                   </Border>
-                  <TextBlock Text="I/O / Camera 2, robot ready and tray: NOT COMMISSIONED" Foreground="#A3AEB9" FontSize="11" TextWrapping="Wrap" Margin="0,9,0,7"/>
+                  <TextBlock Text="I/O / Camera 2, robot ready and tray: NOT COMMISSIONED" Foreground="#A3AEB9" FontSize="11" TextWrapping="Wrap" Margin="0,9,0,7" Visibility="Collapsed"/>
 
-                  <TextBlock Text="SCARA PLC: NOT COMMISSIONED" Foreground="#E3D3A0" FontSize="13" FontWeight="SemiBold"/>
-                  <TextBlock Text="Camera 2: not installed" Foreground="#ADC0CE" Margin="0,7,0,0"/>
-                  <TextBlock Text="Tracking: shared conveyor encoder" Foreground="#ADC0CE" Margin="0,5,0,0"/>
-                  <TextBlock Text="Station queue: not active" Foreground="#ADC0CE" Margin="0,5,0,0"/>
-                  <TextBlock Text="Tray status: not connected" Foreground="#ADC0CE" Margin="0,5,0,9"/>
+                  <TextBlock Text="SCARA PLC: NOT COMMISSIONED" Foreground="#E3D3A0" FontSize="13" FontWeight="SemiBold" Visibility="Collapsed"/>
+                  <TextBlock Text="Camera 2: not installed" Foreground="#ADC0CE" Margin="0,7,0,0" Visibility="Collapsed"/>
+                  <TextBlock Text="Tracking: shared conveyor encoder" Foreground="#ADC0CE" Margin="0,5,0,0" Visibility="Collapsed"/>
+                  <TextBlock Text="Station queue: not active" Foreground="#ADC0CE" Margin="0,5,0,0" Visibility="Collapsed"/>
+                  <TextBlock Text="Tray status: not connected" Foreground="#ADC0CE" Margin="0,5,0,9" Visibility="Collapsed"/>
                   <WrapPanel Margin="0,7,0,0">
-                    <Button Content="OPEN STATION 02 DETAILS" Click="DashOpenScara_Click" ToolTip="Show the planned SCARA station. No device commands." Background="#34485B" Foreground="#EDF6FA" MinHeight="32"/>
+                    <Button Content="OPEN STATION 02 DETAILS" Click="DashOpenScara_Click" ToolTip="Show the planned SCARA station. No device commands." Background="#34485B" Foreground="#EDF6FA" MinHeight="32" Visibility="Collapsed"/>
                   </WrapPanel>
-                  <TextBlock Text="Reserved interfaces: camera 2, product pose, tray, robot and independent handshake." TextWrapping="Wrap" Foreground="#8EA5B6" FontSize="10" Margin="0,10,0,0"/>
+                  <TextBlock Text="Reserved interfaces: camera 2, product pose, tray, robot and independent handshake." TextWrapping="Wrap" Foreground="#8EA5B6" FontSize="10" Margin="0,10,0,0" Visibility="Collapsed"/>
                 </StackPanel>
               </Border>
             </Grid>
@@ -354,7 +357,7 @@
                 <TextBlock Grid.Column="4" x:Name="OverviewIoAo" Text="ST-4424 AO1  |  UNKNOWN" Foreground="#E3CF9A" FontSize="11"/>
               </Grid>
             </Border>
-            <Grid Margin="0,0,0,12">
+            <Grid Visibility="Collapsed" Margin="0,0,0,12">
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
               <Border Grid.Column="0" Background="#142739" BorderBrush="#274158" BorderThickness="1" CornerRadius="7" Padding="13" Margin="0,0,8,0">
                 <StackPanel><TextBlock Text="E-STOP AUXILIARY INPUT" FontSize="10" Foreground="#92A8BA"/><TextBlock x:Name="DashEStop" Text="UNVERIFIED" FontSize="18" FontWeight="Bold" Foreground="#EAC17E" Margin="0,9,0,4"/><TextBlock Text="ST-1228 DI0 feedback (NOT safety-rated)" FontSize="10" Foreground="#91A2B3"/></StackPanel>
@@ -369,13 +372,13 @@
                 <StackPanel><TextBlock Text="PRODUCT QUEUE" FontSize="10" Foreground="#92A8BA"/><TextBlock x:Name="DashQueue" Text="— / 8" FontSize="18" FontWeight="Bold" Foreground="#E5F2FA" Margin="0,9,0,4"/><TextBlock x:Name="DashQueueInfo" Text="Waiting for PLC..." FontSize="10" Foreground="#91A2B3"/></StackPanel>
               </Border>
             </Grid>
-            <Border Background="#1C2B35" CornerRadius="6" Padding="12,10" Margin="0,0,0,14" BorderBrush="#375065" BorderThickness="1">
+            <Border Visibility="Collapsed" Background="#1C2B35" CornerRadius="6" Padding="12,10" Margin="0,0,0,14" BorderBrush="#375065" BorderThickness="1">
               <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <TextBlock x:Name="DashMachineMessage" Text="Reading line status through TwinCAT ADS..." Foreground="#E3EAF0" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap"/>
                 <TextBlock Grid.Column="1" Text="HMI / OPERATOR INFORMATION" Foreground="#8DA9B8" FontSize="10" Margin="12,0,0,0" VerticalAlignment="Center"/>
               </Grid>
             </Border>
-            <Border Background="#132639" BorderBrush="#2D4C63" BorderThickness="1" CornerRadius="8" Padding="11" Margin="0,0,0,12">
+            <Border Visibility="Collapsed" Background="#132639" BorderBrush="#2D4C63" BorderThickness="1" CornerRadius="8" Padding="11" Margin="0,0,0,12">
               <StackPanel>
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -392,7 +395,7 @@
 
               </StackPanel>
             </Border>
-            <Border Background="#152D3B" BorderBrush="#32586E" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,12">
+            <Border Visibility="Collapsed" Background="#152D3B" BorderBrush="#32586E" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,12">
               <StackPanel>
                 <TextBlock Text="PLC I/O AND INTERLOCK MONITOR" FontSize="12" FontWeight="Bold" Foreground="#88D1DC"/>
                 <TextBlock x:Name="OverviewSensors" Text="Reading ADS status. These signals do not establish safety-circuit integrity." Foreground="#E3F1F8" FontSize="12" TextWrapping="Wrap" Margin="0,9,0,3"/>
@@ -402,8 +405,8 @@
 
               </StackPanel>
             </Border>
-            <TextBlock Text="LINE FLOW   CAMERA 1  →  GANTRY 4 POINTS  →  CAMERA 2 / SCARA  →  TRAY" Foreground="#6ABFCE" FontSize="12" FontWeight="SemiBold" Margin="4,0,0,4"/>
-            <TextBlock Text="SCARA telemetry is not commissioned. Only verified Gantry/Camera 1 tags are read. ADS connectivity is not proof of robot readiness." Foreground="#869CAD" FontSize="11" TextWrapping="Wrap"/>
+            <TextBlock Text="LINE FLOW   CAMERA 1  →  GANTRY 4 POINTS  →  CAMERA 2 / SCARA  →  TRAY" Foreground="#6ABFCE" FontSize="12" FontWeight="SemiBold" Margin="4,0,0,4" Visibility="Collapsed"/>
+            <TextBlock Text="SCARA telemetry is not commissioned. Only verified Gantry/Camera 1 tags are read. ADS connectivity is not proof of robot readiness." Foreground="#869CAD" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed"/>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
