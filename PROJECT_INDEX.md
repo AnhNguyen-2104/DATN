@@ -28,13 +28,13 @@
 - **TwinCAT 3:** PLC\TwinCAT\DATN.sln là COPY trùng với bản C:\Users\aml\Documents\DATN_GLOBAL_STOP_STAGE_20261019\DATN.sln tại thời điểm gom. Runtime TwinCAT là hệ thống riêng; không suy luận bản copy đã được nạp, và không tự Activate/Download.
 - **PLC Mitsubishi:** Có nhiều bản .gxw từ máy DESKTOP-B090KN3. Chưa đối chiếu / Read from PLC-Q nên CHƯA THỂ khẳng định file nào là bản chạy thực tế. Không Write to PLC nếu chưa so sánh online.
 - **C# Dashboard:** App\Vision là source và Release\PlateVision50_V2.dll là ứng dụng từ START_DATN.cmd. Không di chuyển Release hay Runtime vì có thể gián đoạn chương trình đang chạy.
-- **Bản TwinCAT gốc:** PLC\TwinCAT_Original_20261015 là bản sao từ Desktop\DATN_TwinCat3, không dùng để thay thế bản hiện hành.
-- **12 ZIP** ở PLC\Backups\TwinCAT_Stages là các bản build/stage lịch sử. Bảng SHA256_Archive_Manifest.csv hỗ trợ kiểm tra không hỏng file.
+- **Bản TwinCAT gốc:** Đã chuyển vào D:/DATN_ARCHIVE_20261020/DATN_Excluded_Builds_and_Backups/PLC/TwinCAT_Original_20261015; không dùng để thay thế bản hiện hành.
+- **12 ZIP lịch sử:** Đã chuyển vào D:/DATN_ARCHIVE_20261020/DATN_Excluded_Builds_and_Backups/PLC/Backups.
 
 ## 3. Các giới hạn / phần chưa được gom vật lý
 
 - Thư mục D:\DATN_ARCHIVE_20261020\DATN_LEGACY_ARCHIVE_20261019 chứa khoảng **6,48 GB** bản C# lịch sử. Chúng vẫn an toàn ở vị trí cũ, KHÔNG nhân đôi vì chứa nhiều bản build nặng và trùng lặp. Có thể đọc Docs\legacy_folder_inventory.csv và Docs\legacy_folder_moves.csv để truy vết.
-- Các thư mục cũ Desktop\PlateVision50_V2, Desktop\PlateVision50_V2_Tests, Desktop\WpfYolo_Detect_RealTime-master, Desktop\DEMO được giữ nguyên; không mặc nhiên là source hiện hành.
+- Hai dự án PlateVision50 cũ (ứng dụng và tests) đã được kiểm tra rồi lưu tại D:/DATN_ARCHIVE_20261020/Desktop_Legacy_Projects; Desktop/WpfYolo_Detect_RealTime-master và Desktop/DEMO vẫn giữ nguyên vì là nguồn phụ thuộc/dữ liệu thử.
 - File GX Works2 được chép từ máy DESKTOP-B090KN3 qua Tailscale, gói backup tại PLC\Mitsubishi\DATN_Mitsubishi_Sources_20261019.zip. Tất cả 10 tập tin nguồn đều khớp SHA256 của SOURCE_MANIFEST.json.
 - Chương trình Mitsubishi PLC-Q, cấu hình TwinCAT đang RUN, route, license và driver KHÔNG được di chuyển hoặc nạp trong thao tác gom file.
 - Hướng dẫn này không xác nhận tính đúng của chương trình PLC, điều kiện an toàn cơ khí hay mạch E-Stop.
@@ -53,5 +53,5 @@
 ## 6. CẬP NHẬT 2026-10-20
 - Tất cả source hiện tại nằm trong DATN; lịch sử/backup chuyển về D:/DATN_ARCHIVE_20261020 sau kiểm tra hash.
 - Có thêm App/Tests/Tests.csproj, build pass.
-- Thư mục Visual Studio cũ Desktop/PlateVision50_V2 được giữ tới khi phiên VS PlateVision50 đóng hoàn toàn.
-- Thư mục cũ TwinCAT_AI_OFFLINE và TwinCAT_Original có thể còn vỏ thư mục rỗng bị Windows giữ handle; tệp đã bảo toàn trên D.
+- Thư mục Visual Studio cũ Desktop/PlateVision50_V2 đã chuyển vào D sau khi xác minh VS Insiders mở chính DATN/App/PlateVision50.sln.
+- Các thư mục TwinCAT_AI_OFFLINE và TwinCAT_Original rỗng sau lưu trữ đã được dọn khi Windows giải phóng handle; tất cả dữ liệu đều trên ổ D.

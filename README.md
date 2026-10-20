@@ -47,8 +47,7 @@ Video is IMAGE-only and does not synchronize product with physical Encoder.
 Old PlateVision50 folders were moved (NOT PERMANENTLY DELETED) from Desktop to
 D:\DATN_ARCHIVE_20261020\DATN_LEGACY_ARCHIVE_20261019
 Manifest: Docs\legacy_folder_inventory.csv and Docs\legacy_folder_moves.csv.
-Two original directories PlateVision50_V2 and PlateVision50_V2_Tests reported
-Access Denied on relocation and were intentionally left unchanged.
+Legacy directories PlateVision50_V2 and PlateVision50_V2_Tests were relocated after content verification to D:/DATN_ARCHIVE_20261020/Desktop_Legacy_Projects.
 Do NOT delete WpfYolo sample project, original DATN_TwinCat3, live PLC project,
 camera drivers, TwinCAT Boot, or original contracts without separate review.
 
@@ -87,5 +86,5 @@ GitHub: https://github.com/AnhNguyen-2104/DATN
 - Current Mitsubishi PLC-Q candidates: PLC/Mitsubishi/Sources_20261019/GXWorks2/Candidates.
 - Historical C# releases and TwinCAT stage backups were moved with SHA-256 verification to D:/DATN_ARCHIVE_20261020.
 - START_DATN_PREVIEW.cmd now forwards to START_DATN_STATION_PREVIEW.cmd (newest preserved SensorLog preview). START_DATN.cmd retains original release.
-- The older Desktop/PlateVision50_V2 directory has not been removed while Visual Studio is observed open with PlateVision50, to avoid breaking unsaved editor state. Do not use it as the source of truth.
+- The old Desktop/PlateVision50_V2 source was archived to D after verifying Visual Studio is currently using DATN/App/PlateVision50.sln; DATN/App remains the source of truth.
 - PLC/TwinCAT_Original_20261015 and PLC/Backups were archived to D; do not blindly activate or deploy the Git version.
