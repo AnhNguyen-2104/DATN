@@ -20,7 +20,7 @@ public sealed class TriggerAuditRow : INotifyPropertyChanged
     public double Theta { get; init; }
     public string Position => $"{Xmm:F2} / {Ymm:F2} / {Theta:F2}°";
     private string _delivery = "DETECTED";
-    private string _plc = "CHƯA GỬI";
+    private string _plc = "NOT SENT";
     public string Delivery { get => _delivery; set { _delivery = value; Changed(); } }
     public string Plc { get => _plc; set { _plc = value; Changed(); } }
     public event PropertyChangedEventHandler? PropertyChanged;

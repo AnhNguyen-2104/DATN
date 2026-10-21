@@ -14,6 +14,11 @@ VAR_INPUT
     bSimExposure            : BOOL;
     bSimResult              : BOOL;
     bSimCompleteHead        : BOOL;
+    // Production FIFO head is held during a verified 4-vertex cycle.
+    // A completion must carry the exact product ID; never release on a generic DONE bit.
+    bHoldHead               : BOOL := FALSE;
+    bCompleteHead           : BOOL := FALSE;
+    nCompleteProductID      : UDINT := 0;
 
     rCenterX_mm             : LREAL;
     rCenterY_mm             : LREAL;
@@ -46,6 +51,7 @@ VAR_OUTPUT
     nRejected               : UDINT;
     nMissed                 : UDINT;
     nSimCompleted           : UDINT; // BENCH simulator ONLY, not robot done
+    nRealCompleted          : UDINT; // Matching 4-vertex Publisher ACK, not simulated
     nExposureOverruns       : UDINT;
     nErrorCode              : INT;
     bInputFault             : BOOL; // latched until reset
@@ -108,6 +114,7 @@ IF bFirstScan OR bReset THEN
     nRejected := 0;
     nMissed := 0;
     nSimCompleted := 0;
+    nRealCompleted := 0;
     nExposureOverruns := 0;
     nErrorCode := 0;
     bInputFault := FALSE;
@@ -275,7 +282,7 @@ IF NOT bReset THEN
     END_FOR;
 
     // Drop ONLY the oldest missed product; preserve FIFO order for later items.
-    IF nQueueCount > 0 THEN
+    IF (nQueueCount > 0) AND NOT bHoldHead THEN
         bOut := TRUE;
         FOR j := 1 TO 4 DO
             IF aQueue[nHeadIndex].aCornerNow[j].X <= rXMax_mm THEN
@@ -292,8 +299,24 @@ IF NOT bReset THEN
         END_IF;
     END_IF;
 
+    // Remove only the exact product acknowledged by the four-vertex Publisher.
+    // HoldHead prevents missed-product eviction in this completion scan.
+    IF bCompleteHead AND NOT bSimMode AND (nQueueCount > 0) THEN
+        IF aQueue[nHeadIndex].bValid AND (aQueue[nHeadIndex].nProductID = nCompleteProductID) THEN
+            aQueue[nHeadIndex].bValid := FALSE;
+            aQueue[nHeadIndex].nState := 0;
+            nRealCompleted := nRealCompleted + 1;
+            nQueueCount := nQueueCount - 1;
+            nHeadIndex := nHeadIndex + 1;
+            IF nHeadIndex > 8 THEN nHeadIndex := 1; END_IF;
+        ELSE
+            bInputFault := TRUE;
+            nErrorCode := 117; // FIFO and Publisher identity disagree
+        END_IF;
+    END_IF;
+
     // Offline/manual simulation of completion only; never constitutes M1001 ACK.
-    IF fbSimDoneEdge.Q AND (nQueueCount > 0) THEN
+    IF fbSimDoneEdge.Q AND bSimMode AND (nQueueCount > 0) AND NOT bHoldHead THEN
         IF aQueue[nHeadIndex].bAllCornersInside THEN
             aQueue[nHeadIndex].bValid := FALSE;
             aQueue[nHeadIndex].nState := 0;

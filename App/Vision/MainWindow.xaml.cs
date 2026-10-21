@@ -73,8 +73,11 @@ public partial class MainWindow : System.Windows.Window
         InitializeComponent();
         Loaded+=(_,_)=>{
             try {
-                if(File.Exists(_themeFile) && File.ReadAllText(_themeFile).Trim()=="dark")
-                    DarkModeBox.IsChecked=true;
+                // Operator surfaces are dark industrial by default; the stored
+                // preference may only switch to light when explicitly saved.
+                bool dark = !File.Exists(_themeFile) || File.ReadAllText(_themeFile).Trim()!="light";
+                if(dark) DarkModeBox.IsChecked=true;
+                else { ThemePalette.Set(this,false); RefreshCaptureMode(); }
             } catch(Exception ex) {StatusText.Text="Unable to load theme settings: "+ex.Message;}
         };
         PipelineTable.ItemsSource=_auditRows;
@@ -84,6 +87,7 @@ public partial class MainWindow : System.Windows.Window
         _adsTimer.Start();
         InitDashboard();
         InitStationOverview();
+        InitStationDashboards();
         RefreshVideos();
         ResetDetectionHud();
         RefreshCaptureMode();
@@ -149,8 +153,8 @@ public partial class MainWindow : System.Windows.Window
         _offlineSimulationEnabled=OfflinePipelineBox.IsChecked==true;
         _offlineQueue.Reset();
         PipelineMockStatus.Text=_offlineSimulationEnabled
-            ?"VIRTUAL FIFO ENABLED • NO ADS WRITE, each Track ID is counted once."
-            :"FIFO ẢO ĐÃ OFF • TwinCAT ADS vẫn chỉ đọc.";
+            ?"VIRTUAL FIFO ENABLED · no ADS write; each Track ID is counted once."
+            :"VIRTUAL FIFO OFF · TwinCAT ADS remains read-only.";
         if(_offlineSimulationEnabled && BenchQueueBox.IsChecked==true)
         {
             BenchQueueBox.IsChecked=false;
@@ -166,7 +170,7 @@ public partial class MainWindow : System.Windows.Window
             bool scaleReady=_options.FixedMmPerPixel>0;
             ReadinessStatus.Text=plc+" | Camera="+(frameReady?"LIVE":"UNVERIFIED")+
                " | Scale mm/px="+(scaleReady?"ENTERED (NOT COMMISSIONED)":"MISSING")+
-               " | TRẠNG THÁI: LIVE PLC WRITES NOT AUTHORIZED.";
+               " | STATE: LIVE · PLC WRITES NOT AUTHORIZED.";
         }
         catch(Exception ex) {ReadinessStatus.Text="NOT READY: "+ex.Message;}
     }
@@ -242,7 +246,7 @@ public partial class MainWindow : System.Windows.Window
         _paused=false;
         ResetDetectionHud();
         RefreshCaptureMode();
-        StatusText.Text="START: camera/video đang nhận dạng, tracking và trigger 50% FOV | ADS READ ONLY.";
+        StatusText.Text="START: camera/video detection, tracking and 50% FOV trigger | ADS READ ONLY.";
     }
 
     private void StopTracking_Click(object sender,RoutedEventArgs e)
@@ -270,16 +274,22 @@ public partial class MainWindow : System.Windows.Window
             StationFrameReceived();
         PlateOverlay.Children.Clear();
         _overlayDetections=Array.Empty<PlateResult>();
-        FrameInfo.Text=source+"  |  "+image.Width+"x"+image.Height+"  |  LIVE VIEW / BẮT VẬT: OFF";
+        FrameInfo.Text=source+"  |  "+image.Width+"x"+image.Height+"  |  LIVE VIEW / DETECTION OFF";
     }
 
+    // Navigation order: 0 LINE OVERVIEW, 1 STATION 01, 2 STATION 02, 3 SHARED CONVEYOR,
+    // 4 SETTINGS, 5 ALARMS & LOGS, 6 VISION WORKSPACE, 7 CAMERA / SOURCE.
     private void OpenSettingsPage_Click(object sender,RoutedEventArgs e)
     {
-        MainNavigation.SelectedIndex=3;
+        MainNavigation.SelectedItem=SettingsTab;
     }
     private void OpenMonitorPage_Click(object sender,RoutedEventArgs e)
     {
-        MainNavigation.SelectedIndex=1;
+        MainNavigation.SelectedItem=VisionOperationTab;
+    }
+    private void OpenVisionWorkspace_Click(object sender,RoutedEventArgs e)
+    {
+        MainNavigation.SelectedItem=VisionOperationTab;
     }
 
     private void RefreshVideos()
@@ -336,7 +346,7 @@ public partial class MainWindow : System.Windows.Window
             _paused=false;
             _timer.Start();
             RefreshCaptureMode();
-            MainNavigation.SelectedIndex=1;
+            MainNavigation.SelectedItem=VisionOperationTab;
             StatusText.Text="VIDEO PLAYBACK: "+Path.GetFileName(path)+" | press START DETECTION to begin tracking.";
         }
         catch(Exception ex){StopVideo();RefreshCaptureMode();StatusText.Text="VIDEO: "+ex.Message;}
@@ -397,7 +407,7 @@ public partial class MainWindow : System.Windows.Window
             bool localAssigned=System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
                 .SelectMany(n=>n.GetIPProperties().UnicastAddresses)
                 .Any(a=>a.Address.Equals(hostAddr));
-            if(!localAssigned)throw new ArgumentException("IP máy "+localIp+" is not configured on any local network adapter. Do not change IP settings automatically.");
+            if(!localAssigned)throw new ArgumentException("Local IP "+localIp+" is not configured on any local network adapter. Do not change IP settings automatically.");
             StopTrackingForSourceChange();
             _directHik?.Dispose(); _directHik=null;
             var next=new HikDirectIpCamera(cameraIp,localIp);
@@ -407,7 +417,7 @@ public partial class MainWindow : System.Windows.Window
             _directHik=next; _lastHikFrame=0;
             StopVideo(); _paused=false; _timer.Start();
             ResetDetectionHud();RefreshCaptureMode();
-            MainNavigation.SelectedIndex=1;
+            MainNavigation.SelectedItem=VisionOperationTab;
             StatusText.Text="Connected to HIKROBOT "+cameraIp+" — LIVE VIEW. Press START DETECTION.";
         }
         catch(Exception ex) {RefreshCaptureMode();StatusText.Text="IP connection failed: "+ex.Message;}
@@ -445,7 +455,7 @@ public partial class MainWindow : System.Windows.Window
             _sessions.Add(new(info,camera));
             StopVideo();_paused=false;_timer.Start();
             ResetDetectionHud();RefreshCaptureMode();
-            MainNavigation.SelectedIndex=1;
+            MainNavigation.SelectedItem=VisionOperationTab;
             StatusText.Text="Connected: "+info.Name+" — LIVE VIEW. Press START DETECTION.";
         }
         catch(Exception ex){camera?.Dispose();RefreshCaptureMode();StatusText.Text="Camera: "+ex.Message;}

@@ -5,7 +5,7 @@
 VAR_INPUT
     bByte0          : BYTE;             // GVL.aIn[0]
     bByte1          : BYTE;             // GVL.aIn[1]
-    rK_mm           : LREAL := 0.476475;// mm / xung (D=54.6mm, 360 xung)
+    rK_mm           : LREAL := 0.11911875;// mm/count (D=54.6mm, encoder 360PPR x4 = 1440 count/rev)
     rCycleTime      : LREAL := 0.01;    // 10ms
 END_VAR
 VAR_OUTPUT

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
   <POU Name="MAIN" Id="{1dc1cc65-9e37-4e46-ab96-71432f29bc06}" SpecialFunc="None">
     <Declaration><![CDATA[PROGRAM MAIN
@@ -49,11 +49,15 @@ VAR
     // TRUE only when the auxiliary feedback from hardwired EStop is healthy.
     bSystemEStopOK             : BOOL := FALSE;
     bSystemStopRequested       : BOOL := TRUE;
-    // Only 3 operator-visible MD200 signals: EStopOK monitor, START and Hz.
-    // EStopOK is derived from the wired digital feedback, NOT an HMI override.
+    // TwinCAT operator input uses conveyor linear speed (mm/s), not Hz.
+    // Hz is internal drive reference/diagnostic, recomputed each PLC scan.
+    // No live drive enable until independent calibration + source approval.
     bMD200_EStopOK           : BOOL := FALSE;
     bMD200_Start             : BOOL := FALSE;
-    rMD200_SetFrequency_Hz    : LREAL := 0.0;
+    rMD200_SetSpeed_mm_s     : LREAL := 0.0; // ENTER HERE in TwinCAT
+    rMD200_AppliedSpeed_mm_s : LREAL := 0.0; // accepted setpoint, not measured
+    nMD200_SpeedInputState   : UINT := 0;  // 1=ready, 10=not commissioned, 11=invalid, 12=>25Hz, 13=change while running
+    rMD200_SetFrequency_Hz   : LREAL := 0.0; // INTERNAL (do not write Hz manually)
     // Diagnostics (read-only outputs from the FB)
     bMD200_DO_RunVirtual      : BOOL;
     nMD200_AO_RawVirtual      : INT;
@@ -63,6 +67,53 @@ VAR
     bMD200_AtTarget           : BOOL;
     bMD200_Limited            : BOOL;
     nMD200_Status             : UINT;
+
+    // ================================================================
+    // HMI LINE-MASTER CONTRACT (OFFLINE STAGE; NO LIVE COMMISSIONING).
+    // HMI requests are pulses. CmdSeq increments for each request;
+    // AckSeq + result/status are diagnostics, NOT hardware feedback.
+    // Both runtime enable paths are gated by FALSE source constants.
+    // ================================================================
+    bHmiLineStartReq          : BOOL := FALSE;
+    bHmiLineStopReq           : BOOL := FALSE;
+    bHmiLineResetReq          : BOOL := FALSE;
+    udiHmiLineCmdSeq          : UDINT := 0;
+    bHmiHeartbeat             : BOOL := FALSE;
+    bHmiCamera1Ready          : BOOL := FALSE;
+    bHmiTracking1Ready        : BOOL := FALSE;
+    bHmiRequireScara          : BOOL := FALSE; // Reserved: SCARA absent
+    fbHmiLineStartRise        : R_TRIG;
+    fbHmiLineStopRise         : R_TRIG;
+    fbHmiLineResetRise        : R_TRIG;
+    bHmiHeartbeatPrev         : BOOL := FALSE;
+    bHmiHeartbeatChanged      : BOOL := FALSE;
+    bHmiHeartbeatSeen         : BOOL := FALSE;
+    tonHmiHeartbeatStale      : TON;
+    bHmiLinkFresh             : BOOL := FALSE;
+    bLineNormalStopLatched    : BOOL := FALSE;
+    bLineAutoAccepted         : BOOL := FALSE;
+    udiLineLastAckSeq         : UDINT := 0;
+    nLineCommandResult        : UINT := 0; // 1=ack; 10..=rejection
+    nLineMasterState          : UINT := 0; // 0=idle,20=auto,30=stop,90=fault
+
+    // Conveyor speed displayed/set by HMI in mm/s, NOT an ADS Hz guess.
+    // Commissioned factor mm/s per Hz must be physically measured.
+    bHmiBeltSetReq            : BOOL := FALSE;
+    bHmiBeltStartReq          : BOOL := FALSE;
+    bHmiBeltStopReq           : BOOL := FALSE;
+    bBeltHmiRunOwned          : BOOL := FALSE; // only new mailbox START owns watchdog
+    rHmiBeltSetSpeed_mm_s     : LREAL := 0.0;
+    rBeltMeasuredMmPerHz      : LREAL := 0.0; // real ratio: measured speed / command Hz
+    bBeltCalibrationVerified  : BOOL := FALSE;
+    bBeltSpeedMapReady        : BOOL := FALSE; // compile gate + measured calibration
+    nBeltSpeedMapState        : UINT := 0; // 0=not commissioned,1=not calibrated,2=READY
+    rBeltPreviewUnverified_Hz : LREAL := 0.0; // OFFLINE estimate ONLY; no write to VFD
+    rBeltCalculatedSet_Hz     : LREAL := 0.0;
+    rBeltAppliedSpeed_mm_s    : LREAL := 0.0;
+    nBeltCommandResult        : UINT := 0; // 1=ack; 10..=rejection
+    fbHmiBeltSetRise          : R_TRIG;
+    fbHmiBeltStartRise        : R_TRIG;
+    fbHmiBeltStopRise         : R_TRIG;
 
     // ================================================================
     // 4. EZI-SERVO: TRỤC QUAY ĐƠN VỊ DEGREE
@@ -124,6 +175,15 @@ VAR
     bAutoStartPulse     : BOOL := FALSE;
     nAutoDispatchState  : INT := 0;       // 0 idle, 1 queued, 2 speed invalid, 3 TCP busy/offline, 4 motion busy, 5 expired, 6 invalid product, 10 request issued
     nAutoStartRequests  : UDINT := 0;
+    // FIFO head ownership: one product per completed four-vertex handshake.
+    bQueueMotionActive  : BOOL := FALSE;
+    bQueueMotionDonePulse : BOOL := FALSE;
+    nQueueActiveProductID : UDINT := 0;
+    nQueueLastCompletedID : UDINT := 0;
+    nQueueRealCompleted : UDINT := 0;
+    fbGlueDoneEdge      : R_TRIG;
+    aPublisherCorners   : ARRAY[1..4] OF ST_Point2D;
+    bPublisherProductValid : BOOL := FALSE;
 
     // ================================================================
     // 6A. ISOLATED DATA-ONLY XY DEBUG (D100-D103 + D114, NO Z/M1000)
@@ -188,9 +248,9 @@ VAR
     aUpstreamCornerNow   : ARRAY[1..4] OF ST_Point2D;
 
     // ================================================================
-    // CAMERA FIFO MONITOR (DATA ONLY): independent 8-product queue.
-    // Camera returns CENTER X/Y in mm and ANGLE in degrees, NOT corners.
-    // No robot Publisher connection or M1000 writes in this stage.
+    // CAMERA FIFO: 8 product identities, one latched exposure at a time.
+    // Head feeds the Publisher only with cQueueMotionCommissioned=TRUE
+    // after separate PLC-Q and camera approval; FALSE in this build.
     // ================================================================
     fbCameraQueue        : FB_CameraProductQueue;
     bLegacyMotionPublisherAllow : BOOL := FALSE; // explicit safety gate: NO robot in FIFO stage
@@ -214,6 +274,8 @@ VAR
     nQueueRejected       : UDINT;
     nQueueMissed         : UDINT;
     nQueueSimCompleted   : UDINT;
+    // The FIFO-to-Mitsubishi transition requires a separate source-code review.
+    // Compile-time constant, not writable by HMI/ADS, prevents accidental commissioning.
     bQueueInputFault     : BOOL;
     nQueueErrorCode      : INT;
 
@@ -292,6 +354,15 @@ VAR
     nEchoBitErrorID     : UDINT;
     bEchoBitBefore      : BOOL;
     bEchoBitAfter       : BOOL;
+END_VAR
+VAR CONSTANT
+    cQueueMotionCommissioned : BOOL := FALSE;
+    // Separate compile-time reviews required: ADS cannot arm these gates.
+    cLineAutoCommissioned : BOOL := FALSE;
+    cBeltMmSCommissioned  : BOOL := FALSE;
+    // Historical statement: ~100 mm/s at 15 Hz, not independently verified.
+    // Only for a clearly labeled PREVIEW, NEVER for MD200 actuator control.
+    cBeltApproxMmPerHz    : LREAL := 6.666666666666667;
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[// ================================================================
@@ -317,7 +388,210 @@ nPlcQErrorID   := stMelsec.nErrorID;
 // Q-PLC cancel. Clear old command bits to prevent unintended restart.
 // ================================================================
 bSystemEStopOK := GVL_MD200_IO.bEStopFeedback;
-bSystemStopRequested := NOT bSystemEStopOK;
+
+// ================================================================
+// HMI LINE MASTER: command broker INSIDE the existing MAIN PLC POU.
+// No ADS writes occur here; PLC command inputs are sampled cyclically.
+// NOT safety rated: independent hardwired E-Stop is mandatory.
+// cLineAutoCommissioned and cBeltMmSCommissioned are FALSE in source.
+// ================================================================
+fbHmiLineStartRise(CLK := bHmiLineStartReq);
+fbHmiLineStopRise(CLK := bHmiLineStopReq);
+fbHmiLineResetRise(CLK := bHmiLineResetReq);
+fbHmiBeltSetRise(CLK := bHmiBeltSetReq);
+fbHmiBeltStartRise(CLK := bHmiBeltStartReq);
+fbHmiBeltStopRise(CLK := bHmiBeltStopReq);
+
+// Heartbeat is a changing BIT from WPF, not a constant TRUE flag.
+// Each toggle resets the watchdog. Boot starts untrusted/stale.
+bHmiHeartbeatChanged := bHmiHeartbeat <> bHmiHeartbeatPrev;
+bHmiHeartbeatPrev := bHmiHeartbeat;
+IF bHmiHeartbeatChanged THEN
+    bHmiHeartbeatSeen := TRUE;
+END_IF;
+tonHmiHeartbeatStale(IN := NOT bHmiHeartbeatChanged, PT := T#1500MS);
+bHmiLinkFresh := bHmiHeartbeatSeen AND NOT tonHmiHeartbeatStale.Q;
+
+// STOP has priority and is latched until a distinct, allowed RESET.
+// Normal STOP is not certified E-STOP or proof a robot physically stopped.
+IF bHmiLineStopReq THEN
+    bLineNormalStopLatched := TRUE;
+END_IF;
+IF fbHmiLineStopRise.Q THEN
+    udiLineLastAckSeq := udiHmiLineCmdSeq;
+    nLineCommandResult := 1; // normal STOP REQUEST was accepted
+END_IF;
+
+// A reset never energizes a drive, starts AUTO or resets the QD75 fault.
+// Separate fault-reset contract is still pending commissioning.
+IF fbHmiLineResetRise.Q AND NOT bHmiLineStopReq THEN
+    udiLineLastAckSeq := udiHmiLineCmdSeq;
+    IF bSystemEStopOK AND NOT bMD200_Start AND NOT bGlueCycleBusy
+       AND NOT bGlueCycleError AND NOT bStartGlueCycle
+       AND NOT bLineAutoAccepted THEN
+        bLineNormalStopLatched := FALSE;
+        nLineCommandResult := 1;
+    ELSE
+        nLineCommandResult := 15; // machine not proven ready for reset
+    END_IF;
+END_IF;
+
+// AUTO start requires a FRESH command edge, live WPF heartbeat,
+// verified vision/PLC-Q and explicit, separately commissioned gates.
+// SCARA is reserved and never considered READY in this source stage.
+IF fbHmiLineStartRise.Q AND NOT bHmiLineStopReq AND NOT bHmiLineResetReq THEN
+    IF (udiHmiLineCmdSeq = 0)
+       OR (udiHmiLineCmdSeq = udiLineLastAckSeq) THEN
+        nLineCommandResult := 10; // zero or duplicate command sequence
+    ELSIF NOT cLineAutoCommissioned OR NOT cQueueMotionCommissioned
+       OR NOT cBeltMmSCommissioned THEN
+        nLineCommandResult := 11; // offline / not commissioned
+    ELSIF NOT bHmiLinkFresh THEN
+        nLineCommandResult := 12; // lost or stale WPF heartbeat
+    ELSIF bHmiRequireScara THEN
+        nLineCommandResult := 17; // SCARA has no commissioned PLC handshake
+    ELSIF NOT bHmiCamera1Ready OR NOT bHmiTracking1Ready
+       OR NOT bVisionFeedVerified OR NOT bVisionCalibrationOK THEN
+        nLineCommandResult := 13; // camera / tracking not ready
+    ELSIF NOT bPlcQConnected OR bGlueCycleError OR bGlueCycleBusy
+       OR NOT bLegacyMotionPublisherAllow OR NOT bAutoDispatchArm THEN
+        nLineCommandResult := 14; // Gantry/QD75 not commissioned/ready
+    ELSIF NOT bSystemEStopOK OR bLineNormalStopLatched THEN
+        nLineCommandResult := 15; // stopped/interlock active
+    ELSIF bMD200_Start OR rMD200_SetFrequency_Hz <= 0.0 THEN
+        nLineCommandResult := 16; // manual belt owner or no setpoint
+    ELSE
+        bLineAutoAccepted := TRUE;
+        nLineCommandResult := 1; // logical acceptance, NOT motion feedback
+    END_IF;
+    IF udiHmiLineCmdSeq <> 0 THEN
+        udiLineLastAckSeq := udiHmiLineCmdSeq;
+    END_IF;
+END_IF;
+
+// Once accepted, lost heartbeat, vision or PLC feedback must revoke
+// ALL new AUTO motion requests. Do not replay START after reconnection.
+IF bLineAutoAccepted THEN
+    IF NOT bHmiLinkFresh OR NOT bHmiCamera1Ready OR NOT bHmiTracking1Ready
+       OR NOT bVisionFeedVerified OR NOT bVisionCalibrationOK
+       OR NOT bPlcQConnected OR NOT bAutoDispatchArm
+       OR NOT bLegacyMotionPublisherAllow OR NOT bSystemEStopOK
+       OR bGlueCycleError OR bLineNormalStopLatched THEN
+        bLineAutoAccepted := FALSE;
+        bLineNormalStopLatched := TRUE;
+        nLineCommandResult := 18; // AUTO revoked; fresh RESET/START required
+    END_IF;
+END_IF;
+
+// One master owns AUTO requests. Existing QD75 publisher still has its own
+// independent physical-commissioning/arm gates; no SCARA commands here.
+IF bLineAutoAccepted THEN
+    bMD200_Start := TRUE;
+    bAutoDispatchEnable := TRUE;
+END_IF;
+
+// Manual belt conversion mapping: a preview may use the historical
+// approximation 15 Hz ~ 100 mm/s, but the MD200 can ONLY use the
+// physically measured ratio, with source approval and manual authorization.
+bBeltSpeedMapReady := FALSE;
+nBeltSpeedMapState := 0; // default: source gate NOT commissioned
+IF cBeltMmSCommissioned THEN
+    nBeltSpeedMapState := 1; // awaiting calibration validation
+    IF bBeltCalibrationVerified AND (rBeltMeasuredMmPerHz = rBeltMeasuredMmPerHz)
+       AND rBeltMeasuredMmPerHz > 0.0 AND rBeltMeasuredMmPerHz <= 1000.0 THEN
+        bBeltSpeedMapReady := TRUE;
+        nBeltSpeedMapState := 2;
+    END_IF;
+END_IF;
+rBeltPreviewUnverified_Hz := 0.0;
+// Preview follows the mm/s field entered directly in TwinCAT.
+// Reference is only historical/uncalibrated, never fed to MD200.
+IF (rMD200_SetSpeed_mm_s = rMD200_SetSpeed_mm_s)
+   AND rMD200_SetSpeed_mm_s >= 0.0
+   AND rMD200_SetSpeed_mm_s <= (25.0 * cBeltApproxMmPerHz) THEN
+    rBeltPreviewUnverified_Hz := rMD200_SetSpeed_mm_s / cBeltApproxMmPerHz;
+END_IF;
+
+// MANUAL BELT: normal STOP is always allowed; START/SET require
+// validated calibration and separate compile-time approval.
+IF bHmiBeltStopReq THEN
+    bMD200_Start := FALSE;
+    bBeltHmiRunOwned := FALSE;
+    IF bLineAutoAccepted THEN
+        bLineAutoAccepted := FALSE;
+        bLineNormalStopLatched := TRUE;
+    END_IF;
+END_IF;
+IF fbHmiBeltStopRise.Q THEN
+    nBeltCommandResult := 1;
+END_IF;
+
+IF fbHmiBeltSetRise.Q THEN
+    rBeltCalculatedSet_Hz := 0.0;
+    IF NOT bBeltSpeedMapReady THEN
+        nBeltCommandResult := 11; // validated calibration/activation missing
+    ELSIF NOT bHmiLinkFresh THEN
+        nBeltCommandResult := 12; // HMI heartbeat stale
+    ELSIF bLineAutoAccepted OR bMD200_Start OR bLineNormalStopLatched THEN
+        nBeltCommandResult := 12; // not allowed to retune while running
+    ELSIF (rBeltMeasuredMmPerHz <> rBeltMeasuredMmPerHz)
+       OR (rHmiBeltSetSpeed_mm_s <> rHmiBeltSetSpeed_mm_s)
+       OR rBeltMeasuredMmPerHz <= 0.0 OR rBeltMeasuredMmPerHz > 1000.0
+       OR rHmiBeltSetSpeed_mm_s <= 0.0 OR rHmiBeltSetSpeed_mm_s > 10000.0 THEN
+        nBeltCommandResult := 13; // invalid calibrated ratio/setpoint
+    ELSE
+        rBeltCalculatedSet_Hz := rHmiBeltSetSpeed_mm_s / rBeltMeasuredMmPerHz;
+        IF rBeltCalculatedSet_Hz <= 0.0 OR rBeltCalculatedSet_Hz > 25.0 THEN
+            nBeltCommandResult := 14; // outside MD200 0..25 Hz
+        ELSE
+            // Store mm/s as the ONLY machine-speed input; Hz is derived
+            // below before FB_MD200, never written directly by WPF.
+            rMD200_SetSpeed_mm_s := rHmiBeltSetSpeed_mm_s;
+            rBeltAppliedSpeed_mm_s := rHmiBeltSetSpeed_mm_s;
+            nBeltCommandResult := 1;
+        END_IF;
+    END_IF;
+END_IF;
+
+IF fbHmiBeltStartRise.Q AND NOT bHmiBeltStopReq THEN
+    IF NOT bBeltSpeedMapReady THEN
+        nBeltCommandResult := 11;
+    ELSIF bLineAutoAccepted OR bLineNormalStopLatched
+       OR bHmiLineStartReq OR bHmiLineStopReq
+       OR NOT bSystemEStopOK OR NOT bHmiLinkFresh THEN
+        nBeltCommandResult := 12;
+    ELSIF rMD200_SetFrequency_Hz <= 0.0 OR rMD200_SetFrequency_Hz > 25.0
+       OR (rMD200_SetFrequency_Hz <> rMD200_SetFrequency_Hz) THEN
+        nBeltCommandResult := 14;
+    ELSE
+        bMD200_Start := TRUE; // MD200 FB still demands a fresh START edge
+        bBeltHmiRunOwned := TRUE;
+        nBeltCommandResult := 1;
+    END_IF;
+END_IF;
+
+// Fail closed for manual belt START issued through this HMI mailbox.
+// Old direct-Hz/manual ADS callers remain separate (migration pending).
+IF bBeltHmiRunOwned THEN
+    IF NOT bHmiLinkFresh OR NOT bSystemEStopOK OR bLineNormalStopLatched
+       OR bHmiLineStartReq THEN
+        bMD200_Start := FALSE;
+        bBeltHmiRunOwned := FALSE;
+        nBeltCommandResult := 18; // watchdog/interlock revoked
+    END_IF;
+END_IF;
+
+// The existing E-Stop/STOP path is the sole normal interlock for
+// conveyor, queued camera items and the Mitsubishi publisher.
+bSystemStopRequested := NOT bSystemEStopOK OR bLineNormalStopLatched;
+IF bLineNormalStopLatched THEN
+    bLineAutoAccepted := FALSE;
+    nLineMasterState := 30; // stop requested; NOT stopped-confirmed
+ELSIF bLineAutoAccepted THEN
+    nLineMasterState := 20; // AUTO command accepted; NOT robot-in-motion proof
+ELSE
+    nLineMasterState := 0;
+END_IF;
 IF bSystemStopRequested THEN
     bMD200_Start := FALSE;
     bServo_Enable := FALSE;
@@ -341,15 +615,19 @@ IF bSystemStopRequested THEN
     bEchoRequestWord := FALSE;
     bEchoRequestBit := FALSE;
     bQueueSimMode := FALSE;
+    // A software E-Stop feedback cannot certify a stopped robot.
+    // Ownership is kept latched until a supervised recovery/reset.
 END_IF;
 
 
 // ================================================================
-// 2. ENCODER BĂNG TẢI: ST-5114 INPUT BYTE 0 + BYTE 1
+// 2. CONVEYOR ENCODER: ST-5114 CHANNEL 2, BYTE 8/9
 // ================================================================
+// ST-5114 Channel 2: 32-bit count in input Byte 8..11.
+// Channel 2 x1 count, leave Channel 0 configuration untouched.
 fbConveyor(
-    bByte0          := GVL.aIn[0],
-    bByte1          := GVL.aIn[1],
+    bByte0          := GVL.aIn[8],
+    bByte1          := GVL.aIn[9],
     rK_mm           := 0.476475,
     rCycleTime      := 0.01,
 
@@ -367,10 +645,46 @@ nEncoderPulseSinceStart := nEncoderPulseSinceStart + INT_TO_DINT(nEncoderDelta);
 
 // ================================================================
 // ================================================================
-// MD200 SIMPLE: EStop feedback, START request, 0..25Hz only.
-// Actual emergency stop MUST act independently through the hardwired
-// safety circuit. Software feedback is a monitor, not a safety device.
+// MD200: TwinCAT operator SETPOINT is mm/s, not Hz.
+// Convert through verified mm/s-per-Hz commissioning factor.
+// The old Hz variable is now a DERIVED drive reference and must not
+// be written externally. Changing speed while running revokes START;
+// a fresh STOP->START is required after editing the speed.
+// No calibrated factor or source approval => 0Hz + normal STOP.
+// Independent hardwired E-Stop is mandatory; this is NOT safety rated.
 // ================================================================
+rMD200_SetFrequency_Hz := 0.0;
+rBeltCalculatedSet_Hz := 0.0;
+nMD200_SpeedInputState := 10;
+IF NOT bBeltSpeedMapReady THEN
+    // Never allow direct old Hz writes to bypass the mm/s calibration.
+    bMD200_Start := FALSE;
+    rMD200_AppliedSpeed_mm_s := 0.0;
+    rBeltAppliedSpeed_mm_s := 0.0;
+ELSIF (rMD200_SetSpeed_mm_s <> rMD200_SetSpeed_mm_s)
+      OR rMD200_SetSpeed_mm_s < 0.0 OR rMD200_SetSpeed_mm_s > 10000.0 THEN
+    nMD200_SpeedInputState := 11;
+    bMD200_Start := FALSE;
+    rMD200_AppliedSpeed_mm_s := 0.0;
+    rBeltAppliedSpeed_mm_s := 0.0;
+ELSIF (rMD200_SetSpeed_mm_s / rBeltMeasuredMmPerHz) > 25.0 THEN
+    nMD200_SpeedInputState := 12;
+    bMD200_Start := FALSE;
+    rMD200_AppliedSpeed_mm_s := 0.0;
+    rBeltAppliedSpeed_mm_s := 0.0;
+ELSIF bMD200_Start AND
+      ABS(rMD200_SetSpeed_mm_s - rMD200_AppliedSpeed_mm_s) > 0.0001 THEN
+    nMD200_SpeedInputState := 13;
+    bMD200_Start := FALSE;
+    rMD200_AppliedSpeed_mm_s := 0.0;
+    rBeltAppliedSpeed_mm_s := 0.0;
+ELSE
+    rMD200_SetFrequency_Hz := rMD200_SetSpeed_mm_s / rBeltMeasuredMmPerHz;
+    rBeltCalculatedSet_Hz := rMD200_SetFrequency_Hz;
+    rMD200_AppliedSpeed_mm_s := rMD200_SetSpeed_mm_s;
+    rBeltAppliedSpeed_mm_s := rMD200_SetSpeed_mm_s;
+    nMD200_SpeedInputState := 1;
+END_IF;
 bMD200_EStopOK := bSystemEStopOK;
 fbMD200_VFD(
     bEStopOK            := bMD200_EStopOK,
@@ -450,45 +764,56 @@ IF bSystemReset THEN
 END_IF;
 
 // ================================================================
-// 4A. CAMERA -> AUTO DISPATCH (explicitly DISABLED until commissioned)
-// The camera event queues one product. No command is sent merely
-// because bProductValid remains TRUE from a previous snapshot.
+// 4A. FIFO PRODUCT -> 4-VERTEX PUBLISHER (SOURCE-LOCKED OFF).
+// The older camera-trigger/750ms logic is intentionally not used: it
+// cannot identify which FIFO product was acknowledged, and expires while
+// products are still travelling toward the robot.
 // ================================================================
-fbAutoCameraEdge(CLK := bCameraTrigger);
 bAutoStartPulse := FALSE;
-
-// A pending camera event has a bounded lifetime (no stale product commands).
-tonAutoProductTTL(IN := bAutoPendingProduct, PT := T#750MS);
-
-IF bSystemStopRequested OR NOT bAutoDispatchEnable OR NOT bAutoDispatchArm OR bAbortGlueCycle
-   OR bGlueResetFault OR bGlueCycleError OR bEchoPermit OR bDebugXYPermit OR bXYManualPermit THEN
-    bAutoPendingProduct := FALSE;
+bAutoPendingProduct := FALSE; // Retained as legacy diagnostic only
+IF bQueueMotionActive THEN
+    // The current product stays owned until all four PLC ACKs succeed.
+    IF bGlueCycleError OR NOT bPlcQConnected THEN
+        nAutoDispatchState := 91; // Fault: retain FIFO head for inspection
+    END_IF;
+ELSIF NOT cQueueMotionCommissioned THEN
+    nAutoDispatchState := 100; // Hard-coded offline commissioning lock
+ELSIF bSystemStopRequested OR NOT bSystemEStopOK OR NOT bAutoDispatchEnable
+    OR NOT bAutoDispatchArm OR NOT bLegacyMotionPublisherAllow
+    OR NOT bVisionFeedVerified OR NOT bVisionCalibrationOK
+    OR bAbortGlueCycle OR bGlueResetFault OR bGlueCycleError
+    OR bQueueSimMode OR bQueueInputFault OR (nQueueErrorCode <> 0)
+    OR bEchoPermit OR bDebugXYPermit OR bXYManualPermit THEN
     nAutoDispatchState := 0;
-ELSIF fbAutoCameraEdge.Q AND bProductValid AND NOT bGlueCycleBusy THEN
-    bAutoPendingProduct := TRUE;
-    nAutoDispatchState := 1;
+ELSIF NOT bQueueHeadValid OR (nQueueCount <= 0) THEN
+    nAutoDispatchState := 1; // No real image product available
+ELSIF NOT bQueueHeadAllInside OR NOT bQueueHeadForecastOK THEN
+    nAutoDispatchState := 5; // Wait for workspace and bounded cycle time
+ELSIF (rConveyorSpeed <= 0.0) OR (rConveyorSpeed > 1000.0) THEN
+    nAutoDispatchState := 2;
+ELSIF NOT bPlcQConnected OR stMelsec.bBusy THEN
+    nAutoDispatchState := 3;
+ELSIF bGlueCycleBusy OR bStartGlueCycle OR bEnableManualWrite
+    OR bEchoWordBusy OR bEchoBitBusy THEN
+    nAutoDispatchState := 4;
+ELSE
+    nQueueActiveProductID := nQueueHeadProductID;
+    bQueueMotionActive := TRUE;
+    bAutoStartPulse := TRUE; // One scan; Publisher locks the head's 4 corners
+    nAutoStartRequests := nAutoStartRequests + 1;
+    nAutoDispatchState := 10;
 END_IF;
 
-IF bAutoPendingProduct THEN
-    IF tonAutoProductTTL.Q THEN
-        bAutoPendingProduct := FALSE;
-        nAutoDispatchState := 5; // Stale camera event discarded
-    ELSIF NOT bProductValid THEN
-        bAutoPendingProduct := FALSE;
-        nAutoDispatchState := 6;
-    ELSIF (rConveyorSpeed <= 0.0) OR (rConveyorSpeed > 1000.0) THEN
-        nAutoDispatchState := 2; // Invalid conveyor speed; do not write 0 speed to QD75
-    ELSIF NOT bPlcQConnected OR stMelsec.bBusy THEN
-        nAutoDispatchState := 3;
-    ELSIF bGlueCycleBusy OR bStartGlueCycle OR bEnableManualWrite
-        OR bEchoWordBusy OR bEchoBitBusy THEN
-        nAutoDispatchState := 4;
-    ELSE
-        bAutoStartPulse := TRUE; // Exactly one scan; Publisher performs PLC preflight
-        bAutoPendingProduct := FALSE;
-        nAutoStartRequests := nAutoStartRequests + 1;
-        nAutoDispatchState := 10;
-    END_IF;
+// The Publisher captures 4 corners at Start and uses encoder drift for
+// each subsequent vertex. Do not use disconnected fbTracking4Pt data for FIFO.
+IF bQueueMotionActive THEN
+    aPublisherCorners := aQueueHeadCornerNow;
+    bPublisherProductValid := bQueueHeadValid
+        AND (nQueueHeadProductID = nQueueActiveProductID);
+ELSE
+    // Manual legacy path remains separately gated as before.
+    aPublisherCorners := aCornerNow;
+    bPublisherProductValid := bProductValid;
 END_IF;
 
 
@@ -504,13 +829,13 @@ fbPublisher(
                            (bSystemStopRequested AND
                              (bGlueCycleBusy OR (fbPublisher.nState = 70)
                               OR (fbPublisher.nState = 95))),
-    bProductValid       := bProductValid,
+    bProductValid       := bPublisherProductValid,
     rEncoderDist_mm     := rConveyorDist,
     bResetFault         := bGlueResetFault AND bSystemEStopOK,
     bEnableManualWrite  := bEnableManualWrite AND bSystemEStopOK AND NOT bDebugXYPermit AND NOT bXYManualPermit,
 
-    // Tọa độ 4 góc thời gian thực từ khối Tracking
-    aCornerNow          := aCornerNow,
+    // One frozen product from FIFO; original legacy path remains gated
+    aCornerNow          := aPublisherCorners,
     rConveyorSpeed_mm_s := rConveyorSpeed,
 
     // Động học
@@ -537,6 +862,26 @@ fbPublisher(
     bM1001_ReadBack     => bTest_M1001_Result,
     bStopCommandConfirmed => bStopCommandConfirmed
 );
+
+// A TRUE four-vertex completion is a different signal from the
+// FIFO simulation-complete pulse; the matching product ID is required.
+fbGlueDoneEdge(CLK := bGlueCycleDone);
+bQueueMotionDonePulse := FALSE;
+IF bQueueMotionActive THEN
+    IF bGlueCycleError OR NOT bPlcQConnected THEN
+        nAutoDispatchState := 91;
+    ELSIF fbGlueDoneEdge.Q THEN
+        IF bQueueHeadValid AND (nQueueHeadProductID = nQueueActiveProductID)
+            AND NOT bQueueSimMode THEN
+            bQueueMotionDonePulse := TRUE;
+            bQueueMotionActive := FALSE;
+            nQueueLastCompletedID := nQueueActiveProductID;
+            nAutoDispatchState := 20;
+        ELSE
+            nAutoDispatchState := 92; // Head changed during motion: latched for review
+        END_IF;
+    END_IF;
+END_IF;
 
 // Tự động nhả cờ kích test sau khi lệnh được nhận
 IF bTest_WriteD100 AND NOT fbPublisher.bManualWriteD100 THEN
@@ -708,7 +1053,8 @@ END_IF;
 // Simulation requires bQueueSimMode and is isolated from QD75 Publisher.
 // ================================================================
 fbCameraQueue(
-    bReset := bQueueReset OR bSystemStopRequested,
+    // Operator queue reset cannot erase a head owned by an active robot cycle.
+    bReset := (bQueueReset AND NOT bQueueMotionActive) OR bSystemStopRequested,
     bLiveExposure := bCameraExposeTrigger AND bSystemEStopOK,
     bLiveResult := bCameraTrigger AND bSystemEStopOK,
     bLiveBridgeVerified := bVisionFeedVerified,
@@ -719,6 +1065,10 @@ fbCameraQueue(
     bSimExposure := bQueueSimExposure AND bSystemEStopOK,
     bSimResult := bQueueSimResult AND bSystemEStopOK,
     bSimCompleteHead := bQueueSimCompleteHead AND bSystemEStopOK,
+    // Never evict the FIFO head while a real publisher cycle owns it.
+    bHoldHead := bQueueMotionActive OR bQueueMotionDonePulse,
+    bCompleteHead := bQueueMotionDonePulse,
+    nCompleteProductID := nQueueActiveProductID,
     rCenterX_mm := rCameraCenterX,
     rCenterY_mm := rCameraCenterY,
     rAngle_deg := rCameraAngleDeg,
@@ -752,6 +1102,7 @@ fbCameraQueue(
     nRejected => nQueueRejected,
     nMissed => nQueueMissed,
     nSimCompleted => nQueueSimCompleted,
+    nRealCompleted => nQueueRealCompleted,
     bInputFault => bQueueInputFault,
     nErrorCode => nQueueErrorCode
 );
@@ -815,6 +1166,8 @@ fbXYManualAck(
       <LineId Id="2361" Count="20" />
       <LineId Id="2360" Count="0" />
       <LineId Id="2493" Count="26" />
+      <LineId Id="143" Count="411" />
+      <LineId Id="2" Count="0" />
     </LineIds>
   </POU>
 </TcPlcObject>

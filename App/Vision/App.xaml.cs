@@ -10,13 +10,16 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        _singleInstance=new Mutex(true, @"Local\DATN_AML_LINE_CONTROL_UI", out bool isNew);
-        if(!isNew)
-        {
-            MessageBox.Show("DATN Line Control đang mở trên AML-IPC.\nKhông khởi chạy thêm một bản để tránh tranh chấp Camera và HMI.",
-                "DATN - Single Instance",MessageBoxButton.OK,MessageBoxImage.Information);
-            Shutdown();
-            return;
+        try {
+            _singleInstance=new Mutex(true, @"Local\DATN_AML_LINE_CONTROL_UI", out bool isNew);
+            if(!isNew)
+            {
+                Console.WriteLine("[App] Mutex Local\\DATN_AML_LINE_CONTROL_UI is already held by another process; shutting down.");
+                Shutdown();
+                return;
+            }
+        } catch(Exception ex) {
+            Console.WriteLine("[App] Mutex error: " + ex);
         }
         base.OnStartup(e);
     }

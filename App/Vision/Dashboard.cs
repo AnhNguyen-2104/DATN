@@ -179,6 +179,7 @@ public partial class MainWindow
             _dashStatus=s;
             UpdateCellViews(s);
             UpdateStationOverviewPlc(s);
+            UpdateStationDashboards(s);
             DashUpdated.Text="ADS / "+s.ReceivedUtc.ToLocalTime().ToString("HH:mm:ss")+
                 "  |  Updated every 1 s";
             DashPlc.Text="ONLINE";
@@ -200,7 +201,7 @@ public partial class MainWindow
                 :s.GantryBusy?"GANTRY: CYCLE IN PROGRESS"
                 :s.GantryPublisherEnabled?"PUBLISHER ENABLED / NOT COMMISSIONED":"GANTRY: AUTO NOT COMMISSIONED";
             DashGantryVertex.Text=$"Current vertex: {s.GantryVertex} / 4 | Error: {s.GantryErrorCode}";
-            DashGantryStats.Text=$"FIFO: {s.QueueCount}  |  Nhận: {s.Accepted}  |  Bỏ lỡ: {s.Missed}";
+            DashGantryStats.Text=$"FIFO: {s.QueueCount}  |  Accepted: {s.Accepted}  |  Missed: {s.Missed}";
             DashCamera1.Text=(_directHik?.IsOpen==true||_sessions.Count>0?"Camera 1: LIVE":"Camera 1: "+(_video!=null?"VIDEO TEST":"DISCONNECTED"))
                  +(_trackingEnabled?" | DETECT ON":" | DETECT OFF");
             // Camera connection ≠ validated camera-to-PLC calibration.
@@ -217,18 +218,17 @@ public partial class MainWindow
         } catch(Exception ex) {
             _dashStatus=null;
             UpdateStationOverviewPlc(null);
+            UpdateStationDashboards(null);
             TagMatrixTable.ItemsSource=null;
-            CellGantryQuality.Text="OFFLINE / PLC DATA UNAVAILABLE";
             CellConveyorQuality.Text="OFFLINE / PLC DATA UNAVAILABLE";
-            CellGantryLink.Text="Mitsubishi Q: UNVERIFIED";
             CellConveyorRun.Text="MD200 RUN DO: UNKNOWN";
             CellConveyorSpeed.Text="OFFLINE / ENCODER DATA UNAVAILABLE";
             CellConveyorDistance.Text="OFFLINE / ENCODER DATA UNAVAILABLE";
             CellConveyorHz.Text="OFFLINE / MD200 DATA UNAVAILABLE";
             CellConveyorAo.Text="OFFLINE / AO DATA UNAVAILABLE";
-            CellGantryCycle.Text="OFFLINE / GANTRY CYCLE UNKNOWN";
-            CellGantryQueue.Text="OFFLINE / FIFO UNAVAILABLE";
-            CellGantryVision.Text="OFFLINE / VISION BRIDGE UNKNOWN";
+            CvMimicBelt.Text="OFFLINE · telemetry unavailable";
+            CvMimicS1.Text="Camera 1 · unknown";
+            CvMimicS1State.Text="Handshake: ADS OFFLINE";
             DashSpeed.Text="-- / STALE";
             DashDistance.Text="-- / STALE";
             DashBeltMmS.Text="-- / STALE";
@@ -253,18 +253,17 @@ public partial class MainWindow
         var time=s.ReceivedUtc.ToLocalTime().ToString("HH:mm:ss");
         string Q(string tag) => s.SymbolPresence.TryGetValue(tag,out var ok) && !ok ? "READ_FAIL" : "LIVE";
         string V(bool v) => v ? "TRUE" : "FALSE";
-        CellGantryQuality.Text=$"ADS LIVE / {time} - read-only monitoring; Gantry HMI commands disabled";
-        CellGantryLink.Text="Mitsubishi PLC-Q: "+(s.PlcQConnected?"CONNECTED":"DISCONNECTED");
-        CellGantryCycle.Text=$"Cycle: {(s.GantryError?"FAULT":s.GantryBusy?"BUSY":s.GantryDone?"DONE":"IDLE")} | Vertex {s.GantryVertex}/4 | Error {s.GantryErrorCode}";
-        CellGantryQueue.Text=$"FIFO {s.QueueCount}/8 | Head ID {s.QueueHead} | Accepted {s.Accepted} | Missed {s.Missed}";
-        CellGantryVision.Text="Camera 1: "+(_directHik?.IsOpen==true||_sessions.Count>0?"FRAME STREAMING":_video!=null?"VIDEO TEST":"DISCONNECTED")
-            +" | Bridge verified "+V(s.VisionBridgeVerified);
-        CellConveyorQuality.Text=$"ADS LIVE / {time} | One shared encoder for both robot stations";
-        CellConveyorRun.Text="ST-2318 DO RUN="+V(s.BeltRun)+" | MD200 START request="+V(s.BeltRequest);
-        CellConveyorSpeed.Text=$"Encoder velocity: {s.BeltSpeed:F2} mm/s";
-        CellConveyorDistance.Text=$"Encoder distance: {s.BeltDistance:F2} mm";
-        CellConveyorHz.Text=$"MD200: set {s.HzSet:F2} Hz | ramped {s.HzActualReference:F2} Hz (not measured motor frequency)";
-        CellConveyorAo.Text=$"ST-4424 AO raw {s.AoRaw} | volts virtual {s.AoVoltsReference:F2} V (not an electrical measurement)";
+        // Conveyor page uses operator labels only; no terminal IDs or drive model names.
+        string camera1 = _directHik?.IsOpen==true||_sessions.Count>0 ? "FRAME STREAMING" : _video!=null ? "VIDEO TEST" : "DISCONNECTED";
+        CellConveyorQuality.Text=$"LIVE / {time} · read-only · one shared encoder for both stations";
+        CellConveyorRun.Text=(s.BeltRun?"RUNNING":"STOPPED")+" · start request "+(s.BeltRequest?"ACTIVE":"INACTIVE")+" · camera 1 "+camera1;
+        CellConveyorSpeed.Text=$"{s.BeltSpeed:F1} mm/s (measured by encoder)";
+        CellConveyorDistance.Text=$"{s.BeltDistance:F1} mm since PLC reset";
+        CellConveyorHz.Text=$"setpoint {s.HzSet:F1} Hz · ramped {s.HzActualReference:F1} Hz (reference, not measured shaft speed)";
+        CellConveyorAo.Text=$"{s.AoVoltsReference:F2} V calculated reference (raw {s.AoRaw}) · not an electrical measurement";
+        CvMimicBelt.Text=(s.BeltRun?"RUNNING":"STOPPED")+$" · {s.BeltSpeed:F1} mm/s · {s.BeltDistance:F1} mm";
+        CvMimicS1.Text = camera1=="DISCONNECTED" ? "Camera 1 · no source" : "Camera 1 · "+camera1.ToLowerInvariant();
+        CvMimicS1State.Text = s.GantryError ? "Handshake: GANTRY FAULT" : "Handshake: PLC-Q FIFO · "+V(s.PlcQConnected);
         TagValueRow T(string group,string tag,string val,string access="R")
             => new(group,tag,val,Q(tag),access,time);
         TagMatrixTable.ItemsSource=new[] {
@@ -297,13 +296,9 @@ public partial class MainWindow
         };
     }
 
-    private void DashCamera_Click(object sender,RoutedEventArgs e) => MainNavigation.SelectedIndex=1;
-    private void DashPLC_Click(object sender,RoutedEventArgs e)
-    {
-        for(int i=0;i<MainNavigation.Items.Count;i++)
-            if(MainNavigation.Items[i] is TabItem t && (t.Header?.ToString()?.Contains("PLC")??false))
-            {MainNavigation.SelectedIndex=i;return;}
-    }
+    private void DashCamera_Click(object sender,RoutedEventArgs e) => MainNavigation.SelectedItem=VisionOperationTab;
+    private void DashPLC_Click(object sender,RoutedEventArgs e) =>
+        MainNavigation.SelectedItem=AlarmsLogsTab;
 
     private void DashArmChanged(object sender,RoutedEventArgs e)
     {
@@ -354,6 +349,17 @@ public partial class MainWindow
 
     private async void DashStop_Click(object sender,RoutedEventArgs e)
     {
+        // Fail closed: never transmit an ADS write without live telemetry and an explicit
+        // operator arm for this session. STOP is the safe direction, but an unguarded write
+        // to a stale/unknown PLC image is still an unverified actuation.
+        if(_dashStatus is null||!_dashControlArmed)
+        {
+            DashControlNote.Text="Normal STOP blocked: "+
+                (_dashStatus is null?"PLC telemetry is stale or offline.":"conveyor HMI control is not armed.")+
+                " Use the PHYSICAL E-STOP in danger.";
+            await RefreshDashboardAsync();
+            return;
+        }
         DashStopButton.IsEnabled=false;
         try{
             await Task.Run(LineAds.StopBelt);

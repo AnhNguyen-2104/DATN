@@ -24,3 +24,6 @@ Mục tiêu: HMI C# có màn hình START TỔNG / STOP TỔNG và trạng thái 
 2. Nghiệm thu EStop hai kênh/mạch cứng theo đánh giá rủi ro với đầy đủ drive/VFD/robot, độc lập với C#/TwinCAT network.
 3. Simulation offline fault injection; sau đó bench có giám sát theo thủ tục an toàn có phê duyệt.
 4. Người vận hành cho phép rõ ràng trước khi thực thi bất kỳ ghi ADS/MC, servo enable hoặc tác động hiện trường.
+
+## Offline source-stage addendum — 2026-10-21 (NOT RUNTIME)
+The original document's NO VERIFIED LIVE GLOBAL CONTRACT statement still applies to the currently running controller. However, NEW MAIN.TcPOU source symbols have been staged and compiled (LAST_BUILD_INFO=0), with cLineAutoCommissioned=FALSE and cBeltMmSCommissioned=FALSE. NORMAL STOP latch and HMI watchdog are prepared, but fault RESET remains a separate uncommissioned robot contract. No PLC Activate/Download. See Docs/TWINCAT_LINE_MASTER_HMI_CONTRACT_20261021.md. WPF must not assume newly added source tags are available on ADS 851.

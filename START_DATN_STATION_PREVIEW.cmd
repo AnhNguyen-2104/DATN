@@ -1,17 +1,36 @@
 @echo off
+rem DATN single-screen station preview launcher.
+rem Starts the verified single-screen release candidate only.
+rem It never writes ADS tags, never energizes the conveyor and never commands a robot.
+rem Runtime resolution: workspace embedded .NET 8 first, otherwise the system dotnet on PATH.
 setlocal
 set "ROOT=%~dp0"
-set "APP=%ROOT%ReleaseCandidate\StationOverview_SensorLog_20261020\PlateVision50_V2.dll"
+set "APPDIR=%ROOT%ReleaseCandidate_COMPACT_SCADA_20261021"
+set "EXE=%APPDIR%\PlateVision50_V2.exe"
+set "DLL=%APPDIR%\PlateVision50_V2.dll"
 set "DOTNET=%ROOT%Runtime\DotNet8\dotnet.exe"
-if not exist "%APP%" (
-  echo Station dashboard preview not found: %APP%
+
+if exist "%EXE%" (
+  pushd "%APPDIR%"
+  start "DATN Station Dashboard Preview" "%EXE%" %*
+  popd
+  endlocal
+  exit /b 0
+)
+
+if not exist "%DLL%" (
+  echo Station dashboard preview not found: %DLL%
   pause
   exit /b 1
 )
-if not exist "%DOTNET%" (
-  echo .NET 8 runtime not found.
+if not exist "%DOTNET%" set "DOTNET=dotnet"
+where %DOTNET% >nul 2>nul
+if errorlevel 1 (
+  echo .NET 8 runtime not found. Install the .NET 8 desktop runtime or restore Runtime\DotNet8.
   pause
   exit /b 1
 )
-start "DATN Station Dashboard Preview" /D "%ROOT%ReleaseCandidate\StationOverview_SensorLog_20261020" "%DOTNET%" "%APP%" %*
+pushd "%APPDIR%"
+start "DATN Station Dashboard Preview" "%DOTNET%" "PlateVision50_V2.dll" %*
+popd
 endlocal

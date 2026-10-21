@@ -51,7 +51,7 @@ public sealed class AdsFifoBenchBridge
         using var ads=new AdsClient();
         ads.Connect(851);
         if(ads.ReadState().AdsState!=AdsState.Run)
-            return "CHƯA SẴN SÀNG: PLC port 851 không RUN.";
+            return "NOT READY: PLC port 851 is not in RUN state.";
         bool vision=Read<bool>(ads,"bVisionFeedVerified");
         bool calibration=Read<bool>(ads,"bVisionCalibrationOK");
         bool simulation=Read<bool>(ads,"bQueueSimMode");
@@ -60,12 +60,12 @@ public sealed class AdsFifoBenchBridge
         double velocity=Read<double>(ads,"rConveyorSpeed");
         bool error=Read<bool>(ads,"bQueueInputFault");
         short fifoError=Read<short>(ads,"nQueueErrorCode");
-        return $"ADS ONLINE (chỉ đọc) | Live verified={vision} | Calibration PLC={calibration} | "+
+        return $"ADS ONLINE (read only) | Live verified={vision} | Calibration PLC={calibration} | "+
             $"Camera→Work={distance:F2}mm | Sim={simulation} | "+
             $"MotionPublisher={robotWriteEnabled} | Speed={velocity:F2}mm/s | "+
             $"FIFO fault={error} code={fifoError}. "+
-            "CHƯA ĐỦ ĐIỀU KIỆN GỬI THẬT: cần xác nhận đồng bộ FrameID/exposure-encoder, "+
-            "hiệu chuẩn thực và chạy thử có giám sát.";
+            "REAL TRANSFER NOT PERMITTED: FrameID/exposure-encoder synchronization must be confirmed, "+
+            "calibration verified and a supervised dry run completed.";
     }
 
     public FifoSnapshot ReadStatus()

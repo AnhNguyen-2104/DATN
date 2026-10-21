@@ -190,7 +190,7 @@ public static class VisionLabelOverlay
                 FontFamily=new FontFamily("Consolas"),FontSize=11.8,FontWeight=FontWeights.SemiBold,
                 Foreground=Brush("#FFF2F7FB"),Margin=new Thickness(0,1,0,0)});
             display.Children.Add(new TextBlock{
-                Text=$"Góc θ = {val(pose.ThetaDeg)}°",
+                Text=$"Angle θ = {val(pose.ThetaDeg)}°",
                 FontFamily=new FontFamily("Segoe UI"),FontSize=12.5,FontWeight=FontWeights.SemiBold,
                 Foreground=Brush("#F8D477"),Margin=new Thickness(0,2,0,4)});
             for(int i=0;i<Math.Min(4,p.GluePx.Length);i++)

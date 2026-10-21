@@ -91,11 +91,6 @@ public partial class MainWindow
         OverviewCam1Pose.Text = validPose
             ? $"X {_lastBelt.Xmm:F1}  Y {_lastBelt.Ymm:F1}  θ {_last.AngleDeg:F1}°"
             : "X --  Y --  θ --";
-        StationCam1Status.Text = source + " | " + freshness + (_trackingEnabled ? " | DETECT ON" : " | DETECT OFF")
-            + (sourceVideo ? " | No synchronized physical encoder" : "");
-        StationCam1Coords.Text = validPose
-            ? $"Track {track} | X {_lastBelt.Xmm:F2} mm | Y {_lastBelt.Ymm:F2} mm | θ {_last.AngleDeg:F2}°"
-            : "Track -- | X -- / Y -- / θ --";
         if (_events.Count > 0)
             OverviewRecentEvent.Text = "CAMERA 1 / " + _events[0];
     }
@@ -168,20 +163,29 @@ public partial class MainWindow
         UpdateStationOverviewVision();
     }
 
+    // Every machine command in this HMI funnels through here. The global START/STOP/RESET
+    // contract and any mm/s -> Hz mapping are NOT commissioned, so this method explains the
+    // requirement and never transmits an ADS command. It exists so the compact command strip
+    // can be shown to operators without any chance of the buttons looking like they "ran" the line.
     private void DashGlobalCommand_Click(object sender, RoutedEventArgs e)
     {
         var action = (sender as Button)?.Tag?.ToString() ?? "UNKNOWN";
+        string title = "DATN / Machine Command Information";
         string details = action switch
         {
-            "START" => "GLOBAL START is not connected to TwinCAT. A commissioned Cmd/Ack handshake and validated interlocks are required for Gantry, SCARA, conveyor and the physical emergency stop. NO PLC COMMAND WAS SENT.",
-            "STOP" => "GLOBAL STOP requires a validated PLC sequence, robot cancellation and conveyor stop acknowledgement. No commissioned global stop tag exists. NO PLC COMMAND WAS SENT.",
+            "START" => "SYSTEM START is not commissioned. A verified TwinCAT command/acknowledge handshake plus interlocks for the conveyor, Gantry, future SCARA and the physical emergency stop must exist first. This HMI would only raise a start request; the TwinCAT master decides. NO PLC COMMAND WAS SENT.",
+            "STOP" => "SYSTEM STOP is not commissioned. A controlled stop sequence that confirms the conveyor, Gantry and future SCARA have actually stopped must be validated first. NO PLC COMMAND WAS SENT.",
+            "RESET" => "RESET / fault acknowledge is not commissioned. No verified fault-reset symbol exists in the PLC image for this build, and a reset must never start the machine. NO PLC RESET WAS SENT.",
+            "BELT_SET" => "The belt setpoint is mm/s, but the MD200 reference is configured in Hz. Because no validated mm/s to Hz mapping exists, no setpoint is written to the PLC. Provide an accepted calibration first.",
+            "BELT_START" => "Manual belt START is locked while the automatic command contract is pending. Manual and automatic commands must never both be live. NO PLC COMMAND WAS SENT.",
+            "BELT_STOP" => "Manual belt STOP is locked with the rest of the manual group. In danger, use the PHYSICAL EMERGENCY STOP. NO PLC COMMAND WAS SENT.",
             "ESTOP" => "THIS IS NOT AN EMERGENCY-STOP CONTROL. In danger, use the PHYSICAL E-STOP button on the machine. This UI only monitors auxiliary DI0 feedback and cannot remove hazardous energy.",
-            _ => "No command."
+            _ => "No command. This HMI transmits no machine command from this control."
         };
         var stamp = DateTime.Now.ToString("HH:mm:ss");
+        SensorHistory($"{action}: information only, no ADS command transmitted");
         OverviewRecentEvent.Text = $"{stamp} · HMI REQUEST {action}: NOT SENT TO PLC";
-        MessageBox.Show(details, "DATN / Global Command Information",
-            MessageBoxButton.OK, MessageBoxImage.Warning);
+        MessageBox.Show(details, title, MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void DashOpenGantry_Click(object sender, RoutedEventArgs e) =>
