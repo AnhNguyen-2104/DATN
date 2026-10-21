@@ -29,3 +29,12 @@
 
 ## Git backup policy
 Push a dated backup branch with tracked WPF/Mitsubishi/TwinCAT source and relevant newly added source/docs. Do not commit generated ReleaseCandidate, Runtime, binary libraries, historic backups, credentials or machine-local process logs.
+
+## Follow-up verification after the 20:05 screenshot
+- Direct inspection of the existing XAE window confirmed: PLC > PLC1 > PLC1 Instance only; no PLC1 Project node.
+- Used the XAE's own PLC1 > Load Project... menu and selected the pre-existing PLC1/PLC1.plcproj via the original Windows Open picker. Subsequent source tree still did not appear, with no confirmed successful import. No new project was created.
+- The Open picker is closed now; current DTE solution remains DATN.sln (IsOpen=True, Saved=True).
+- Confirmed (again) original DATN.tsproj is identical to Git baseline, 47 I/O mappings unchanged; PLC1.plcproj 9,481 bytes, MAIN.TcPOU SHA256 86E61DB3527B95500766E413CB1FDAEE1D502762241000AE9988178967135BCC. Git backup branch 9e438552ceea398b6ccf4abab3e1d2582f11df05 verified on origin.
+- Examined Windows event logs from earlier: XAE crashed in TwinCAT System Manager.dll with 0xc0000005. No confirmed root-cause proof or repaired IDE extension yet.
+- Direct Win32 UI interaction can be stolen by simultaneously active WPF/orca; one WPF Manual-mode confirmation surfaced and was not approved. Avoid any further foreground mouse input or hardware test. Do NOT touch PLC runtime.
+- Pending explicit user approval for software installation/repair scope: inspect and if indicated repair the XAE/PLC Engineering package, while preserving the runtime package and equipment configuration. After that validate PLC1 Project subtree and offline compile.

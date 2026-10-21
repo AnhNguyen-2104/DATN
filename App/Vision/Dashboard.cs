@@ -212,8 +212,8 @@ public partial class MainWindow
             else
                 DashMachineMessage.Text="AUX E-STOP DI OK · TWINCAT RUN · GANTRY AUTO NOT COMMISSIONED";
             // Normal STOP is available even if command-arm switch is not selected.
-            DashStopButton.IsEnabled=true;
-            DashStartButton.IsEnabled=_dashControlArmed && s.EstopOk && !s.GlobalStop
+            DashStopButton.IsEnabled=_operatorManualMode && _dashControlArmed;
+            DashStartButton.IsEnabled=_operatorManualMode && _dashControlArmed && s.EstopOk && !s.GlobalStop
                 && !s.GantryBusy && !s.BeltRequest;
         } catch(Exception ex) {
             _dashStatus=null;
@@ -305,6 +305,13 @@ public partial class MainWindow
         if(!IsLoaded)return;
         if(DashControlArm.IsChecked==true)
         {
+            if (!_operatorManualMode)
+            {
+                _dashControlArmed = false;
+                DashControlArm.IsChecked = false;
+                DashControlNote.Text = "Manual conveyor controls are unavailable in AUTO mode.";
+                return;
+            }
             var ans=MessageBox.Show(
                 "Enable HMI control only after the physical emergency-stop circuit and conveyor have been commissioned.\n"+
                 "START can energize the actual MD200 conveyor. This STOP is NOT an emergency stop.\n\n"+
@@ -324,7 +331,7 @@ public partial class MainWindow
 
     private async void DashStart_Click(object sender,RoutedEventArgs e)
     {
-        if(!_dashControlArmed || _dashStatus is null || !_dashStatus.EstopOk
+        if(!_operatorManualMode || !_dashControlArmed || _dashStatus is null || !_dashStatus.EstopOk
             || _dashStatus.GlobalStop || _dashStatus.GantryBusy)return;
         if(!double.TryParse(DashHzInput.Text.Trim(),NumberStyles.Float,
                 CultureInfo.InvariantCulture,out var hz) &&
@@ -352,7 +359,7 @@ public partial class MainWindow
         // Fail closed: never transmit an ADS write without live telemetry and an explicit
         // operator arm for this session. STOP is the safe direction, but an unguarded write
         // to a stale/unknown PLC image is still an unverified actuation.
-        if(_dashStatus is null||!_dashControlArmed)
+        if(!_operatorManualMode || _dashStatus is null||!_dashControlArmed)
         {
             DashControlNote.Text="Normal STOP blocked: "+
                 (_dashStatus is null?"PLC telemetry is stale or offline.":"conveyor HMI control is not armed.")+

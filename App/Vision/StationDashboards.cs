@@ -402,7 +402,9 @@ public partial class MainWindow
             OvCvRun.Text = status.BeltRun ? "RUNNING" : "STOPPED";
             OvCvSpeed.Text = Pres(status, "MAIN.rConveyorSpeed") ? $"{status.BeltSpeed:F1} mm/s" : "NO DATA";
             OvCvDistance.Text = Pres(status, "MAIN.rConveyorDist") ? $"{status.BeltDistance:F1} mm" : "NO DATA";
-            OvCvCommand.Text = _dashControlArmed ? "ARMED (SESSION)" : "DISARMED";
+            OvCvCommand.Text = _operatorManualMode
+            ? (_dashControlArmed ? "MANUAL / ARMED" : "MANUAL / DISARMED")
+            : "AUTO / COMMANDS NOT COMMISSIONED";
             CvTriggerLine.Text = "Direction " + (_beltDirection == BeltDirection.YMinus ? "Y↑" : "set in Settings")
                 + $" · {_lineFraction * 100:F0}% FOV";
         }

@@ -69,6 +69,9 @@ public partial class MainWindow
     private void UpdateStationOverviewVision()
     {
         if (_closing) return;
+        // Camera detection is PC-only and can be started from LINE OVERVIEW.
+        OvVisionStartButton.IsEnabled = HasActiveSource && !_trackingEnabled;
+        OvVisionStopButton.IsEnabled = _trackingEnabled;
         bool sourceFresh = Preview.Source != null && HasActiveSource
             && DateTime.UtcNow - _stationLastFrameUtc <= TimeSpan.FromSeconds(3);
         bool sourceVideo = _video != null;
@@ -186,6 +189,37 @@ public partial class MainWindow
         SensorHistory($"{action}: information only, no ADS command transmitted");
         OverviewRecentEvent.Text = $"{stamp} · HMI REQUEST {action}: NOT SENT TO PLC";
         MessageBox.Show(details, title, MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    // Explicit mode selection controls visibility, never machine authority.
+    // Any mode transition revokes the legacy conveyor arm; commissioning remains separate.
+    private bool _operatorManualMode;
+
+    private void OperatorManualModeChanged(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        bool requested = OvManualModeToggle.IsChecked == true;
+        if (requested && MessageBox.Show(
+                "Open MANUAL maintenance controls? This does NOT arm the conveyor, " +
+                "validate calibration, or authorize PLC/robot motion.\n\n" +
+                "Normal machine operation remains on LINE OVERVIEW.",
+                "DATN / Manual mode", MessageBoxButton.YesNo, MessageBoxImage.Warning)
+                != MessageBoxResult.Yes)
+        {
+            OvManualModeToggle.IsChecked = false;
+            return;
+        }
+        _operatorManualMode = requested;
+        _dashControlArmed = false;
+        DashControlArm.IsChecked = false;
+        DashStartButton.IsEnabled = false;
+        DashStopButton.IsEnabled = false;
+        ConveyorManualControlPanel.Visibility = requested ? Visibility.Visible : Visibility.Collapsed;
+        ConveyorManualModeNote.Text = requested
+            ? "MANUAL MODE: legacy Hz controls are visible but disarmed; only trained operators may authorize use."
+            : "AUTO VIEW: read-only. Switch to MANUAL MODE from LINE OVERVIEW for maintenance controls.";
+        SensorHistory(requested ? "MANUAL MODE selected (no PLC command)" : "AUTO MODE selected (no PLC command)");
+        UpdateControlSafetyBanner();
     }
 
     private void DashOpenGantry_Click(object sender, RoutedEventArgs e) =>

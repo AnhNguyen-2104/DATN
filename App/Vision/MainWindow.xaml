@@ -428,6 +428,8 @@
                   <Button x:Name="SysStartButton" Content="START" Click="DashGlobalCommand_Click" Tag="START" IsEnabled="False" MinWidth="58" MinHeight="25" Padding="8,1" FontSize="11" ToolTip="Global START is not commissioned: no verified TwinCAT command/ack symbol exists. Disabled by design."/>
                   <Button x:Name="SysStopButton" Content="STOP" Click="DashGlobalCommand_Click" Tag="STOP" IsEnabled="False" MinWidth="58" MinHeight="25" Padding="8,1" FontSize="11" ToolTip="Global STOP is not commissioned. The physical emergency stop is the only safety-rated stop."/>
                   <Button x:Name="SysResetButton" Content="RESET" Click="DashGlobalCommand_Click" Tag="RESET" IsEnabled="False" MinWidth="58" MinHeight="25" Padding="8,1" FontSize="11" ToolTip="Fault acknowledge is not commissioned: no verified reset symbol exists in the PLC image."/>
+                   <Button x:Name="OvVisionStartButton" Content="START VISION" Click="StationVisionStart_Click" MinWidth="88" MinHeight="25" Padding="6,1" FontSize="10" Margin="9,0,0,0" ToolTip="Starts camera/video detection on this PC only. Does not start conveyor or robots."/>
+                   <Button x:Name="OvVisionStopButton" Content="STOP VISION" Click="StationVisionStop_Click" MinWidth="85" MinHeight="25" Padding="6,1" FontSize="10" ToolTip="Stops detection only; camera view remains live. NOT a machine stop."/>
                 </StackPanel>
 
                 <Rectangle Grid.Column="1" Fill="{StaticResource ScadaBorder}" Margin="10,2"/>
@@ -436,14 +438,17 @@
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                   <TextBlock Text="CONVEYOR" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                   <TextBlock Text="setpoint" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                  <TextBox x:Name="OvBeltSetpointBox" Text="100" IsEnabled="False" Width="62" MinHeight="25" Padding="5,1" FontSize="11" HorizontalContentAlignment="Right" ToolTip="mm/s setpoint is not enabled: no validated mm/s to Hz mapping exists, so no setpoint is written."/>
+                  <TextBox x:Name="OvBeltSetpointBox" Text="100" IsEnabled="True" Width="62" MinHeight="25" Padding="5,1" FontSize="11" HorizontalContentAlignment="Right" ToolTip="mm/s setpoint is not enabled: no validated mm/s to Hz mapping exists, so no setpoint is written."/>
                   <TextBlock Text="mm/s" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="4,0,8,0"/>
                   <Button x:Name="OvBeltSetButton" Content="SET" Click="DashGlobalCommand_Click" Tag="BELT_SET" IsEnabled="False" MinWidth="48" MinHeight="25" Padding="6,1" FontSize="11" ToolTip="Disabled: mm/s to Hz conversion is not commissioned for the MD200 reference."/>
                   <Button x:Name="OvBeltStartButton" Content="START BELT" Click="DashGlobalCommand_Click" Tag="BELT_START" IsEnabled="False" MinWidth="82" MinHeight="25" Padding="6,1" FontSize="11" ToolTip="Manual belt start is locked while the automatic contract is pending."/>
                   <Button x:Name="OvBeltStopButton" Content="STOP BELT" Click="DashGlobalCommand_Click" Tag="BELT_STOP" IsEnabled="False" MinWidth="80" MinHeight="25" Padding="6,1" FontSize="11" ToolTip="Manual belt stop is locked. Use the physical emergency stop in danger."/>
                 </StackPanel>
 
-                <Button Grid.Column="3" Content="CONVEYOR PAGE" Click="DashOpenConveyor_Click" MinWidth="112" MinHeight="25" Padding="8,1" FontSize="11" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                   <CheckBox x:Name="OvManualModeToggle" Content="MANUAL MODE" Checked="OperatorManualModeChanged" Unchecked="OperatorManualModeChanged" FontSize="10" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="2,0,8,0" ToolTip="Default AUTO. Manual access requires explicit confirmation; it does not arm any PLC write."/>
+                   <Button Content="ADVANCED / TAGS" Click="DashOpenConveyor_Click" MinWidth="118" MinHeight="25" Padding="8,1" FontSize="10" ToolTip="Read-only telemetry is available in all modes; legacy controls appear only after choosing Manual."/>
+                 </StackPanel>
               </Grid>
 
               <Border Grid.Row="3" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="0,1,0,0" Padding="8,3">
@@ -451,7 +456,7 @@
                   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                   <TextBlock x:Name="OvCvQuality" Text="NO DATA" FontSize="9.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                   <TextBlock Grid.Column="1" x:Name="OvAlarm" Text="No PLC alarm data. Global START/STOP is not commissioned." FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                  <TextBlock Grid.Column="2" Text="NO ADS COMMAND IS TRANSMITTED FROM THIS STRIP" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                  <TextBlock Grid.Column="2" Text="VISION COMMANDS: PC ONLY | MACHINE COMMANDS: NOT COMMISSIONED" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </Grid>
               </Border>
             </Grid>
@@ -501,8 +506,8 @@
         <Grid Background="{StaticResource ScadaBg}" Margin="5">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*" MinHeight="200"/>
-            <RowDefinition Height="1*" MinHeight="160"/>
+            <RowDefinition Height="2.6*" MinHeight="220"/>
+            <RowDefinition Height="1*" MinHeight="130"/>
             <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
 
@@ -523,9 +528,9 @@
           <!-- B. Top band: camera (dominant) | robot telemetry | product tracking -->
           <Grid Grid.Row="1" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="46*" MinWidth="380"/>
-              <ColumnDefinition Width="22*" MinWidth="190"/>
-              <ColumnDefinition Width="26*" MinWidth="220"/>
+              <ColumnDefinition Width="58*" MinWidth="360"/>
+              <ColumnDefinition Width="20*" MinWidth="180"/>
+              <ColumnDefinition Width="22*" MinWidth="220"/>
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,10,0">
@@ -582,8 +587,8 @@
                       <StackPanel><TextBlock Text="Y" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1Y" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
                       <StackPanel><TextBlock Text="Z" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1Z" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
                       <StackPanel><TextBlock Text="Rz" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1Rz" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
-                    <TextBlock Text="NOT IN PLC" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" Margin="0,4,0,0"/>
                     </UniformGrid>
+                    <TextBlock Text="TCP: NOT AVAILABLE IN PLC IMAGE" FontSize="8.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" Margin="0,5,0,0"/>
                   </StackPanel>
                 </Border>
               </StackPanel>
@@ -594,7 +599,7 @@
               <StackPanel Margin="11,9">
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <TextBlock Text="PRODUCT TRACKING · CAMERA MEASURED" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
+                  <TextBlock Text="PRODUCT TRACKING" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
                   <Border Grid.Column="1" Background="#103028" CornerRadius="3" Padding="6,2">
                     <TextBlock x:Name="S1QualityChip" Text="READ ONLY" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource ScadaTeal}"/>
                   </Border>
@@ -767,8 +772,8 @@
         <Grid Background="{StaticResource ScadaBg}" Margin="5">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*" MinHeight="228" MaxHeight="360"/>
-            <RowDefinition Height="1*" MinHeight="196"/>
+            <RowDefinition Height="2.6*" MinHeight="220"/>
+            <RowDefinition Height="1*" MinHeight="130"/>
             <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
 
@@ -787,9 +792,9 @@
 
           <Grid Grid.Row="1" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="46*" MinWidth="380"/>
-              <ColumnDefinition Width="22*" MinWidth="190"/>
-              <ColumnDefinition Width="26*" MinWidth="220"/>
+              <ColumnDefinition Width="58*" MinWidth="360"/>
+              <ColumnDefinition Width="20*" MinWidth="180"/>
+              <ColumnDefinition Width="22*" MinWidth="220"/>
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,10,0">
@@ -849,8 +854,8 @@
                       <StackPanel><TextBlock Text="Y" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S2Y" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
                       <StackPanel><TextBlock Text="Z" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S2Z" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
                       <StackPanel><TextBlock Text="Rz" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S2Rz" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
-                    <TextBlock Text="NOT IN PLC" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" Margin="0,4,0,0"/>
                     </UniformGrid>
+                    <TextBlock Text="TCP: NOT AVAILABLE IN PLC IMAGE" FontSize="8.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" Margin="0,5,0,0"/>
                   </StackPanel>
                 </Border>
               </StackPanel>
@@ -1043,7 +1048,7 @@
               <TextBlock Text="SHARED CONVEYOR · ENCODER 01" FontSize="17" FontWeight="Bold" Foreground="#E8F1FC"/>
               <TextBlock Text="One conveyor and one encoder source provide the shared tracking base for Station 01 and Station 02." FontSize="10" Foreground="#92AABE" Margin="0,3,0,0"/>
             </StackPanel>
-            <TextBlock Grid.Column="1" Text="READ-ONLY TELEMETRY" FontSize="9" FontWeight="Bold" Foreground="#27C9EC" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="MONITORING / MANUAL DETAILS" FontSize="9" FontWeight="Bold" Foreground="#27C9EC" VerticalAlignment="Center"/>
           </Grid>
           <Grid Grid.Row="1">
             <Grid.ColumnDefinitions><ColumnDefinition Width="1.15*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -1095,7 +1100,7 @@
             </Border>
             <ScrollViewer Grid.Column="1" Margin="6,0,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel VerticalAlignment="Top">
-              <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="6" Padding="12">
+              <Border x:Name="ConveyorManualControlPanel" Visibility="Collapsed" Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="6" Padding="12">
                 <StackPanel>
                   <TextBlock Text="CONVEYOR MOTOR CONTROLS · OPERATOR AUTHORIZATION" FontSize="11" FontWeight="Bold" Foreground="#A9BDCC"/>
                   <TextBlock Text="DISARMED BY DEFAULT. Commissioning prerequisite: physical emergency-stop circuit verified on site." FontSize="9" Foreground="#F4BB45" TextWrapping="Wrap" Margin="0,5,0,9"/>
@@ -1108,11 +1113,12 @@
                     <Button x:Name="DashStartButton" Content="START" Click="DashStart_Click" Background="#167B69" Foreground="White" IsEnabled="False" MinHeight="30" MinWidth="92"/>
                     <Button x:Name="DashStopButton" Content="STOP" Click="DashStop_Click" Background="#8E4147" Foreground="White" IsEnabled="False" MinHeight="30" MinWidth="92" Margin="8,2,2,2"/>
                   </StackPanel>
-                  <TextBlock x:Name="DashControlNote" Text="HMI commands disarmed by default; a normal STOP does not replace the hardware emergency stop." Foreground="#C3D4DE" Margin="0,9,0,0" FontSize="10" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="DashControlNote" Text="Manual access does not commission hardware; legacy Hz path requires separate operator authorization." Foreground="#C3D4DE" Margin="0,9,0,0" FontSize="10" TextWrapping="Wrap"/>
                 </StackPanel>
               </Border>
               <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,8,0,0">
                 <StackPanel>
+                  <TextBlock x:Name="ConveyorManualModeNote" Text="AUTO VIEW: read-only. Switch to MANUAL MODE from LINE OVERVIEW to show legacy controls (disarmed)." Foreground="#F4BB45" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8"/>
                   <TextBlock Text="STATION SYNCHRONIZATION" FontSize="11" FontWeight="Bold" Foreground="#27C9EC"/>
                   <Grid Margin="0,7,0,0">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
