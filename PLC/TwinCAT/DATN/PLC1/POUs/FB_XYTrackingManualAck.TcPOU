@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
   <POU Name="FB_XYTrackingManualAck" Id="{c073479e-38e1-4262-a1e5-0c2f91d91f79}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_XYTrackingManualAck
@@ -392,6 +392,12 @@ fbRead(stSession := stSession, bExecute := bReadReq,
        pData := pReadData, nDataSize := nReadSize);
 ]]></ST>
     </Implementation>
-    <LineIds Name="FB_XYTrackingManualAck"><LineId Id="9" Count="0" /></LineIds>
+    <LineIds Name="FB_XYTrackingManualAck">
+      <LineId Id="9" Count="0" />
+      <LineId Id="4" Count="4" />
+      <LineId Id="323" Count="0" />
+      <LineId Id="10" Count="312" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
   </POU>
 </TcPlcObject>

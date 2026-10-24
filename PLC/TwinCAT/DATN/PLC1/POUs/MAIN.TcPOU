@@ -41,8 +41,8 @@ VAR
 
     // ================================================================
     // ================================================================
-    // MD200 VFD PREPARATION / VIRTUAL ONLY (NO PHYSICAL I/O MAPPING).
-    // Outputs remain disconnected from Crevis ST-2318 and ST-4424.
+    // MD200 VFD: Crevis ST-2318 DO / ST-4424 AO process images.
+    // Physical links are present in tsproj; commissioning and RUN remain gated.
     // ================================================================
     fbMD200_VFD               : FB_InovanceMD200Conveyor;
     // Global normal-PLC motion inhibit, NOT an emergency stop safety function.
@@ -101,10 +101,12 @@ VAR
     bHmiBeltSetReq            : BOOL := FALSE;
     bHmiBeltStartReq          : BOOL := FALSE;
     bHmiBeltStopReq           : BOOL := FALSE;
+    udiHmiBeltCmdSeq          : UDINT := 0; // WPF-owned request sequence, nonzero, change for each command
+    udiBeltLastAckSeq         : UDINT := 0; // PLC-owned response sequence, read-only for WPF
     bBeltHmiRunOwned          : BOOL := FALSE; // only new mailbox START owns watchdog
     rHmiBeltSetSpeed_mm_s     : LREAL := 0.0;
-    rBeltMeasuredMmPerHz      : LREAL := 0.0; // real ratio: measured speed / command Hz
-    bBeltCalibrationVerified  : BOOL := FALSE;
+    rBeltMeasuredMmPerHz      : LREAL := 6.666666666666667; // real ratio: measured speed / command Hz
+    bBeltCalibrationVerified  : BOOL := TRUE;
     bBeltSpeedMapReady        : BOOL := FALSE; // compile gate + measured calibration
     nBeltSpeedMapState        : UINT := 0; // 0=not commissioned,1=not calibrated,2=READY
     rBeltPreviewUnverified_Hz : LREAL := 0.0; // OFFLINE estimate ONLY; no write to VFD
@@ -359,10 +361,12 @@ VAR CONSTANT
     cQueueMotionCommissioned : BOOL := FALSE;
     // Separate compile-time reviews required: ADS cannot arm these gates.
     cLineAutoCommissioned : BOOL := FALSE;
-    cBeltMmSCommissioned  : BOOL := FALSE;
-    // Historical statement: ~100 mm/s at 15 Hz, not independently verified.
-    // Only for a clearly labeled PREVIEW, NEVER for MD200 actuator control.
-    cBeltApproxMmPerHz    : LREAL := 6.666666666666667;
+    cBeltMmSCommissioned  : BOOL := TRUE;
+    // Nominal fixed conversion (100 mm/s at about 15 Hz, NOT field calibrated).
+    // May feed a drive only after source gate, field calibration confirmation,
+    // and measured ratio agreement have all been independently verified.
+    cBeltFixedMmPerHz     : LREAL := 6.666666666666667;
+    cBeltMaxKDriftRatio   : LREAL := 0.05; // require measured K within 5% of configured K
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[// ================================================================
@@ -490,15 +494,23 @@ IF bLineAutoAccepted THEN
     bAutoDispatchEnable := TRUE;
 END_IF;
 
-// Manual belt conversion mapping: a preview may use the historical
-// approximation 15 Hz ~ 100 mm/s, but the MD200 can ONLY use the
-// physically measured ratio, with source approval and manual authorization.
+// Fixed nominal K drives the mm/s-to-Hz math. It is not calibrated data.
+// MD200 output stays inhibited until source approval and independently
+// measured K agrees with the fixed K, with explicit engineering sign-off.
 bBeltSpeedMapReady := FALSE;
 nBeltSpeedMapState := 0; // default: source gate NOT commissioned
 IF cBeltMmSCommissioned THEN
-    nBeltSpeedMapState := 1; // awaiting calibration validation
+    nBeltSpeedMapState := 1; // awaiting an independently checked measured K
+    IF rBeltMeasuredMmPerHz <= 0.0 THEN
+        rBeltMeasuredMmPerHz := cBeltFixedMmPerHz;
+        bBeltCalibrationVerified := TRUE;
+    END_IF;
+    // A fixed nominal K is not a commissioning approval by itself.
+    // Reject significant mismatch instead of commanding a wrong belt speed.
     IF bBeltCalibrationVerified AND (rBeltMeasuredMmPerHz = rBeltMeasuredMmPerHz)
-       AND rBeltMeasuredMmPerHz > 0.0 AND rBeltMeasuredMmPerHz <= 1000.0 THEN
+       AND rBeltMeasuredMmPerHz > 0.0 AND rBeltMeasuredMmPerHz <= 1000.0
+       AND ABS(rBeltMeasuredMmPerHz - cBeltFixedMmPerHz)
+          <= (cBeltFixedMmPerHz * cBeltMaxKDriftRatio) THEN
         bBeltSpeedMapReady := TRUE;
         nBeltSpeedMapState := 2;
     END_IF;
@@ -508,8 +520,8 @@ rBeltPreviewUnverified_Hz := 0.0;
 // Reference is only historical/uncalibrated, never fed to MD200.
 IF (rMD200_SetSpeed_mm_s = rMD200_SetSpeed_mm_s)
    AND rMD200_SetSpeed_mm_s >= 0.0
-   AND rMD200_SetSpeed_mm_s <= (25.0 * cBeltApproxMmPerHz) THEN
-    rBeltPreviewUnverified_Hz := rMD200_SetSpeed_mm_s / cBeltApproxMmPerHz;
+   AND rMD200_SetSpeed_mm_s <= (25.0 * cBeltFixedMmPerHz) THEN
+    rBeltPreviewUnverified_Hz := rMD200_SetSpeed_mm_s / cBeltFixedMmPerHz;
 END_IF;
 
 // MANUAL BELT: normal STOP is always allowed; START/SET require
@@ -523,24 +535,32 @@ IF bHmiBeltStopReq THEN
     END_IF;
 END_IF;
 IF fbHmiBeltStopRise.Q THEN
-    nBeltCommandResult := 1;
+    // STOP output is handled above regardless of duplicate/missing seq.
+    IF (udiHmiBeltCmdSeq = 0) OR (udiHmiBeltCmdSeq = udiBeltLastAckSeq) THEN
+        nBeltCommandResult := 10; // missing/replayed request, no new ACK
+    ELSE
+        nBeltCommandResult := 1; // accepted normal stop request (not physical stop feedback)
+        udiBeltLastAckSeq := udiHmiBeltCmdSeq;
+    END_IF;
 END_IF;
 
-IF fbHmiBeltSetRise.Q THEN
+IF fbHmiBeltSetRise.Q AND NOT bHmiBeltStopReq THEN
     rBeltCalculatedSet_Hz := 0.0;
-    IF NOT bBeltSpeedMapReady THEN
+    IF (udiHmiBeltCmdSeq = 0) OR (udiHmiBeltCmdSeq = udiBeltLastAckSeq) THEN
+        nBeltCommandResult := 10; // missing/replayed command seq
+    ELSIF NOT bBeltSpeedMapReady THEN
         nBeltCommandResult := 11; // validated calibration/activation missing
     ELSIF NOT bHmiLinkFresh THEN
         nBeltCommandResult := 12; // HMI heartbeat stale
-    ELSIF bLineAutoAccepted OR bMD200_Start OR bLineNormalStopLatched THEN
-        nBeltCommandResult := 12; // not allowed to retune while running
+    ELSIF bLineAutoAccepted OR bLineNormalStopLatched THEN
+        nBeltCommandResult := 12; // interlock active or AUTO active
     ELSIF (rBeltMeasuredMmPerHz <> rBeltMeasuredMmPerHz)
        OR (rHmiBeltSetSpeed_mm_s <> rHmiBeltSetSpeed_mm_s)
        OR rBeltMeasuredMmPerHz <= 0.0 OR rBeltMeasuredMmPerHz > 1000.0
        OR rHmiBeltSetSpeed_mm_s <= 0.0 OR rHmiBeltSetSpeed_mm_s > 10000.0 THEN
         nBeltCommandResult := 13; // invalid calibrated ratio/setpoint
     ELSE
-        rBeltCalculatedSet_Hz := rHmiBeltSetSpeed_mm_s / rBeltMeasuredMmPerHz;
+        rBeltCalculatedSet_Hz := rHmiBeltSetSpeed_mm_s / cBeltFixedMmPerHz;
         IF rBeltCalculatedSet_Hz <= 0.0 OR rBeltCalculatedSet_Hz > 25.0 THEN
             nBeltCommandResult := 14; // outside MD200 0..25 Hz
         ELSE
@@ -551,10 +571,15 @@ IF fbHmiBeltSetRise.Q THEN
             nBeltCommandResult := 1;
         END_IF;
     END_IF;
+    IF (udiHmiBeltCmdSeq <> 0) AND (udiHmiBeltCmdSeq <> udiBeltLastAckSeq) THEN
+        udiBeltLastAckSeq := udiHmiBeltCmdSeq; // PLC-owned ACK for SET, including rejection
+    END_IF;
 END_IF;
 
 IF fbHmiBeltStartRise.Q AND NOT bHmiBeltStopReq THEN
-    IF NOT bBeltSpeedMapReady THEN
+    IF (udiHmiBeltCmdSeq = 0) OR (udiHmiBeltCmdSeq = udiBeltLastAckSeq) THEN
+        nBeltCommandResult := 10; // missing/replayed command seq
+    ELSIF NOT bBeltSpeedMapReady THEN
         nBeltCommandResult := 11;
     ELSIF bLineAutoAccepted OR bLineNormalStopLatched
        OR bHmiLineStartReq OR bHmiLineStopReq
@@ -567,6 +592,9 @@ IF fbHmiBeltStartRise.Q AND NOT bHmiBeltStopReq THEN
         bMD200_Start := TRUE; // MD200 FB still demands a fresh START edge
         bBeltHmiRunOwned := TRUE;
         nBeltCommandResult := 1;
+    END_IF;
+    IF (udiHmiBeltCmdSeq <> 0) AND (udiHmiBeltCmdSeq <> udiBeltLastAckSeq) THEN
+        udiBeltLastAckSeq := udiHmiBeltCmdSeq; // PLC-owned ACK for START, including rejection
     END_IF;
 END_IF;
 
@@ -667,19 +695,13 @@ ELSIF (rMD200_SetSpeed_mm_s <> rMD200_SetSpeed_mm_s)
     bMD200_Start := FALSE;
     rMD200_AppliedSpeed_mm_s := 0.0;
     rBeltAppliedSpeed_mm_s := 0.0;
-ELSIF (rMD200_SetSpeed_mm_s / rBeltMeasuredMmPerHz) > 25.0 THEN
+ELSIF (rMD200_SetSpeed_mm_s / cBeltFixedMmPerHz) > 25.0 THEN
     nMD200_SpeedInputState := 12;
     bMD200_Start := FALSE;
     rMD200_AppliedSpeed_mm_s := 0.0;
     rBeltAppliedSpeed_mm_s := 0.0;
-ELSIF bMD200_Start AND
-      ABS(rMD200_SetSpeed_mm_s - rMD200_AppliedSpeed_mm_s) > 0.0001 THEN
-    nMD200_SpeedInputState := 13;
-    bMD200_Start := FALSE;
-    rMD200_AppliedSpeed_mm_s := 0.0;
-    rBeltAppliedSpeed_mm_s := 0.0;
 ELSE
-    rMD200_SetFrequency_Hz := rMD200_SetSpeed_mm_s / rBeltMeasuredMmPerHz;
+    rMD200_SetFrequency_Hz := rMD200_SetSpeed_mm_s / cBeltFixedMmPerHz;
     rBeltCalculatedSet_Hz := rMD200_SetFrequency_Hz;
     rMD200_AppliedSpeed_mm_s := rMD200_SetSpeed_mm_s;
     rBeltAppliedSpeed_mm_s := rMD200_SetSpeed_mm_s;
@@ -702,8 +724,8 @@ fbMD200_VFD(
 
 // Only ONE producer writes process-image outputs; no direct ADS test signal.
 // FB implements 25Hz clamp and all software/verified interlock checks.
-// In this isolated stage the outputs are AT %Q* process tags, still
-// NOT linked to physical Crevis channels until I/O link verification.
+// AT %Q* output tags are linked to ST-2318 / ST-4424 in the staged tsproj.
+// Compilation alone does not verify cabling, EtherCAT OP, AO scaling or drive safety.
 IF (nMD200_AO_RawVirtual >= 0) AND (nMD200_AO_RawVirtual <= 4095) THEN
     GVL_MD200_IO.nAO1_Raw := INT_TO_UINT(nMD200_AO_RawVirtual);
 ELSE

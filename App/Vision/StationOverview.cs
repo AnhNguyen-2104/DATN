@@ -3,6 +3,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
+using PlateVision50.Vision;
 namespace PlateVision50;
 
 // Operator station overview: no hardware writes. All data comes from
@@ -63,7 +64,7 @@ public partial class MainWindow
         OverviewGantryLog.ItemsSource = _auditRows;
         OverviewSensorLog.ItemsSource = _stationSensorEvents;
         UpdateStationOverviewVision();
-        OverviewGlobalAuthority.Text = "Global START/STOP not commissioned; use the physical E-Stop circuit";
+        OverviewGlobalAuthority.Text = "AUTO START: fail-closed until the TwinCAT AUTO contract is commissioned; physical E-Stop remains independent";
     }
 
     private void UpdateStationOverviewVision()
@@ -75,8 +76,7 @@ public partial class MainWindow
         bool sourceFresh = Preview.Source != null && HasActiveSource
             && DateTime.UtcNow - _stationLastFrameUtc <= TimeSpan.FromSeconds(3);
         bool sourceVideo = _video != null;
-        string source = sourceVideo ? "VIDEO TEST" :
-            (_directHik?.IsOpen == true || _sessions.Count > 0) ? "CAMERA 1" : "DISCONNECTED";
+        string source = sourceVideo ? "VIDEO TEST" : _cam1.IsOpen ? "CAM 1" : "DISCONNECTED";
         string freshness = sourceFresh ? "FRAME LIVE" : "NO FRAME / STALE";
         OverviewCam1Quality.Text = source + " • " + freshness +
             (_trackingEnabled ? " • TRACKING" : " • DETECT OFF");
@@ -96,6 +96,7 @@ public partial class MainWindow
             : "X --  Y --  θ --";
         if (_events.Count > 0)
             OverviewRecentEvent.Text = "CAMERA 1 / " + _events[0];
+        UpdateS1CameraLabels();
     }
 
     private void UpdateStationOverviewIoIndicators(LineStatus? status)
@@ -151,8 +152,8 @@ public partial class MainWindow
             return;
         }
         string BoolState(bool v) => v ? "ON" : "OFF";
-        string Quality(string tag) => status.SymbolPresence.TryGetValue(tag, out var q) && q ? "LIVE" : "READ_FAIL";
-        string servo = Quality("MAIN.bServo_Ready") == "READ_FAIL" ? "READ_FAIL" : BoolState(status.ServoReady);
+        string Quality(string tag) => LineMailboxProtocol.ClassifyQuality(tag, status.SymbolPresence.TryGetValue(tag, out var q) && q);
+        string servo = Quality("MAIN.bServo_Ready") != "LIVE" ? Quality("MAIN.bServo_Ready") : BoolState(status.ServoReady);
         OverviewSensors.Text =
             $"E-STOP AUX DI0: {BoolState(status.EstopOk)}  |  TwinCAT STOP REQUEST: {BoolState(status.GlobalStop)}  |  " +
             $"SERVO READY: {servo}  |  MD200 RUN DO: {BoolState(status.BeltRun)}  |  ENCODER: {status.BeltSpeed:F2} mm/s";
@@ -197,29 +198,6 @@ public partial class MainWindow
 
     private void OperatorManualModeChanged(object sender, RoutedEventArgs e)
     {
-        if (!IsLoaded) return;
-        bool requested = OvManualModeToggle.IsChecked == true;
-        if (requested && MessageBox.Show(
-                "Open MANUAL maintenance controls? This does NOT arm the conveyor, " +
-                "validate calibration, or authorize PLC/robot motion.\n\n" +
-                "Normal machine operation remains on LINE OVERVIEW.",
-                "DATN / Manual mode", MessageBoxButton.YesNo, MessageBoxImage.Warning)
-                != MessageBoxResult.Yes)
-        {
-            OvManualModeToggle.IsChecked = false;
-            return;
-        }
-        _operatorManualMode = requested;
-        _dashControlArmed = false;
-        DashControlArm.IsChecked = false;
-        DashStartButton.IsEnabled = false;
-        DashStopButton.IsEnabled = false;
-        ConveyorManualControlPanel.Visibility = requested ? Visibility.Visible : Visibility.Collapsed;
-        ConveyorManualModeNote.Text = requested
-            ? "MANUAL MODE: legacy Hz controls are visible but disarmed; only trained operators may authorize use."
-            : "AUTO VIEW: read-only. Switch to MANUAL MODE from LINE OVERVIEW for maintenance controls.";
-        SensorHistory(requested ? "MANUAL MODE selected (no PLC command)" : "AUTO MODE selected (no PLC command)");
-        UpdateControlSafetyBanner();
     }
 
     private void DashOpenGantry_Click(object sender, RoutedEventArgs e) =>

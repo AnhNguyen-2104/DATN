@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
   <POU Name="FB_UpstreamCameraTracking4Pt" Id="{8b38e67a-306d-4b39-98cc-51306c4eb09e}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_UpstreamCameraTracking4Pt
@@ -171,6 +171,12 @@ IF bCaptured THEN
 END_IF;
 ]]></ST>
     </Implementation>
-    <LineIds Name="FB_UpstreamCameraTracking4Pt"><LineId Id="9" Count="0" /></LineIds>
+    <LineIds Name="FB_UpstreamCameraTracking4Pt">
+      <LineId Id="9" Count="0" />
+      <LineId Id="4" Count="4" />
+      <LineId Id="112" Count="0" />
+      <LineId Id="10" Count="101" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
   </POU>
 </TcPlcObject>

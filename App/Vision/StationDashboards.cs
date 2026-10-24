@@ -154,7 +154,7 @@ public partial class MainWindow
         {
             Label = "Camera 1 frame source",
             Group = "VISION",
-            Value = _video != null ? "VIDEO TEST" : (_directHik?.IsOpen == true || _sessions.Count > 0) ? "CAMERA 1" : "NONE",
+            Value = _video != null ? "VIDEO TEST" : _cam1.IsOpen ? "CAM 1" : "NONE",
             State = HasActiveSource ? StateLive : StateNoData,
             StateBrush = StateBrushFor(HasActiveSource ? StateLive : StateNoData)
         });
@@ -304,10 +304,7 @@ public partial class MainWindow
         // ---- Station 01: live camera + real read-only PLC-Q/glue telemetry ----
         bool fresh = Preview.Source is not null && HasActiveSource &&
                      DateTime.UtcNow - _stationLastFrameUtc <= TimeSpan.FromSeconds(3);
-        string source = _video != null ? "VIDEO TEST"
-            : (_directHik?.IsOpen == true || _sessions.Count > 0) ? "CAMERA 1" : "DISCONNECTED";
-        S1CamBadge.Text = "CAMERA 01 · " + (fresh ? "LIVE FRAME" : source == "DISCONNECTED" ? "NO SOURCE" : "STALE");
-        S1CamEmpty.Visibility = fresh ? Visibility.Collapsed : Visibility.Visible;
+        string source = _video != null ? "VIDEO TEST" : _cam1.IsOpen ? "CAM 1" : "DISCONNECTED";
         S1DetectStatus.Text = _trackingEnabled ? "DETECT ON" : "DETECT OFF";
 
         bool validPose = fresh && _trackingEnabled && _last.Found &&
@@ -374,11 +371,12 @@ public partial class MainWindow
         S2Detect.Text = "NO DATA";
         S2Confidence.Text = "--";
         S2Pose.Text = "X --  Y --  θ --";
-        S2FrameQuality.Text = "Camera 02 not integrated";
+        S2FrameQuality.Text = _cam2.IsOpen ? "CAM 2 · ACQUISITION ONLY" : "CAM 2 OFFLINE";
         S2QueueDepth.Text = "UNMAPPED";
         S2CycleStatus.Text = "NOT COMM.";
         S2Vertex.Text = "--";
-        S2AlarmStrip.Text = "Station 02 is not commissioned. No camera, robot or tray signal is available.";
+        S2AlarmStrip.Text = "SCARA not commissioned; no robot/tray signal.";
+        S2CfgCamera.Text = _cam2.IsOpen ? "CAM 2 CONNECTED" : "CAM 2 OFFLINE";
 
         // Conveyor page receives the same honest snapshot.
         OvUpdated.Text = status is null
@@ -410,11 +408,9 @@ public partial class MainWindow
         }
 
         // Overview cards: Station 01 mirrors the same numbers, Station 02 stays closed.
-        Ov1Badge.Text = status is null ? "OFFLINE" : "LIVE";
+        Ov1Badge.Text = status is null ? "ADS OFFLINE" : "ADS LIVE";
         Ov1BadgeHost.Background = DashBrush(status is null ? "#33181C" : "#103028");
         Ov1Badge.Foreground = DashBrush(status is null ? "#FF6E70" : "#39C7A2");
-        Ov1CamStatus.Text = "CAMERA 1 · " + (fresh ? source + " LIVE" : "NO FRAME");
-        Ov1CamEmpty.Visibility = fresh ? Visibility.Collapsed : Visibility.Visible;
         Ov1Link.Text = status is null ? "NO DATA" : status.PlcQConnected ? "CONNECTED" : "DISCONNECTED";
         Ov1Ready.Text = status is null ? "NO DATA" : Pres(status, "MAIN.bServo_Ready") ? (status.ServoReady ? "READY" : "NOT READY") : "NO DATA";
         Ov1Servo.Text = status is null ? "NO DATA" : Pres(status, "MAIN.bServo_Ready") ? (status.ServoReady ? "ENABLED" : "DISABLED") : "NO DATA";

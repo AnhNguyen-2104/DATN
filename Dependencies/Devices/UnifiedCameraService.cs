@@ -17,11 +17,23 @@ public sealed class UnifiedCameraService : IDisposable
     public List<CameraInfo> CameraList { get; } = new();
     public event Action<BitmapSource>? FrameReceived;
 
+    public string LastError { get; private set; } = string.Empty;
+    public string HikLastError => _hik.LastError;
+    public string BaslerLastError => _basler?.LastError ?? _baslerInitError;
+
+    private string _baslerInitError = string.Empty;
     public bool IsBaslerAvailable => _basler != null;
 
     public UnifiedCameraService()
     {
-        PylonNativeLoader.Ensure();
+        try
+        {
+            PylonNativeLoader.Ensure();
+        }
+        catch (Exception ex)
+        {
+            _baslerInitError = ex.GetType().Name + ": " + ex.Message;
+        }
 
         _hik.FrameReceived += frame => FrameReceived?.Invoke(frame);
 
@@ -30,9 +42,10 @@ public sealed class UnifiedCameraService : IDisposable
             _basler = new BaslerCameraService();
             _basler.FrameReceived += frame => FrameReceived?.Invoke(frame);
         }
-        catch
+        catch (Exception ex)
         {
-            // Basler optional when pylon runtime is unavailable.
+            _basler = null;
+            _baslerInitError = ex.GetType().Name + ": " + ex.Message;
         }
     }
 
@@ -60,58 +73,100 @@ public sealed class UnifiedCameraService : IDisposable
     public bool Enumerate(CameraTransportType transport)
     {
         CameraList.Clear();
+        LastError = string.Empty;
 
-        _hik.Enumerate(transport);
-        foreach (var cam in _hik.CameraList)
+        try
         {
-            CameraList.Add(new CameraInfo
+            _hik.Enumerate(transport);
+            foreach (var cam in _hik.CameraList)
             {
-                Index = CameraList.Count,
-                BackendIndex = cam.BackendIndex,
-                Vendor = cam.Vendor,
-                Transport = cam.Transport,
-                Name = cam.Name,
-                SerialNumber = cam.SerialNumber
-            });
+                CameraList.Add(new CameraInfo
+                {
+                    Index = CameraList.Count,
+                    BackendIndex = cam.BackendIndex,
+                    Vendor = cam.Vendor,
+                    Transport = cam.Transport,
+                    Name = cam.Name,
+                    SerialNumber = cam.SerialNumber
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendError("Hikvision: " + ex.GetType().Name + ": " + ex.Message);
         }
 
-        if (_basler != null)
-            _basler.Enumerate(ToBaslerTransport(transport));
-
-        foreach (var cam in _basler?.CameraList ?? [])
+        try
         {
-            CameraList.Add(new CameraInfo
+            if (_basler != null)
+                _basler.Enumerate(ToBaslerTransport(transport));
+            else if (_baslerInitError.Length > 0)
+                AppendError("Basler: " + _baslerInitError);
+
+            foreach (var cam in _basler?.CameraList ?? [])
             {
-                Index = CameraList.Count,
-                BackendIndex = cam.DeviceListIndex,
-                Vendor = CameraVendor.Basler,
-                Transport = cam.Transport == BaslerTransport.Usb
-                    ? CameraTransportType.Usb
-                    : CameraTransportType.GigE,
-                Name = cam.Name,
-                SerialNumber = cam.SerialNumber
-            });
+                CameraList.Add(new CameraInfo
+                {
+                    Index = CameraList.Count,
+                    BackendIndex = cam.DeviceListIndex,
+                    Vendor = CameraVendor.Basler,
+                    Transport = cam.Transport == BaslerTransport.Usb
+                        ? CameraTransportType.Usb
+                        : CameraTransportType.GigE,
+                    Name = cam.Name,
+                    SerialNumber = cam.SerialNumber
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendError("Basler: " + ex.GetType().Name + ": " + ex.Message);
         }
 
         return CameraList.Count > 0;
     }
 
+    private void AppendError(string message) =>
+        LastError = LastError.Length == 0 ? message : LastError + " | " + message;
+
     public bool Open(CameraInfo camInfo)
     {
-        if (camInfo == null) return false;
+        LastError = string.Empty;
+        if (camInfo == null)
+        {
+            LastError = "Select a camera device";
+            return false;
+        }
 
         CloseActiveOnly();
 
-        var opened = camInfo.Vendor switch
+        bool opened;
+        try
         {
-            CameraVendor.Basler => OpenBasler(camInfo),
-            _ => _hik.Open(camInfo)
-        };
+            opened = camInfo.Vendor switch
+            {
+                CameraVendor.Basler => OpenBasler(camInfo),
+                _ => _hik.Open(camInfo)
+            };
+        }
+        catch (Exception ex)
+        {
+            LastError = camInfo.Vendor + " open failed: " + ex.GetType().Name + ": " + ex.Message;
+            return false;
+        }
 
         if (opened)
+        {
             _activeVendor = camInfo.Vendor;
+            return true;
+        }
 
-        return opened;
+        LastError = camInfo.Vendor switch
+        {
+            CameraVendor.Basler => BaslerLastError.Length > 0 ? BaslerLastError : "Open refused by Basler SDK",
+            _ => HikLastError.Length > 0 ? HikLastError : "Open refused by Hikvision SDK"
+        };
+        return false;
     }
 
     public void Start()

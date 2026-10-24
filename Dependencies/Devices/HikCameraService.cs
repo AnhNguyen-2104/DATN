@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
+using System.Collections.Generic;
 namespace WpfYolo_DotNet.Devices
 {
     public class HikCameraService : IDisposable
@@ -41,52 +42,107 @@ namespace WpfYolo_DotNet.Devices
         }
         public event Action<BitmapSource> FrameReceived;
         public List<CameraInfo> CameraList { get; private set; } = new List<CameraInfo>();
+        public string LastError { get; private set; } = string.Empty;
+        public IReadOnlyDictionary<int, string> DeviceAddresses => _addresses;
+        private readonly Dictionary<int, string> _addresses = new();
+
 
         public bool Enumerate(CameraTransportType transport = CameraTransportType.GigE)
         {
-            MyCamera.MV_CC_DEVICE_INFO_LIST list = new MyCamera.MV_CC_DEVICE_INFO_LIST();
-            int ret = MyCamera.MV_CC_EnumDevices_NET(GetHikTransportMask(transport), ref list);
-            if (ret != MyCamera.MV_OK) return false;
-            CameraList.Clear();
-
-            for (int i = 0; i < list.nDeviceNum; i++)
+            LastError = string.Empty;
+            try
             {
-                var dev = (MyCamera.MV_CC_DEVICE_INFO)
-                    Marshal.PtrToStructure(list.pDeviceInfo[i], typeof(MyCamera.MV_CC_DEVICE_INFO));
-                var (modelName, serialNumber, deviceTransport) = ReadHikDeviceIdentity(dev);
-                var label = string.IsNullOrWhiteSpace(modelName) ? $"Cam{i + 1}" : modelName;
-                var display = string.IsNullOrWhiteSpace(serialNumber) ? label : $"{label} - {serialNumber}";
-
-                CameraList.Add(new CameraInfo
+                MyCamera.MV_CC_DEVICE_INFO_LIST list = new MyCamera.MV_CC_DEVICE_INFO_LIST();
+                int ret = MyCamera.MV_CC_EnumDevices_NET(GetHikTransportMask(transport), ref list);
+                if (ret != MyCamera.MV_OK)
                 {
-                    Index = CameraList.Count,
-                    BackendIndex = i,
-                    Vendor = CameraVendor.Hikvision,
-                    Transport = deviceTransport,
-                    Name = $"HIK [{deviceTransport}]: {display}",
-                    SerialNumber = serialNumber
-                });
+                    LastError = FormatHikError("MV_CC_EnumDevices_NET", ret);
+                    return false;
+                }
+                CameraList.Clear();
+                _addresses.Clear();
+
+                for (int i = 0; i < list.nDeviceNum; i++)
+                {
+                    var dev = (MyCamera.MV_CC_DEVICE_INFO)
+                        Marshal.PtrToStructure(list.pDeviceInfo[i], typeof(MyCamera.MV_CC_DEVICE_INFO));
+                    var (modelName, serialNumber, deviceTransport, address) = ReadHikDeviceIdentity(dev);
+                    if (!string.IsNullOrWhiteSpace(address)) _addresses[i] = address;
+                    var label = string.IsNullOrWhiteSpace(modelName) ? $"Cam{i + 1}" : modelName;
+                    var display = string.IsNullOrWhiteSpace(serialNumber) ? label : $"{label} - {serialNumber}";
+
+                    CameraList.Add(new CameraInfo
+                    {
+                        Index = CameraList.Count,
+                        BackendIndex = i,
+                        Vendor = CameraVendor.Hikvision,
+                        Transport = deviceTransport,
+                        Name = $"HIK [{deviceTransport}]: {display}",
+                        SerialNumber = serialNumber
+                    });
+                }
+                return CameraList.Count > 0;
             }
-            return CameraList.Count > 0;
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+                return false;
+            }
         }
 
         public bool Open(CameraInfo camInfo)
         {
-            if (camInfo == null) return false;
-            MyCamera.MV_CC_DEVICE_INFO_LIST list = new MyCamera.MV_CC_DEVICE_INFO_LIST();
-            MyCamera.MV_CC_EnumDevices_NET(GetHikTransportMask(camInfo.Transport), ref list);
-            if (list.nDeviceNum <= camInfo.BackendIndex) return false;
+            LastError = string.Empty;
+            if (camInfo == null)
+            {
+                LastError = "CameraInfo is null";
+                return false;
+            }
 
-            var pDevInfo = (MyCamera.MV_CC_DEVICE_INFO)Marshal.PtrToStructure(list.pDeviceInfo[camInfo.BackendIndex], typeof(MyCamera.MV_CC_DEVICE_INFO));
-            _cam.MV_CC_CreateDevice_NET(ref pDevInfo);
-            if (_cam.MV_CC_OpenDevice_NET() != MyCamera.MV_OK) return false;
+            try
+            {
+                MyCamera.MV_CC_DEVICE_INFO_LIST list = new MyCamera.MV_CC_DEVICE_INFO_LIST();
+                int enumRet = MyCamera.MV_CC_EnumDevices_NET(GetHikTransportMask(camInfo.Transport), ref list);
+                if (enumRet != MyCamera.MV_OK)
+                {
+                    LastError = FormatHikError("MV_CC_EnumDevices_NET", enumRet);
+                    return false;
+                }
 
-            _cam.MV_CC_SetEnumValue_NET("AcquisitionMode", (int)MyCamera.MV_CAM_ACQUISITION_MODE.MV_ACQ_MODE_CONTINUOUS);
-            _cam.MV_CC_SetEnumValue_NET("TriggerMode", (int)MyCamera.MV_CAM_TRIGGER_MODE.MV_TRIGGER_MODE_OFF);
-            _cam.MV_CC_SetEnumValue_NET("PixelFormat", (uint)MyCamera.MvGvspPixelType.PixelType_Gvsp_BGR8_Packed);
-            _callback = new MyCamera.cbOutputExdelegate(OnFrame);
-            _opened = true;
-            return true;
+                if (list.nDeviceNum <= camInfo.BackendIndex)
+                {
+                    LastError = $"Device index {camInfo.BackendIndex} out of range ({list.nDeviceNum} found)";
+                    return false;
+                }
+
+                var pDevInfo = (MyCamera.MV_CC_DEVICE_INFO)Marshal.PtrToStructure(
+                    list.pDeviceInfo[camInfo.BackendIndex], typeof(MyCamera.MV_CC_DEVICE_INFO));
+                int ret = _cam.MV_CC_CreateDevice_NET(ref pDevInfo);
+                if (ret != MyCamera.MV_OK)
+                {
+                    LastError = FormatHikError("MV_CC_CreateDevice_NET", ret);
+                    return false;
+                }
+
+                ret = _cam.MV_CC_OpenDevice_NET();
+                if (ret != MyCamera.MV_OK)
+                {
+                    LastError = FormatHikError("MV_CC_OpenDevice_NET", ret);
+                    return false;
+                }
+
+                _cam.MV_CC_SetEnumValue_NET("AcquisitionMode", (int)MyCamera.MV_CAM_ACQUISITION_MODE.MV_ACQ_MODE_CONTINUOUS);
+                _cam.MV_CC_SetEnumValue_NET("TriggerMode", (int)MyCamera.MV_CAM_TRIGGER_MODE.MV_TRIGGER_MODE_OFF);
+                _cam.MV_CC_SetEnumValue_NET("PixelFormat", (uint)MyCamera.MvGvspPixelType.PixelType_Gvsp_BGR8_Packed);
+                _callback = new MyCamera.cbOutputExdelegate(OnFrame);
+                _opened = true;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+                return false;
+            }
         }
 
         public void Start()
@@ -270,19 +326,55 @@ namespace WpfYolo_DotNet.Devices
                 ? (uint)MyCamera.MV_USB_DEVICE
                 : (uint)MyCamera.MV_GIGE_DEVICE;
 
-        private static (string ModelName, string SerialNumber, CameraTransportType Transport) ReadHikDeviceIdentity(
-            MyCamera.MV_CC_DEVICE_INFO dev)
+        private static (string ModelName, string SerialNumber, CameraTransportType Transport, string Address)
+            ReadHikDeviceIdentity(MyCamera.MV_CC_DEVICE_INFO dev)
         {
             if (dev.nTLayerType == MyCamera.MV_USB_DEVICE)
             {
                 var usb = (MyCamera.MV_USB3_DEVICE_INFO_EX)MyCamera.ByteToStruct(
                     dev.SpecialInfo.stUsb3VInfo, typeof(MyCamera.MV_USB3_DEVICE_INFO_EX));
-                return (usb.chModelName, usb.chSerialNumber, CameraTransportType.Usb);
+                return (usb.chModelName, usb.chSerialNumber, CameraTransportType.Usb, string.Empty);
             }
 
             var gige = (MyCamera.MV_GIGE_DEVICE_INFO_EX)MyCamera.ByteToStruct(
                 dev.SpecialInfo.stGigEInfo, typeof(MyCamera.MV_GIGE_DEVICE_INFO_EX));
-            return (gige.chModelName, gige.chSerialNumber, CameraTransportType.GigE);
+            return (gige.chModelName, gige.chSerialNumber, CameraTransportType.GigE, FormatHikIp(gige.nCurrentIp));
         }
+
+        private static string FormatHikIp(uint value)
+        {
+            if (value == 0) return string.Empty;
+
+            string ip = string.Format("{0}.{1}.{2}.{3}",
+                (value >> 24) & 0xFF, (value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF);
+
+            return ip == "0.0.0.0" ? string.Empty : ip;
+        }
+
+        private static string FormatHikError(string api, int code) =>
+            $"{api} returned 0x{code:X8} ({HikErrorName(code)})";
+
+        private static string HikErrorName(int code) => code switch
+        {
+            MyCamera.MV_E_HANDLE => "MV_E_HANDLE",
+            MyCamera.MV_E_SUPPORT => "MV_E_SUPPORT",
+            MyCamera.MV_E_BUFOVER => "MV_E_BUFOVER",
+            MyCamera.MV_E_CALLORDER => "MV_E_CALLORDER",
+            MyCamera.MV_E_PARAMETER => "MV_E_PARAMETER",
+            MyCamera.MV_E_RESOURCE => "MV_E_RESOURCE",
+            MyCamera.MV_E_NODATA => "MV_E_NODATA",
+            MyCamera.MV_E_PRECONDITION => "MV_E_PRECONDITION",
+            MyCamera.MV_E_VERSION => "MV_E_VERSION",
+            MyCamera.MV_E_NOENOUGH_BUF => "MV_E_NOENOUGH_BUF",
+            MyCamera.MV_E_LOAD_LIBRARY => "MV_E_LOAD_LIBRARY",
+            MyCamera.MV_E_ACCESS_DENIED => "MV_E_ACCESS_DENIED",
+            MyCamera.MV_E_BUSY => "MV_E_BUSY",
+            MyCamera.MV_E_NETER => "MV_E_NETER",
+            MyCamera.MV_E_IP_CONFLICT => "MV_E_IP_CONFLICT",
+            MyCamera.MV_E_USB_READ => "MV_E_USB_READ",
+            MyCamera.MV_E_USB_WRITE => "MV_E_USB_WRITE",
+            MyCamera.MV_E_USB_DEVICE => "MV_E_USB_DEVICE",
+            _ => "HIK_ERROR"
+        };
     }
 }

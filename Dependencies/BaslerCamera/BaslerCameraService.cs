@@ -22,6 +22,10 @@ public sealed class BaslerCameraService : IDisposable
     private bool _grabbing;
 
     public List<BaslerCameraDeviceInfo> CameraList { get; } = new();
+    public string LastError { get; private set; } = string.Empty;
+    public string LastErrorDetails { get; private set; } = string.Empty;
+
+    private Exception? _enumerationError;
 
     public event Action<BitmapSource>? FrameReceived;
 
@@ -54,6 +58,9 @@ public sealed class BaslerCameraService : IDisposable
 
     public bool Enumerate(CameraTransportType transport)
     {
+        LastError = string.Empty;
+        LastErrorDetails = string.Empty;
+        _enumerationError = null;
         PylonNativeLoader.Ensure();
 
         CameraList.Clear();
@@ -85,15 +92,23 @@ public sealed class BaslerCameraService : IDisposable
                 });
             }
 
+            if (CameraList.Count == 0 && _enumerationError is not null)
+            {
+                LastError = "pylon enumeration failed: " + _enumerationError.Message;
+                LastErrorDetails = _enumerationError.ToString();
+            }
+
             return CameraList.Count > 0;
         }
-        catch
+        catch (Exception ex)
         {
+            LastError = "pylon enumeration failed: " + ex.Message;
+            LastErrorDetails = ex.ToString();
             return false;
         }
     }
 
-    private static List<ICameraInfo> EnumerateForTransport(CameraTransportType transport)
+    private List<ICameraInfo> EnumerateForTransport(CameraTransportType transport)
     {
         var result = new List<ICameraInfo>();
         var seenSerials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -105,8 +120,9 @@ public sealed class BaslerCameraService : IDisposable
             {
                 batch = CameraFinder.Enumerate(deviceType);
             }
-            catch
+            catch (Exception ex)
             {
+                _enumerationError ??= ex;
                 continue;
             }
 
@@ -139,9 +155,20 @@ public sealed class BaslerCameraService : IDisposable
 
     public bool Open(BaslerCameraDeviceInfo camInfo)
     {
-        if (camInfo == null) return false;
-        if (camInfo.DeviceListIndex < 0 || camInfo.DeviceListIndex >= _enumeratedDevices.Count)
+        LastError = string.Empty;
+        LastErrorDetails = string.Empty;
+
+        if (camInfo == null)
+        {
+            LastError = "Select a camera device";
             return false;
+        }
+
+        if (camInfo.DeviceListIndex < 0 || camInfo.DeviceListIndex >= _enumeratedDevices.Count)
+        {
+            LastError = $"Device index {camInfo.DeviceListIndex} is not in the pylon enumeration";
+            return false;
+        }
 
         CloseInternal();
 
@@ -156,8 +183,10 @@ public sealed class BaslerCameraService : IDisposable
             _opened = true;
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            LastError = ex.Message;
+            LastErrorDetails = ex.ToString();
             CloseInternal();
             return false;
         }

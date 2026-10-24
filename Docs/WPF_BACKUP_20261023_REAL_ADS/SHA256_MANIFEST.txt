@@ -1,0 +1,50 @@
+﻿# WPF BACKUP 20261023 REAL ADS REASSIGN
+# Workspace: E:\Orca\DATN
+# Date: 2026-10-23
+# SHA-256 baseline manifest before edits
+
+5534dc3cff3d495f131af41fe1d42bb3214940458034aaf6f790de49f2b42d6f  App\Vision\Dashboard.cs
+97ddf393ca3e5cf721de3e237fb86576859f05d55386c4be8746fe1446c56c3b  App\Vision\MainWindow.xaml
+f7927065d4fec4dbf4d5c83ef0a3bb7b5a6fdeaf81c94f25fcaaae8a442bde34  App\Vision\MainWindow.xaml.cs
+3f205a39b0f3d76be4c00adfb06d533023540cada4761ef1312a76d1defca6e4  App\Vision\Vision\LineMailboxProtocol.cs
+625c64c3f5a51a2faac825144dc9ccc07966acc27007566a68e34faea402b081  App\Vision\Vision\LineInterlock.cs
+dce5adb9290cc0e41bd363c4f7f769605302b40ef31b435b34e69a48d0540122  App\Vision\StationOverview.cs
+258ba0ad862b50c20b4a5046c7ebffbf3d5b505508254472292f9d20384cbdff  App\Vision\StationDashboards.cs
+6096975198ec033774816ab485ca758f05b47b11928f3600794492849cb82b1d  App\Tests\Program.cs
+
+## git status --short baseline
+ M App/PlateVision50.sln
+ M App/Tests/Program.cs
+ M App/Tests/Tests.csproj
+ M App/Vision/Dashboard.cs
+ M App/Vision/MainWindow.xaml
+ M App/Vision/MainWindow.xaml.cs
+ M App/Vision/StationDashboards.cs
+ M App/Vision/StationOverview.cs
+ M App/Vision/Vision/GvcpDiscovery.cs
+ M Dependencies/BaslerCamera/BaslerCameraService.cs
+ M Dependencies/Devices/HikCameraService.cs
+ M Dependencies/Devices/UnifiedCameraService.cs
+AM PLC/TwinCAT/DATN.project.~u
+ M PLC/TwinCAT/DATN/DATN.tsproj
+ M PLC/TwinCAT/DATN/PLC1/GVLs/GVL_MD200_IO.TcGVL
+?? App/Vision/Vision/CameraSlotModel.cs
+?? App/Vision/Vision/LineInterlock.cs
+?? App/Vision/Vision/LineMailboxProtocol.cs
+?? App/Vision/Vision/StationCameraController.cs
+?? Docs/BUILD_FIX_20261021/
+?? Docs/ORCA_DUAL_STATION_CAMERA_UI_RESULT_20261022.md
+?? Docs/ORCA_DUAL_STATION_USB_GIGE_MINIMAL_UI_20261022.md
+?? Docs/ORCA_FIX_CAMERA_SCAN_IP_USB_ONLY_20261022.md
+?? Docs/ORCA_FIX_CAMERA_SCAN_IP_USB_ONLY_RESULT_20261022.md
+?? Docs/ORCA_STATION02_BASLER_USB3_ADDENDUM_20261022.md
+?? Docs/ORCA_STATION_INTERLOCK_IMPLEMENTATION_RESULT_20261021.md
+?? Docs/ORCA_STATION_INTERLOCK_WPF_TASK_20261021.md
+?? Docs/ORCA_TWINCAT_CSHARP_SYNC_PLAN_20261022.md
+?? Docs/ORCA_WPF_REAL_ADS_REASSIGN_20261023.md
+?? Docs/TWINCAT_CSHARP_SYNC_20261022/
+?? Docs/TwinCAT_Tag_Restore_20261022/
+?? Docs/WPF_BACKUP_20261021_STATION_INTERLOCK/
+?? Docs/WPF_BACKUP_20261023_REAL_ADS/
+?? Docs/WPF_BACKUP_CAMERA_SCAN_20261022/
+?? Docs/WPF_BACKUP_DUAL_CAMERA_20261022/

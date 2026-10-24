@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+﻿<?xml version='1.0' encoding='utf-8'?>
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="PlateVision50.MainWindow" Title="DATN | Line Control · TwinCAT Master" Width="1600" Height="940" MinWidth="1150" MinHeight="660" WindowStartupLocation="CenterScreen" Background="#0E151C" Foreground="#E3E9EF" FontFamily="Segoe UI" FontSize="12">
     <Window.Resources>
     <!-- Siemens WinCC Unified SCADA Design Tokens -->
@@ -132,12 +132,78 @@
         </Setter.Value>
       </Setter>
     </Style>
+    <Style TargetType="ComboBoxItem">
+      <Setter Property="Background" Value="#0D1C2B" />
+      <Setter Property="Foreground" Value="{StaticResource ScadaTextPrimary}" />
+      <Setter Property="Padding" Value="6,3" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBoxItem">
+            <Border x:Name="itemBorder" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+              <ContentPresenter />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="itemBorder" Property="Background" Value="#162C42" />
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="itemBorder" Property="Background" Value="#203246" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
     <Style TargetType="ComboBox">
       <Setter Property="Background" Value="{StaticResource ScadaPanelSecondary}" />
       <Setter Property="Foreground" Value="{StaticResource ScadaTextPrimary}" />
       <Setter Property="BorderBrush" Value="{StaticResource ScadaBorder}" />
       <Setter Property="Margin" Value="3" />
       <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBox">
+            <Grid>
+              <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="2" />
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="16" />
+                </Grid.ColumnDefinitions>
+                <ContentPresenter Margin="5,0,2,0" VerticalAlignment="Center"
+                                  Content="{TemplateBinding SelectionBoxItem}"
+                                  ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                  ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}" />
+                <Path Grid.Column="1" Data="M0,0 L8,0 L4,5 Z" Fill="{TemplateBinding Foreground}"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Grid>
+              <ToggleButton Background="Transparent" BorderThickness="0" Focusable="False"
+                            IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                            ClickMode="Press">
+                <ToggleButton.Template>
+                  <ControlTemplate TargetType="ToggleButton">
+                    <Border Background="Transparent" />
+                  </ControlTemplate>
+                </ToggleButton.Template>
+              </ToggleButton>
+              <Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}"
+                     AllowsTransparency="True" Focusable="False" PopupAnimation="None">
+                <Border Background="#0D1C2B" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1"
+                        MinWidth="{TemplateBinding ActualWidth}" MaxHeight="240">
+                  <ScrollViewer>
+                    <StackPanel IsItemsHost="True" />
+                  </ScrollViewer>
+                </Border>
+              </Popup>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.55" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style TargetType="TextBlock">
       <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -234,10 +300,6 @@
     <SolidColorBrush x:Key="VDTheme079" Color="#101E2E" />
     <SolidColorBrush x:Key="VDTheme080" Color="#23384D" />
     <SolidColorBrush x:Key="VDTheme081" Color="#92AABE" />
-    <Style TargetType="ComboBoxItem">
-      <Setter Property="Background" Value="{StaticResource ScadaPanelSecondary}" />
-      <Setter Property="Foreground" Value="{StaticResource ScadaTextPrimary}" />
-    </Style>
     <SolidColorBrush x:Key="VDThemeComboBg" Color="#0D1C2B" />
     <SolidColorBrush x:Key="VDThemeComboFg" Color="#E8F1FC" />
   </Window.Resources>
@@ -261,12 +323,11 @@
         <Border Grid.Column="1" Width="1" Height="21" Background="{StaticResource ScadaBorder}" Margin="13,0" VerticalAlignment="Center" />
         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
           <TextBlock Text="LINE CONTROL SCADA" FontSize="12" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center" />
-          <TextBlock Text="GANTRY DISPENSING · SCARA PICK-PLACE · CONVEYOR TRACKING" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="12,0,0,0" VerticalAlignment="Center" />
         </StackPanel>
         <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
           <Ellipse x:Name="ShellAdsDot" Width="6" Height="6" Fill="{StaticResource ScadaAmber}" Margin="0,0,6,0" VerticalAlignment="Center" />
-          <TextBlock x:Name="ControlSafetyBanner" Text="ADS: READ-ONLY BY DEFAULT  |  ROBOT: NO COMMANDS" Foreground="{StaticResource ScadaTextSecondary}" FontSize="10" VerticalAlignment="Center" />
-          <CheckBox x:Name="DarkModeBox" Content="Dark theme" Checked="DarkModeChanged" Unchecked="DarkModeChanged" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="14,0,0,0" />
+          <TextBlock x:Name="ControlSafetyBanner" Text="ADS READ-ONLY · NO MOTION" Foreground="{StaticResource ScadaTextSecondary}" FontSize="10" VerticalAlignment="Center"/>
+          <CheckBox x:Name="DarkModeBox" Content="Theme" IsChecked="True" Visibility="Collapsed" Checked="DarkModeChanged" Unchecked="DarkModeChanged" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
         </StackPanel>
       </Grid>
     </Border>
@@ -335,8 +396,8 @@
                 <Border Background="{StaticResource ScadaPanelHead}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="0,0,0,1" Padding="8,0">
                   <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <TextBlock Text="CAMERA 01 / GANTRY" FontSize="11" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1" x:Name="Ov1CamStatus" Text="CAMERA 1 · NO FRAME" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBlock Text="CAM 1 · GANTRY" FontSize="11" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" x:Name="Ov1CamStatus" Text="OFFLINE" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <Border Grid.Column="2" x:Name="Ov1BadgeHost" Background="{StaticResource ScadaPanelSecondary}" CornerRadius="2" Padding="6,1" VerticalAlignment="Center">
                       <TextBlock x:Name="Ov1Badge" Text="CHECKING" Foreground="{StaticResource ScadaTeal}" FontSize="9" FontWeight="Bold"/>
                     </Border>
@@ -344,7 +405,7 @@
                 </Border>
                 <Grid Grid.Row="1" Background="{StaticResource ScadaVideoBg}">
                   <Image x:Name="Ov1CamImage" Source="{Binding Source,ElementName=Preview}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
-                  <TextBlock x:Name="Ov1CamEmpty" Text="CAMERA 01 · WAITING FOR VIDEO" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource ScadaTextSecondary}" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="12"/>
+                  <TextBlock x:Name="Ov1CamEmpty" Text="CAM 1 OFFLINE · NO FRAME" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource ScadaTextSecondary}" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Margin="12"/>
                 </Grid>
                 <UniformGrid Grid.Row="2" Columns="4" Background="{StaticResource ScadaPanelSecondary}">
                   <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="7,4"><StackPanel><TextBlock Text="TRACK ID" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="Ov1Track" Text="--" FontSize="12" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{StaticResource ScadaTextPrimary}" TextTrimming="CharacterEllipsis"/></StackPanel></Border>
@@ -367,22 +428,23 @@
                 <Border Background="{StaticResource ScadaPanelHead}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="0,0,0,1" Padding="8,0">
                   <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <TextBlock Text="CAMERA 02 / SCARA" FontSize="11" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1" Text="NOT INSTALLED / NOT COMMISSIONED" FontSize="10" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center"/>
+                    <TextBlock Text="CAM 2 · SCARA" FontSize="11" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" x:Name="Ov2CamStatus" Text="OFFLINE" FontSize="10" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center"/>
                   </Grid>
                 </Border>
                 <Grid Grid.Row="1" Background="{StaticResource ScadaVideoBg}">
-                  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="CAMERA 02 · RESERVED" FontSize="12" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Camera 02 and SCARA are not commissioned." FontSize="10" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Center" Margin="0,5,0,0"/>
-                    <TextBlock Text="No simulated frames or robot positions are shown." FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                  <Image x:Name="Ov2CamImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                  <StackPanel x:Name="Ov2CamEmpty" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="NO SIGNAL" FontSize="12" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="CAM 2 OFFLINE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                    <TextBlock Text="SCARA not commissioned" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Center" Margin="0,3,0,0"/>
                   </StackPanel>
                 </Grid>
                 <UniformGrid Grid.Row="2" Columns="4" Background="{StaticResource ScadaPanelSecondary}">
                   <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="7,4"><StackPanel><TextBlock Text="TRACK ID" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock Text="--" FontSize="12" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel></Border>
                   <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="7,4"><StackPanel><TextBlock Text="TRACKING" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock Text="UNAVAILABLE" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" TextTrimming="CharacterEllipsis"/></StackPanel></Border>
                   <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="7,4"><StackPanel><TextBlock Text="PRODUCT X / Y" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock Text="-- / -- mm" FontSize="12" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel></Border>
-                  <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="7,4"><StackPanel><TextBlock Text="SCARA ROBOT" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock Text="NOT READY" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" TextTrimming="CharacterEllipsis"/></StackPanel></Border>
+                  <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="7,4"><StackPanel><TextBlock Text="SCARA ROBOT" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock Text="NOT COMM." FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" TextTrimming="CharacterEllipsis"/></StackPanel></Border>
                 </UniformGrid>
               </Grid>
             </Border>
@@ -400,63 +462,60 @@
               <Border Background="{StaticResource ScadaPanelHead}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="0,0,0,1" Padding="8,0">
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <TextBlock Text="SHARED CONVEYOR + MACHINE COMMANDS" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
+                  <TextBlock Text="CONVEYOR + COMMANDS" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
                   <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock x:Name="OvUpdated" Text="Reading PLC..." FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <TextBlock Text="MASTER: TWINCAT 3 · COMMAND CONTRACT PENDING" FontSize="9.5" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="OvUpdated" Text="Reading PLC..." FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBlock Text="CONTRACT PENDING" FontSize="9" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center"/>
                   </StackPanel>
                 </Grid>
               </Border>
 
               <UniformGrid Grid.Row="1" Columns="4" Background="{StaticResource ScadaPanelSecondary}">
-                <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="8,3"><StackPanel><TextBlock Text="RUN STATUS" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="OvCvRun" Text="NO DATA" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}"/></StackPanel></Border>
-                <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="8,3"><StackPanel><TextBlock Text="ACTUAL SPEED" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="OvCvSpeed" Text="-- mm/s" FontSize="12.5" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{StaticResource ScadaTextPrimary}"/></StackPanel></Border>
-                <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="8,3"><StackPanel><TextBlock Text="ENCODER POSITION" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="OvCvDistance" Text="-- mm" FontSize="12.5" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{StaticResource ScadaTextPrimary}"/></StackPanel></Border>
-                <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="8,3"><StackPanel><TextBlock Text="MACHINE STATE" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="OvCvCommand" Text="DISARMED" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}"/></StackPanel></Border>
+                <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="8,3"><StackPanel><TextBlock Text="RUN" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="OvCvRun" Text="NO DATA" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}"/></StackPanel></Border>
+                <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="8,3"><StackPanel><TextBlock Text="ACTUAL (mm/s)" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="OvCvSpeed" Text="-- mm/s" FontSize="12.5" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{StaticResource ScadaTextPrimary}"/></StackPanel></Border>
+                <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="8,3"><StackPanel><TextBlock Text="POSITION (mm)" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="OvCvDistance" Text="-- mm" FontSize="12.5" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{StaticResource ScadaTextPrimary}"/></StackPanel></Border>
+                <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="8,3"><StackPanel><TextBlock Text="MODE" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="OvCvCommand" Text="DISARMED" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}"/></StackPanel></Border>
               </UniformGrid>
 
-              <Grid Grid.Row="2" Margin="8,5,8,4">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="Auto"/>
-                  <ColumnDefinition Width="1"/>
-                  <ColumnDefinition Width="*"/>
-                  <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <!-- SYSTEM: contract pending, so every button is disabled with a reason tooltip. -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                  <TextBlock Text="SYSTEM" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                  <Button x:Name="SysStartButton" Content="START" Click="DashGlobalCommand_Click" Tag="START" IsEnabled="False" MinWidth="58" MinHeight="25" Padding="8,1" FontSize="11" ToolTip="Global START is not commissioned: no verified TwinCAT command/ack symbol exists. Disabled by design."/>
-                  <Button x:Name="SysStopButton" Content="STOP" Click="DashGlobalCommand_Click" Tag="STOP" IsEnabled="False" MinWidth="58" MinHeight="25" Padding="8,1" FontSize="11" ToolTip="Global STOP is not commissioned. The physical emergency stop is the only safety-rated stop."/>
-                  <Button x:Name="SysResetButton" Content="RESET" Click="DashGlobalCommand_Click" Tag="RESET" IsEnabled="False" MinWidth="58" MinHeight="25" Padding="8,1" FontSize="11" ToolTip="Fault acknowledge is not commissioned: no verified reset symbol exists in the PLC image."/>
-                   <Button x:Name="OvVisionStartButton" Content="START VISION" Click="StationVisionStart_Click" MinWidth="88" MinHeight="25" Padding="6,1" FontSize="10" Margin="9,0,0,0" ToolTip="Starts camera/video detection on this PC only. Does not start conveyor or robots."/>
-                   <Button x:Name="OvVisionStopButton" Content="STOP VISION" Click="StationVisionStop_Click" MinWidth="85" MinHeight="25" Padding="6,1" FontSize="10" ToolTip="Stops detection only; camera view remains live. NOT a machine stop."/>
+              <StackPanel Grid.Row="2" Margin="8,5,8,4">
+                <WrapPanel VerticalAlignment="Center">
+                  <TextBlock Text="SPEED (mm/s)" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                  <TextBox x:Name="OvPresetSpeedBox" Text="100" Width="64" MinHeight="25" Padding="5,1" FontSize="11" HorizontalContentAlignment="Right" LostFocus="PresetSpeed_LostFocus" ToolTip="Shared LINE / SHARED CONVEYOR preset in mm/s. Local preset only; no PLC setpoint write exists."/>
+                  <Button x:Name="OvPresetApplyButton" Content="APPLY" Click="PresetSpeedApply_Click" MinWidth="50" MinHeight="25" Padding="6,1" FontSize="10" Margin="6,0,0,0" ToolTip="Stores the mm/s preset used by the AUTO request. No ADS write is performed."/>
+                  <Rectangle Width="1" Height="20" Fill="{StaticResource ScadaBorder}" Margin="10,0"/>
+                  <Button x:Name="SysStartButton" Content="START" Click="SysLineStart_Click" IsEnabled="False" MinWidth="62" MinHeight="25" Padding="8,1" FontSize="11" ToolTip="One operator START: PC vision tracking and the conveyor request go together. Disabled while any prerequisite is unknown, stale or uncommissioned."/>
+                  <Button x:Name="SysStopButton" Content="STOP" Click="SysLineStop_Click" IsEnabled="False" MinWidth="58" MinHeight="25" Padding="6,1" FontSize="11" Margin="4,0,0,0" ToolTip="Requests the normal coordinated stop (tracking + conveyor request). NOT a certified emergency stop."/>
+                  <Button x:Name="SysResetButton" Content="RESET" Click="SysLineReset_Click" IsEnabled="False" MinWidth="58" MinHeight="25" Padding="6,1" FontSize="11" Margin="4,0,0,0" ToolTip="Clears the HMI stop latch only after a stop request or fault. It never resets a physical drive or robot fault."/>
+                  <Rectangle Width="1" Height="20" Fill="{StaticResource ScadaBorder}" Margin="10,0"/>
+                  <Button x:Name="OvVisionStartButton" Content="VISION START" Click="StationVisionStart_Click" MinWidth="90" MinHeight="25" Padding="6,1" FontSize="9.5" ToolTip="PC-only detection. Does not start the conveyor and is not a line START."/>
+                  <Button x:Name="OvVisionStopButton" Content="VISION STOP" Click="StationVisionStop_Click" MinWidth="86" MinHeight="25" Padding="6,1" FontSize="9.5" Margin="4,0,0,0" ToolTip="Stops detection only; camera view remains live. NOT a machine stop."/>
+                </WrapPanel>
+                <Grid Margin="0,5,0,0">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                  <UniformGrid Grid.Column="0" Columns="4">
+                    <TextBlock x:Name="OvIlAds" Text="○ ADS 851" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,1" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="OvIlEstop" Text="○ E-STOP AUX" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,1" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="OvIlPlcQ" Text="○ PLC-Q LINK" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,1" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="OvIlGantry" Text="○ GANTRY FAULT" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,1" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="OvIlCamera" Text="○ CAM 1 FRAME" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,1" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="OvIlSpeed" Text="○ SPEED PRESET" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,1" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="OvIlMaster" Text="○ AUTO CONTRACT" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,1" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="OvIlScara" Text="○ STATION 02 EXCLUDED" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,1" TextTrimming="CharacterEllipsis"/>
+                  </UniformGrid>
+                  <TextBlock Grid.Column="1" x:Name="OvStartReason" Text="NOT EVALUATED" FontSize="9" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" MaxWidth="420" Margin="12,0,0,0" TextTrimming="CharacterEllipsis" TextWrapping="Wrap"/>
+                </Grid>
+                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                  <TextBlock x:Name="OvPresetHz" Text="Hz: NOT CALIBRATED" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="OvPresetError" Text="" FontSize="9" Foreground="{StaticResource ScadaRed}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </StackPanel>
-
-                <Rectangle Grid.Column="1" Fill="{StaticResource ScadaBorder}" Margin="10,2"/>
-
-                <!-- CONVEYOR MANUAL: mm/s only; no mm/s to Hz conversion is accepted yet. -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                  <TextBlock Text="CONVEYOR" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                  <TextBlock Text="setpoint" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                  <TextBox x:Name="OvBeltSetpointBox" Text="100" IsEnabled="True" Width="62" MinHeight="25" Padding="5,1" FontSize="11" HorizontalContentAlignment="Right" ToolTip="mm/s setpoint is not enabled: no validated mm/s to Hz mapping exists, so no setpoint is written."/>
-                  <TextBlock Text="mm/s" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="4,0,8,0"/>
-                  <Button x:Name="OvBeltSetButton" Content="SET" Click="DashGlobalCommand_Click" Tag="BELT_SET" IsEnabled="False" MinWidth="48" MinHeight="25" Padding="6,1" FontSize="11" ToolTip="Disabled: mm/s to Hz conversion is not commissioned for the MD200 reference."/>
-                  <Button x:Name="OvBeltStartButton" Content="START BELT" Click="DashGlobalCommand_Click" Tag="BELT_START" IsEnabled="False" MinWidth="82" MinHeight="25" Padding="6,1" FontSize="11" ToolTip="Manual belt start is locked while the automatic contract is pending."/>
-                  <Button x:Name="OvBeltStopButton" Content="STOP BELT" Click="DashGlobalCommand_Click" Tag="BELT_STOP" IsEnabled="False" MinWidth="80" MinHeight="25" Padding="6,1" FontSize="11" ToolTip="Manual belt stop is locked. Use the physical emergency stop in danger."/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                   <CheckBox x:Name="OvManualModeToggle" Content="MANUAL MODE" Checked="OperatorManualModeChanged" Unchecked="OperatorManualModeChanged" FontSize="10" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="2,0,8,0" ToolTip="Default AUTO. Manual access requires explicit confirmation; it does not arm any PLC write."/>
-                   <Button Content="ADVANCED / TAGS" Click="DashOpenConveyor_Click" MinWidth="118" MinHeight="25" Padding="8,1" FontSize="10" ToolTip="Read-only telemetry is available in all modes; legacy controls appear only after choosing Manual."/>
-                 </StackPanel>
-              </Grid>
+              </StackPanel>
 
               <Border Grid.Row="3" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="0,1,0,0" Padding="8,3">
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                   <TextBlock x:Name="OvCvQuality" Text="NO DATA" FontSize="9.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                  <TextBlock Grid.Column="1" x:Name="OvAlarm" Text="No PLC alarm data. Global START/STOP is not commissioned." FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                  <TextBlock Grid.Column="2" Text="VISION COMMANDS: PC ONLY | MACHINE COMMANDS: NOT COMMISSIONED" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                  <TextBlock Grid.Column="1" x:Name="OvAlarm" Text="No PLC alarm data." FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                  <TextBlock Grid.Column="2" Text="COMMANDS NOT COMMISSIONED" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </Grid>
               </Border>
             </Grid>
@@ -506,8 +565,7 @@
         <Grid Background="{StaticResource ScadaBg}" Margin="5">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="2.6*" MinHeight="220"/>
-            <RowDefinition Height="1*" MinHeight="130"/>
+            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
 
@@ -515,9 +573,7 @@
           <Grid Margin="0,0,0,4" MinHeight="26">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-              <TextBlock Text="STATION 01 · GANTRY DISPENSING" FontSize="12" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
-              <Border Width="1" Height="20" Background="{StaticResource ScadaBorderBright}" Margin="12,0" VerticalAlignment="Center"/>
-              <TextBlock Text="GANTRY · 4-POINT GLUE DISPENSING" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaCyan}" VerticalAlignment="Center"/>
+              <TextBlock Text="STATION 01" FontSize="12" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
             </StackPanel>
             <Border Grid.Column="1" x:Name="S1BadgeHost" Background="#103028" CornerRadius="4" Padding="10,4" VerticalAlignment="Center" Margin="0,0,8,0" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1">
               <TextBlock x:Name="S1Badge" Text="CHECKING" Foreground="{StaticResource ScadaTeal}" FontSize="10" FontWeight="Bold"/>
@@ -525,27 +581,56 @@
             <Button Grid.Column="2" x:Name="S1SettingsButton" Content="STATION 01 SETTINGS" Click="StationSettings_Click" Tag="S1" MinHeight="28" Padding="12,3" FontSize="10.5"/>
           </Grid>
 
-          <!-- B. Top band: camera (dominant) | robot telemetry | product tracking -->
-          <Grid Grid.Row="1" Margin="0,0,0,10">
+          <!-- B. Main Area: Camera View (Dominant ~72%) | Station Sidebar (~28%) -->
+          <Grid Grid.Row="1" Margin="0,0,0,6">
             <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="58*" MinWidth="360"/>
-              <ColumnDefinition Width="20*" MinWidth="180"/>
-              <ColumnDefinition Width="22*" MinWidth="220"/>
+              <ColumnDefinition Width="72*" MinWidth="500"/>
+              <ColumnDefinition Width="28*" MinWidth="320" MaxWidth="440"/>
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,10,0">
+            <!-- Column 0: DOMINANT CAMERA VIEWPORT -->
+            <Border Grid.Column="0" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,8,0">
               <Grid>
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                <Border Background="{StaticResource ScadaPanelPrimary}" CornerRadius="5,5,0,0" Padding="10,6">
-                  <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <TextBlock x:Name="S1CamBadge" Text="CAMERA 01 · NO FRAME" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextSecondary}"/>
-                    <TextBlock Grid.Column="1" Text="LIVE PIPELINE · OVERLAY PRESERVED" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/>
-                  </Grid>
+                <Border Background="{StaticResource ScadaPanelPrimary}" CornerRadius="5,5,0,0" Padding="8,4">
+                  <StackPanel>
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="6"/>
+                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="6"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock x:Name="S1CamBadge" Text="CAM 1" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
+                      <ComboBox x:Name="S1ModeBox" Grid.Column="2" Width="62" MinHeight="22" FontSize="9.5" SelectedIndex="0" SelectionChanged="S1ModeChanged" ToolTip="IP enumerates Hikrobot/Basler GigE plus read-only GVCP; USB enumerates USB3 Vision. Auto is removed.">
+                        <ComboBoxItem Content="IP"/><ComboBoxItem Content="USB"/>
+                      </ComboBox>
+                      <ComboBox x:Name="S1DeviceBox" Grid.Column="4" MinWidth="130" MinHeight="22" FontSize="9.5" DisplayMemberPath="Display" SelectionChanged="S1DeviceChanged" ToolTip="Scanned Hikrobot/Basler device: model · serial · vendor · transport."/>
+                      <Button x:Name="S1ScanButton" Grid.Column="5" Content="SCAN" Click="S1Scan_Click" MinWidth="48" MinHeight="22" Padding="6,0" FontSize="9" Margin="4,0,0,0"/>
+                      <Button x:Name="S1ConnectButton" Grid.Column="6" Content="CONNECT" Click="S1ConnectCamera_Click" MinWidth="64" MinHeight="22" Padding="6,0" FontSize="9" Margin="4,0,0,0"/>
+                      <Button x:Name="S1DisconnectButton" Grid.Column="7" Content="DISCONNECT" Click="S1DisconnectCamera_Click" MinWidth="78" MinHeight="22" Padding="6,0" FontSize="9" Margin="4,0,0,0"/>
+                      <TextBlock x:Name="S1CamLinkText" Grid.Column="8" Text="OFFLINE" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="7,0,0,0" TextTrimming="CharacterEllipsis" MaxWidth="120"/>
+                    </Grid>
+                    <WrapPanel x:Name="S1IpRow" Margin="0,4,0,0" Visibility="Collapsed">
+                      <TextBlock Text="IP" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                      <TextBox x:Name="S1CamIpBox" Width="112" MinHeight="22" Padding="4,0" FontSize="10" TextChanged="S1IpTextChanged" ToolTip="GigE IPv4 address or hostname. Only IP mode requires it."/>
+                      <TextBlock Text="NIC" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                      <TextBox x:Name="S1HostIpBox" Width="112" MinHeight="22" Padding="4,0" FontSize="10" ToolTip="Local NIC IPv4 for GVCP discovery and Hikrobot direct-IP connect; auto-detected when the camera subnet is local."/>
+                      <TextBlock Text="VENDOR" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                      <ComboBox x:Name="S1VendorBox" Width="88" MinHeight="22" FontSize="9.5" SelectedIndex="0" ToolTip="Typed-IP manual connect is supported for HIKROBOT only. BASLER devices need SCAN.">
+                        <ComboBoxItem Content="HIKROBOT"/><ComboBoxItem Content="BASLER"/>
+                      </ComboBox>
+                    </WrapPanel>
+                    <Expander x:Name="S1DetailsExpander" Margin="0,4,0,0" FontSize="9.5" Visibility="Collapsed">
+                      <Expander.Header><TextBlock x:Name="S1DetailsHeader" Text="DETAILS" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}"/></Expander.Header>
+                      <TextBlock x:Name="S1DetailsText" TextWrapping="Wrap" MaxHeight="120" FontFamily="Consolas" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,3,0,0"/>
+                    </Expander>
+                  </StackPanel>
                 </Border>
                 <Grid Grid.Row="1">
                   <Image x:Name="Station1Preview" Source="{Binding Source,ElementName=Preview}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
-                  <TextBlock x:Name="S1CamEmpty" Text="Camera 1 not connected — select a source in VISION WORKSPACE" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource ScadaTextSecondary}" FontSize="11.5" TextWrapping="Wrap" TextAlignment="Center" Margin="20"/>
+                  <Canvas x:Name="S1Overlay" IsHitTestVisible="False" ClipToBounds="True" Panel.ZIndex="2" SizeChanged="S1Overlay_SizeChanged"/>
+                  <TextBlock x:Name="S1CamEmpty" Text="OFFLINE" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource ScadaTextSecondary}" FontSize="11.5" TextWrapping="Wrap" TextAlignment="Center" Margin="20"/>
                   <UniformGrid VerticalAlignment="Bottom" Columns="3" Margin="8">
                     <Border Background="#D007121E" CornerRadius="3" Padding="7,4" Margin="0,0,5,0"><StackPanel><TextBlock Text="TRACK ID" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1TrackId" Text="--" FontSize="13" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{StaticResource ScadaTextPrimary}"/></StackPanel></Border>
                     <Border Background="#D007121E" CornerRadius="3" Padding="7,4" Margin="0,0,5,0"><StackPanel><TextBlock Text="DETECTION" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1DetectStatus" Text="OFF" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}"/></StackPanel></Border>
@@ -555,214 +640,214 @@
               </Grid>
             </Border>
 
-            <Border Grid.Column="1" Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,10,0">
-              <StackPanel Margin="11,9">
-                <TextBlock Text="ROBOT TELEMETRY" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
-                <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,6,0,7"/>
-                <Grid>
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                  <TextBlock Text="Controller link" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}"/>
-                  <TextBlock Grid.Column="1" x:Name="S1Link" Text="NO DATA" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right"/>
-                  <TextBlock Grid.Row="1" Text="Robot ready" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="1" Grid.Column="1" x:Name="S1Ready" Text="NO DATA" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="2" Text="Servo state" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="2" Grid.Column="1" x:Name="S1Servo" Text="NO DATA" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="3" Text="Robot mode" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="3" Grid.Column="1" x:Name="S1Mode" Text="NO DATA" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
-                  <TextBlock Grid.Row="4" Text="Busy / fault" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="4" Grid.Column="1" x:Name="S1Busy" Text="NO DATA" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="5" Text="Homed / referenced" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="5" Grid.Column="1" x:Name="S1Homed" Text="NO DATA" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Right" Margin="0,5,0,0"/>
-                </Grid>
-                <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="9,6" Margin="0,9,0,0">
-                  <StackPanel>
-                    <Grid>
-                      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                      <TextBlock Text="ACTUAL ROBOT TCP" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}"/>
-                      
-                    </Grid>
-                    <UniformGrid Columns="4" Margin="0,5,0,0">
-                      <StackPanel><TextBlock Text="X" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1X" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
-                      <StackPanel><TextBlock Text="Y" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1Y" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
-                      <StackPanel><TextBlock Text="Z" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1Z" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
-                      <StackPanel><TextBlock Text="Rz" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1Rz" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
-                    </UniformGrid>
-                    <TextBlock Text="TCP: NOT AVAILABLE IN PLC IMAGE" FontSize="8.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" Margin="0,5,0,0"/>
-                  </StackPanel>
-                </Border>
-              </StackPanel>
-            </Border>
+            <!-- Column 1: UNIFIED SIDEBAR (Tabs: STATUS & TRACKING | SENSORS & I/O | PARAMETERS | LOCAL EVENTS) -->
+            <Border Grid.Column="1" Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6">
+              <TabControl Background="Transparent" BorderThickness="0" Padding="0">
+                <TabControl.Resources>
+                  <Style TargetType="TabItem">
+                    <Setter Property="FontSize" Value="10"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                    <Setter Property="Foreground" Value="{StaticResource ScadaTextSecondary}"/>
+                    <Setter Property="Margin" Value="0,0,2,0"/>
+                    <Setter Property="Template">
+                      <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                          <Border x:Name="ti" Background="Transparent" BorderThickness="0,0,0,2" BorderBrush="Transparent" Padding="8,6">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          </Border>
+                          <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                              <Setter TargetName="ti" Property="BorderBrush" Value="{StaticResource ScadaCyan}"/>
+                              <Setter Property="Foreground" Value="{StaticResource ScadaTextPrimary}"/>
+                            </Trigger>
+                            <MultiTrigger>
+                              <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsSelected" Value="False"/>
+                              </MultiTrigger.Conditions>
+                              <Setter Property="Foreground" Value="{StaticResource ScadaTextPrimary}"/>
+                            </MultiTrigger>
+                          </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                      </Setter.Value>
+                    </Setter>
+                  </Style>
+                </TabControl.Resources>
 
-            <Border Grid.Column="2" Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6">
-              <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,2,0">
-              <StackPanel Margin="11,9">
-                <Grid>
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <TextBlock Text="PRODUCT TRACKING" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
-                  <Border Grid.Column="1" Background="#103028" CornerRadius="3" Padding="6,2">
-                    <TextBlock x:Name="S1QualityChip" Text="READ ONLY" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource ScadaTeal}"/>
-                  </Border>
-                </Grid>
-                <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,6,0,7"/>
-                <TextBlock Text="Vision pose (not robot TCP)" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}"/>
-                <TextBlock x:Name="S1Pose" Text="X --   Y --   θ --" FontSize="14" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" Margin="0,2,0,0"/>
-                <TextBlock x:Name="S1FrameQuality" Text="Frame quality: --" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,2,0,0"/>
-                <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,7"/>
-                <Grid>
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                  <TextBlock Text="Queue" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}"/>
-                  <TextBlock Grid.Column="1" x:Name="S1QueueDepth" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right"/>
-                  <TextBlock Grid.Row="1" Text="Cycle" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="1" Grid.Column="1" x:Name="S1CycleStatus" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="2" Text="4-point sequence" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="2" Grid.Column="1" x:Name="S1Vertex" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                </Grid>
-                <TextBlock Text="Camera pose is a measurement of the product; it never becomes a robot TCP value." FontSize="8.5" Foreground="{StaticResource ScadaTextSecondary}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,8,0,7"/>
-                <TextBlock Text="STATION CONFIGURATION" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
-                <Grid Margin="0,5,0,0">
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                  <TextBlock Text="Station role" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}"/>
-                  <TextBlock Grid.Column="1" Text="Gantry glue" FontSize="10" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right"/>
-                  <TextBlock Grid.Row="1" Text="Glue points" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="1" Grid.Column="1" Text="4 corners" FontSize="10" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="2" Text="Camera" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="2" Grid.Column="1" x:Name="S1CfgCamera" Text="Camera 1" FontSize="10" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="3" Text="Handshake" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="3" Grid.Column="1" Text="PLC-Q FIFO" FontSize="10" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                </Grid>
-              </StackPanel>
-              </ScrollViewer>
+                <!-- Tab 1: STATUS & TRACKING -->
+                <TabItem Header="STATUS &amp; ROBOT">
+                  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="6,6">
+                    <StackPanel>
+                      <!-- PRODUCT TRACKING -->
+                      <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,8">
+                        <StackPanel>
+                          <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="PRODUCT TRACKING" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
+                            <Border Grid.Column="1" Background="#103028" CornerRadius="3" Padding="6,2">
+                              <TextBlock x:Name="S1QualityChip" Text="READ ONLY" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource ScadaTeal}"/>
+                            </Border>
+                          </Grid>
+                          <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,5,0,6"/>
+                          <TextBlock Text="VISION POSE" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/>
+                          <TextBlock x:Name="S1Pose" Text="X --   Y --   θ --" FontSize="13" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" Margin="0,2,0,0"/>
+                          <TextBlock x:Name="S1FrameQuality" Text="Frame quality: --" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,2,0,0"/>
+                          <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,6"/>
+                          <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <TextBlock Text="Queue" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}"/>
+                            <TextBlock Grid.Column="1" x:Name="S1QueueDepth" Text="NO DATA" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right"/>
+                            <TextBlock Grid.Row="1" Text="Cycle" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,3,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="S1CycleStatus" Text="NO DATA" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                            <TextBlock Grid.Row="2" Text="4-point sequence" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,3,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="S1Vertex" Text="NO DATA" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                          </Grid>
+                          <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,6,0,5"/>
+                          <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <TextBlock Text="Camera" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}"/>
+                            <TextBlock Grid.Column="1" x:Name="S1CfgCamera" Text="Camera 1" FontSize="9.5" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right"/>
+                            <TextBlock Grid.Row="1" Text="Link" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,3,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="PLC-Q FIFO" FontSize="9.5" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                          </Grid>
+                        </StackPanel>
+                      </Border>
+
+                      <!-- ROBOT TELEMETRY -->
+                      <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8">
+                        <StackPanel>
+                          <TextBlock Text="ROBOT TELEMETRY" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
+                          <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,5,0,6"/>
+                          <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <TextBlock Text="Controller link" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}"/>
+                            <TextBlock Grid.Column="1" x:Name="S1Link" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right"/>
+                            <TextBlock Grid.Row="1" Text="Robot ready" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="S1Ready" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="2" Text="Servo state" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="S1Servo" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="3" Text="Robot mode" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="S1Mode" Text="NO DATA" FontSize="9.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Row="4" Text="Busy / fault" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="S1Busy" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="5" Text="Homed" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="5" Grid.Column="1" x:Name="S1Homed" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                          </Grid>
+                          <Border Background="#0A1622" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,8,0,0">
+                            <StackPanel>
+                              <TextBlock Text="ACTUAL ROBOT TCP" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}"/>
+                              <UniformGrid Columns="4" Margin="0,4,0,0">
+                                <StackPanel><TextBlock Text="X" FontSize="8.5" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1X" Text="--" FontSize="10.5" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
+                                <StackPanel><TextBlock Text="Y" FontSize="8.5" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1Y" Text="--" FontSize="10.5" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
+                                <StackPanel><TextBlock Text="Z" FontSize="8.5" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1Z" Text="--" FontSize="10.5" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
+                                <StackPanel><TextBlock Text="Rz" FontSize="8.5" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S1Rz" Text="--" FontSize="10.5" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
+                              </UniformGrid>
+                              <TextBlock Text="TCP: NOT AVAILABLE IN PLC IMAGE" FontSize="8" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                          </Border>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </ScrollViewer>
+                </TabItem>
+
+                <!-- Tab 2: SENSORS & I/O -->
+                <TabItem Header="I/O SIGNALS">
+                  <Grid Margin="6">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <StackPanel Margin="0,0,0,5">
+                      <WrapPanel Margin="0,0,0,4">
+                        <Button Content="ALL" Tag="S1|ALL" Click="StationSensorGroup_Click" FontSize="9" Padding="6,2" MinHeight="22" Margin="0,0,3,0"/>
+                        <Button Content="SAFETY" Tag="S1|SAFETY" Click="StationSensorGroup_Click" FontSize="9" Padding="6,2" MinHeight="22" Margin="0,0,3,0"/>
+                        <Button Content="MOTION" Tag="S1|MOTION" Click="StationSensorGroup_Click" FontSize="9" Padding="6,2" MinHeight="22" Margin="0,0,3,0"/>
+                        <Button Content="VISION" Tag="S1|VISION" Click="StationSensorGroup_Click" FontSize="9" Padding="6,2" MinHeight="22"/>
+                      </WrapPanel>
+                      <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBox x:Name="S1SensorSearch" TextChanged="StationSensorSearch_Changed" Tag="S1" FontSize="9.5" MinHeight="22" Padding="6,1" VerticalAlignment="Center" ToolTip="Filter signals"/>
+                        <TextBlock Grid.Column="1" x:Name="S1SensorCount" Text="0/0" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                      </Grid>
+                    </StackPanel>
+                    <Border Grid.Row="1" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4">
+                      <ListBox x:Name="S1SensorList" Background="Transparent" BorderThickness="0" Margin="2" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                          <DataTemplate>
+                            <Grid Height="20">
+                              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                              <TextBlock Text="{Binding Label}" Foreground="{StaticResource ScadaTextPrimary}" FontSize="10" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                              <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{StaticResource ScadaTextSecondary}" FontFamily="Consolas" FontSize="9.5" VerticalAlignment="Center" Margin="4,0,8,0"/>
+                              <Border Grid.Column="2" CornerRadius="2" Padding="5,1" Background="#0A1A26" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding State}" Foreground="{Binding StateBrush}" FontSize="8.5" FontWeight="Bold"/>
+                              </Border>
+                            </Grid>
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                          <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="3,0"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                          </Style>
+                        </ListBox.ItemContainerStyle>
+                      </ListBox>
+                    </Border>
+                  </Grid>
+                </TabItem>
+
+                <!-- Tab 3: PARAMETERS -->
+                <TabItem Header="PARAMS">
+                  <Grid Margin="6">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <TextBlock x:Name="S1ParamCount" Text="0 parameters" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="2,0,0,4"/>
+                    <Border Grid.Row="1" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4">
+                      <ListBox x:Name="S1ParamList" Background="Transparent" BorderThickness="0" Margin="2" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                          <DataTemplate>
+                            <Grid Height="20">
+                              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                              <TextBlock Text="{Binding Label}" Foreground="{StaticResource ScadaTextPrimary}" FontSize="10" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                              <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{StaticResource ScadaTextPrimary}" FontFamily="Consolas" FontSize="10" VerticalAlignment="Center" Margin="6,0,4,0"/>
+                              <TextBlock Grid.Column="2" Text="{Binding Unit}" Foreground="{StaticResource ScadaTextSecondary}" FontSize="8.5" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            </Grid>
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                          <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="3,0"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                          </Style>
+                        </ListBox.ItemContainerStyle>
+                      </ListBox>
+                    </Border>
+                  </Grid>
+                </TabItem>
+
+                <!-- Tab 4: LOCAL EVENTS -->
+                <TabItem Header="EVENTS">
+                  <Grid Margin="6">
+                    <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4">
+                      <ListBox x:Name="S1EventList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource ScadaTextPrimary}" FontFamily="Consolas" FontSize="9.5" Margin="4"/>
+                    </Border>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="2,5,0,0">
+                      <Button Content="VISION WORKSPACE" Click="OpenVisionWorkspace_Click" FontSize="9" Padding="8,2" MinHeight="22"/>
+                    </StackPanel>
+                  </Grid>
+                </TabItem>
+              </TabControl>
             </Border>
           </Grid>
 
-          <!-- C. Lower pane: Sensors &amp; I/O | Parameters | Local Events (functional tabs) -->
-          <Border Grid.Row="2" Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,10">
-            <TabControl Background="Transparent" BorderThickness="0" Padding="0">
-              <TabControl.Resources>
-                <Style TargetType="TabItem">
-                  <Setter Property="FontSize" Value="11"/>
-                  <Setter Property="FontWeight" Value="SemiBold"/>
-                  <Setter Property="Foreground" Value="{StaticResource ScadaTextSecondary}"/>
-                  <Setter Property="Margin" Value="0,0,4,0"/>
-                  <Setter Property="Template">
-                    <Setter.Value>
-                      <ControlTemplate TargetType="TabItem">
-                        <Border x:Name="ti" Background="Transparent" BorderThickness="0,0,0,2" BorderBrush="Transparent" Padding="14,7">
-                          <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                          <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="ti" Property="BorderBrush" Value="{StaticResource ScadaCyan}"/>
-                            <Setter Property="Foreground" Value="{StaticResource ScadaTextPrimary}"/>
-                          </Trigger>
-                          <MultiTrigger>
-                            <MultiTrigger.Conditions>
-                              <Condition Property="IsMouseOver" Value="True"/>
-                              <Condition Property="IsSelected" Value="False"/>
-                            </MultiTrigger.Conditions>
-                            <Setter Property="Foreground" Value="{StaticResource ScadaTextPrimary}"/>
-                          </MultiTrigger>
-                        </ControlTemplate.Triggers>
-                      </ControlTemplate>
-                    </Setter.Value>
-                  </Setter>
-                </Style>
-              </TabControl.Resources>
-
-              <TabItem Header="SENSORS &amp; I/O">
-                <Grid Margin="10,8,10,8">
-                  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                  <Grid Margin="0,0,0,6">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <WrapPanel VerticalAlignment="Center">
-                      <Button Content="ALL" Tag="S1|ALL" Click="StationSensorGroup_Click" FontSize="10" Padding="9,2" MinHeight="24" Margin="0,0,4,0"/>
-                      <Button Content="SAFETY" Tag="S1|SAFETY" Click="StationSensorGroup_Click" FontSize="10" Padding="9,2" MinHeight="24" Margin="0,0,4,0"/>
-                      <Button Content="MOTION" Tag="S1|MOTION" Click="StationSensorGroup_Click" FontSize="10" Padding="9,2" MinHeight="24" Margin="0,0,4,0"/>
-                      <Button Content="VISION" Tag="S1|VISION" Click="StationSensorGroup_Click" FontSize="10" Padding="9,2" MinHeight="24" Margin="0,0,4,0"/>
-                      <Button Content="GLUE" Tag="S1|GLUE" Click="StationSensorGroup_Click" FontSize="10" Padding="9,2" MinHeight="24" Margin="0,0,4,0"/>
-                    </WrapPanel>
-                    <TextBox Grid.Column="1" x:Name="S1SensorSearch" TextChanged="StationSensorSearch_Changed" Tag="S1" FontSize="10.5" MinHeight="24" Padding="8,2" Margin="10,0,10,0" VerticalAlignment="Center" ToolTip="Filter station signals by operator label"/>
-                    <TextBlock Grid.Column="2" x:Name="S1SensorCount" Text="0 / 0 signals" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center"/>
-                  </Grid>
-                  <Border Grid.Row="1" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4">
-                    <ListBox x:Name="S1SensorList" Background="Transparent" BorderThickness="0" Margin="4" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                      <ListBox.ItemTemplate>
-                        <DataTemplate>
-                          <Grid Height="21">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Label}" Foreground="{StaticResource ScadaTextPrimary}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{StaticResource ScadaTextSecondary}" FontFamily="Consolas" FontSize="10.5" VerticalAlignment="Center" Margin="8,0,12,0"/>
-                            <Border Grid.Column="2" CornerRadius="3" Padding="7,1" Background="#0A1A26" VerticalAlignment="Center">
-                              <TextBlock Text="{Binding State}" Foreground="{Binding StateBrush}" FontSize="9" FontWeight="Bold"/>
-                            </Border>
-                          </Grid>
-                        </DataTemplate>
-                      </ListBox.ItemTemplate>
-                      <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                          <Setter Property="Padding" Value="5,0"/>
-                          <Setter Property="Background" Value="Transparent"/>
-                          <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        </Style>
-                      </ListBox.ItemContainerStyle>
-                    </ListBox>
-                  </Border>
-                </Grid>
-              </TabItem>
-
-              <TabItem Header="PARAMETERS">
-                <Grid Margin="10,8,10,8">
-                  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                  <TextBlock x:Name="S1ParamCount" Text="0 / 0 parameters" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="2,0,0,6"/>
-                  <Border Grid.Row="1" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4">
-                    <ListBox x:Name="S1ParamList" Background="Transparent" BorderThickness="0" Margin="4" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                      <ListBox.ItemTemplate>
-                        <DataTemplate>
-                          <Grid Height="22">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Label}" Foreground="{StaticResource ScadaTextPrimary}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{StaticResource ScadaTextPrimary}" FontFamily="Consolas" FontSize="11" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                            <TextBlock Grid.Column="2" Text="{Binding Unit}" Foreground="{StaticResource ScadaTextSecondary}" FontSize="9.5" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                          </Grid>
-                        </DataTemplate>
-                      </ListBox.ItemTemplate>
-                      <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                          <Setter Property="Padding" Value="5,0"/>
-                          <Setter Property="Background" Value="Transparent"/>
-                          <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        </Style>
-                      </ListBox.ItemContainerStyle>
-                    </ListBox>
-                  </Border>
-                </Grid>
-              </TabItem>
-
-              <TabItem Header="LOCAL EVENTS">
-                <Grid Margin="10,8,10,8">
-                  <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                  <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4">
-                    <ListBox x:Name="S1EventList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource ScadaTextPrimary}" FontFamily="Consolas" FontSize="10.5" Margin="6"/>
-                  </Border>
-                  <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="2,7,0,0">
-                    <Button Content="OPEN VISION WORKSPACE" Click="OpenVisionWorkspace_Click" FontSize="10" Padding="10,2" MinHeight="24"/>
-                    <TextBlock Text="Detection buttons control PC image processing only — they never command robot motion." FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                  </StackPanel>
-                </Grid>
-              </TabItem>
-            </TabControl>
-          </Border>
-
-          <!-- D. Local alarm strip -->
-          <Border Grid.Row="3" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="5" Padding="10,6">
+          <!-- C. Local alarm strip -->
+          <Border Grid.Row="2" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="5" Padding="10,5">
             <Grid>
               <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <TextBlock Text="LOCAL ALARM" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-              <TextBlock Grid.Column="1" x:Name="S1AlarmStrip" Text="No alarm data yet. Detailed history is on ALARMS &amp; LOGS." FontSize="10.5" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+              <TextBlock Grid.Column="1" x:Name="S1AlarmStrip" Text="No alarm data yet. Detailed history is on ALARMS &amp; LOGS." FontSize="10" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
               <TextBlock Grid.Column="2" Text="NO ROBOT COMMANDS" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaRed}" VerticalAlignment="Center" Margin="10,0,0,0"/>
             </Grid>
           </Border>
@@ -772,17 +857,15 @@
         <Grid Background="{StaticResource ScadaBg}" Margin="5">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="2.6*" MinHeight="220"/>
-            <RowDefinition Height="1*" MinHeight="130"/>
+            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
 
+          <!-- A. Page header -->
           <Grid Margin="0,0,0,4" MinHeight="26">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-              <TextBlock Text="STATION 02 · SCARA PICK &amp; PLACE" FontSize="12" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
-              <Border Width="1" Height="20" Background="{StaticResource ScadaBorderBright}" Margin="12,0" VerticalAlignment="Center"/>
-              <TextBlock Text="SCARA · TRAY PICK AND PLACE" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center"/>
+              <TextBlock Text="STATION 02" FontSize="12" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
             </StackPanel>
             <Border Grid.Column="1" Background="#332A12" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,4" VerticalAlignment="Center" Margin="0,0,8,0">
               <TextBlock Text="NOT COMMISSIONED" Foreground="{StaticResource ScadaAmber}" FontSize="10" FontWeight="Bold"/>
@@ -790,28 +873,58 @@
             <Button Grid.Column="2" x:Name="S2SettingsButton" Content="STATION 02 SETTINGS" Click="StationSettings_Click" Tag="S2" MinHeight="28" Padding="12,3" FontSize="10.5"/>
           </Grid>
 
-          <Grid Grid.Row="1" Margin="0,0,0,10">
+          <!-- B. Main Area: Camera View (Dominant ~72%) | Station Sidebar (~28%) -->
+          <Grid Grid.Row="1" Margin="0,0,0,6">
             <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="58*" MinWidth="360"/>
-              <ColumnDefinition Width="20*" MinWidth="180"/>
-              <ColumnDefinition Width="22*" MinWidth="220"/>
+              <ColumnDefinition Width="72*" MinWidth="500"/>
+              <ColumnDefinition Width="28*" MinWidth="320" MaxWidth="440"/>
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,10,0">
+            <!-- Column 0: DOMINANT CAMERA 2 VIEWPORT -->
+            <Border Grid.Column="0" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,8,0">
               <Grid>
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                <Border Background="{StaticResource ScadaPanelPrimary}" CornerRadius="5,5,0,0" Padding="10,6">
-                  <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <TextBlock x:Name="S2CamBadge" Text="CAMERA 02 · UNMAPPED" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextSecondary}"/>
-                    <TextBlock Grid.Column="1" Text="NO SOURCE CONFIGURED" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/>
-                  </Grid>
+                <Border Background="{StaticResource ScadaPanelPrimary}" CornerRadius="5,5,0,0" Padding="8,4">
+                  <StackPanel>
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="6"/>
+                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="6"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock x:Name="S2CamBadge" Text="CAM 2" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
+                      <ComboBox x:Name="S2ModeBox" Grid.Column="2" Width="62" MinHeight="22" FontSize="9.5" SelectedIndex="1" SelectionChanged="S2ModeChanged" ToolTip="IP enumerates Hikrobot/Basler GigE plus read-only GVCP; USB enumerates USB3 Vision. Auto is removed.">
+                        <ComboBoxItem Content="IP"/><ComboBoxItem Content="USB"/>
+                      </ComboBox>
+                      <ComboBox x:Name="S2DeviceBox" Grid.Column="4" MinWidth="130" MinHeight="22" FontSize="9.5" DisplayMemberPath="Display" SelectionChanged="S2DeviceChanged" ToolTip="Scanned Hikrobot/Basler device: model · serial · vendor · transport."/>
+                      <Button x:Name="S2ScanButton" Grid.Column="5" Content="SCAN" Click="S2Scan_Click" MinWidth="48" MinHeight="22" Padding="6,0" FontSize="9" Margin="4,0,0,0"/>
+                      <Button x:Name="S2ConnectButton" Grid.Column="6" Content="CONNECT" Click="S2ConnectCamera_Click" MinWidth="64" MinHeight="22" Padding="6,0" FontSize="9" Margin="4,0,0,0"/>
+                      <Button x:Name="S2DisconnectButton" Grid.Column="7" Content="DISCONNECT" Click="S2DisconnectCamera_Click" MinWidth="78" MinHeight="22" Padding="6,0" FontSize="9" Margin="4,0,0,0"/>
+                      <TextBlock x:Name="S2CamLinkText" Grid.Column="8" Text="OFFLINE" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="7,0,0,0" TextTrimming="CharacterEllipsis" MaxWidth="120"/>
+                    </Grid>
+                    <WrapPanel x:Name="S2IpRow" Margin="0,4,0,0" Visibility="Collapsed">
+                      <TextBlock Text="IP" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                      <TextBox x:Name="S2CamIpBox" Width="112" MinHeight="22" Padding="4,0" FontSize="10" TextChanged="S2IpTextChanged" ToolTip="GigE IPv4 address or hostname. Only IP mode requires it."/>
+                      <TextBlock Text="NIC" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                      <TextBox x:Name="S2HostIpBox" Width="112" MinHeight="22" Padding="4,0" FontSize="10" ToolTip="Local NIC IPv4 for GVCP discovery and Hikrobot direct-IP connect; auto-detected when the camera subnet is local."/>
+                      <TextBlock Text="VENDOR" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                      <ComboBox x:Name="S2VendorBox" Width="88" MinHeight="22" FontSize="9.5" SelectedIndex="0" ToolTip="Typed-IP manual connect is supported for HIKROBOT only. BASLER devices need SCAN.">
+                        <ComboBoxItem Content="HIKROBOT"/><ComboBoxItem Content="BASLER"/>
+                      </ComboBox>
+                    </WrapPanel>
+                    <Expander x:Name="S2DetailsExpander" Margin="0,4,0,0" FontSize="9.5" Visibility="Collapsed">
+                      <Expander.Header><TextBlock x:Name="S2DetailsHeader" Text="DETAILS" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}"/></Expander.Header>
+                      <TextBlock x:Name="S2DetailsText" TextWrapping="Wrap" MaxHeight="120" FontFamily="Consolas" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,3,0,0"/>
+                    </Expander>
+                  </StackPanel>
                 </Border>
-                <Grid Grid.Row="1">
-                  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="340">
-                    <TextBlock Text="CAMERA 02" FontSize="19" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Center"/>
-                    <TextBlock Text="NOT INSTALLED / NOT COMMISSIONED" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Center" Margin="0,7,0,0"/>
-                    <TextBlock Text="No simulated frames, poses or robot positions are shown." FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Center" Margin="0,5,0,0" TextWrapping="Wrap" TextAlignment="Center"/>
+                <Grid Grid.Row="1" Background="{StaticResource ScadaVideoBg}">
+                  <Image x:Name="Station2Preview" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                  <StackPanel x:Name="S2CamEmpty" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="300">
+                    <TextBlock Text="CAM 2" FontSize="16" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="S2CamHint" Text="OFFLINE" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                    <TextBlock Text="SCARA not commissioned" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Center" Margin="0,4,0,0" TextWrapping="Wrap" TextAlignment="Center"/>
                   </StackPanel>
                   <UniformGrid VerticalAlignment="Bottom" Columns="3" Margin="8">
                     <Border Background="#D007121E" CornerRadius="3" Padding="7,4" Margin="0,0,5,0"><StackPanel><TextBlock Text="TRACK ID" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S2Track" Text="--" FontSize="13" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel></Border>
@@ -822,207 +935,214 @@
               </Grid>
             </Border>
 
-            <Border Grid.Column="1" Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,10,0">
-              <StackPanel Margin="11,9">
-                <TextBlock Text="ROBOT TELEMETRY" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
-                <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,6,0,7"/>
-                <Grid>
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                  <TextBlock Text="Controller link" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}"/>
-                  <TextBlock Grid.Column="1" x:Name="S2Link" Text="UNMAPPED" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right"/>
-                  <TextBlock Grid.Row="1" Text="Robot ready" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="1" Grid.Column="1" x:Name="S2Ready" Text="NO DATA" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="2" Text="Servo state" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="2" Grid.Column="1" x:Name="S2Servo" Text="NO DATA" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="3" Text="Robot mode" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="3" Grid.Column="1" x:Name="S2Mode" Text="NO DATA" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="4" Text="Busy / fault" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="4" Grid.Column="1" x:Name="S2Busy" Text="NO DATA" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="5" Text="Homed / referenced" FontSize="10.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,5,0,0"/>
-                  <TextBlock Grid.Row="5" Grid.Column="1" x:Name="S2Homed" Text="NO DATA" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Right" Margin="0,5,0,0"/>
-                </Grid>
-                <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="9,6" Margin="0,9,0,0">
-                  <StackPanel>
-                    <Grid>
-                      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                      <TextBlock Text="ACTUAL ROBOT TCP" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}"/>
-                      
-                    </Grid>
-                    <UniformGrid Columns="4" Margin="0,5,0,0">
-                      <StackPanel><TextBlock Text="X" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S2X" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
-                      <StackPanel><TextBlock Text="Y" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S2Y" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
-                      <StackPanel><TextBlock Text="Z" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S2Z" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
-                      <StackPanel><TextBlock Text="Rz" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S2Rz" Text="--" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
-                    </UniformGrid>
-                    <TextBlock Text="TCP: NOT AVAILABLE IN PLC IMAGE" FontSize="8.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" Margin="0,5,0,0"/>
-                  </StackPanel>
-                </Border>
-              </StackPanel>
-            </Border>
+            <!-- Column 1: UNIFIED SIDEBAR (Tabs: STATUS & TRACKING | SENSORS & I/O | PARAMETERS | LOCAL EVENTS) -->
+            <Border Grid.Column="1" Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6">
+              <TabControl Background="Transparent" BorderThickness="0" Padding="0">
+                <TabControl.Resources>
+                  <Style TargetType="TabItem">
+                    <Setter Property="FontSize" Value="10"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                    <Setter Property="Foreground" Value="{StaticResource ScadaTextSecondary}"/>
+                    <Setter Property="Margin" Value="0,0,2,0"/>
+                    <Setter Property="Template">
+                      <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                          <Border x:Name="ti2" Background="Transparent" BorderThickness="0,0,0,2" BorderBrush="Transparent" Padding="8,6">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          </Border>
+                          <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                              <Setter TargetName="ti2" Property="BorderBrush" Value="{StaticResource ScadaCyan}"/>
+                              <Setter Property="Foreground" Value="{StaticResource ScadaTextPrimary}"/>
+                            </Trigger>
+                            <MultiTrigger>
+                              <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsSelected" Value="False"/>
+                              </MultiTrigger.Conditions>
+                              <Setter Property="Foreground" Value="{StaticResource ScadaTextPrimary}"/>
+                            </MultiTrigger>
+                          </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                      </Setter.Value>
+                    </Setter>
+                  </Style>
+                </TabControl.Resources>
 
-            <Border Grid.Column="2" Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6">
-              <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,2,0">
-              <StackPanel Margin="11,9">
-                <Grid>
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <TextBlock Text="PRODUCT TRACKING · NOT AVAILABLE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}"/>
-                  <Border Grid.Column="1" Background="#332A12" CornerRadius="3" Padding="6,2">
-                    <TextBlock Text="LOCKED" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}"/>
-                  </Border>
-                </Grid>
-                <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,6,0,7"/>
-                <TextBlock Text="Vision pose (not robot TCP)" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}"/>
-                <TextBlock x:Name="S2Pose" Text="X --   Y --   θ --" FontSize="14" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" Margin="0,2,0,0"/>
-                <TextBlock x:Name="S2FrameQuality" Text="Frame quality: --" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,2,0,0"/>
-                <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,7"/>
-                <Grid>
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                  <TextBlock Text="Queue" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}"/>
-                  <TextBlock Grid.Column="1" x:Name="S2QueueDepth" TextTrimming="CharacterEllipsis" Text="UNMAPPED" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right"/>
-                  <TextBlock Grid.Row="1" Text="Cycle" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="1" Grid.Column="1" x:Name="S2CycleStatus" Text="NOT COMM." FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="2" Text="Pick/place sequence" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="2" Grid.Column="1" x:Name="S2Vertex" Text="--" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                </Grid>
-                <TextBlock Text="No SCARA or Camera 02 symbol is validated in the PLC image, so no value is inferred." FontSize="8.5" Foreground="{StaticResource ScadaTextSecondary}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,8,0,7"/>
-                <TextBlock Text="STATION CONFIGURATION" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
-                <Grid Margin="0,5,0,0">
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                  <TextBlock Text="Station role" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}"/>
-                  <TextBlock Grid.Column="1" Text="Tray pick/place" FontSize="10" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right"/>
-                  <TextBlock Grid.Row="1" Text="Robot" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="1" Grid.Column="1" Text="SCARA · planned" FontSize="10" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="2" Text="Camera" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="2" Grid.Column="1" Text="Camera 2 · none" FontSize="10" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="3" Text="Handshake" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                  <TextBlock Grid.Row="3" Grid.Column="1" Text="Not defined" FontSize="10" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                </Grid>
-              </StackPanel>
-              </ScrollViewer>
+                <!-- Tab 1: STATUS & TRACKING -->
+                <TabItem Header="STATUS &amp; ROBOT">
+                  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="6,6">
+                    <StackPanel>
+                      <!-- PRODUCT TRACKING -->
+                      <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,8">
+                        <StackPanel>
+                          <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="PRODUCT TRACKING" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}"/>
+                            <Border Grid.Column="1" Background="#332A12" CornerRadius="3" Padding="6,2">
+                              <TextBlock Text="LOCKED" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}"/>
+                            </Border>
+                          </Grid>
+                          <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,5,0,6"/>
+                          <TextBlock Text="VISION POSE" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/>
+                          <TextBlock x:Name="S2Pose" Text="X --   Y --   θ --" FontSize="13" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" Margin="0,2,0,0"/>
+                          <TextBlock x:Name="S2FrameQuality" Text="Frame quality: --" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,2,0,0"/>
+                          <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,6"/>
+                          <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <TextBlock Text="Queue" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}"/>
+                            <TextBlock Grid.Column="1" x:Name="S2QueueDepth" TextTrimming="CharacterEllipsis" Text="UNMAPPED" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right"/>
+                            <TextBlock Grid.Row="1" Text="Cycle" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,3,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="S2CycleStatus" Text="NOT COMM." FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                            <TextBlock Grid.Row="2" Text="Pick/place sequence" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,3,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="S2Vertex" Text="--" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                          </Grid>
+                          <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,6,0,5"/>
+                          <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <TextBlock Text="Role" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}"/>
+                            <TextBlock Grid.Column="1" Text="Tray pick/place" FontSize="9.5" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right"/>
+                            <TextBlock Grid.Row="1" Text="Robot" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,3,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="SCARA · planned" FontSize="9.5" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                            <TextBlock Grid.Row="2" Text="Camera" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,3,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="S2CfgCamera" Text="CAM 2" FontSize="9.5" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                            <TextBlock Grid.Row="3" Text="Link" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,3,0,0"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="Not defined" FontSize="9.5" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                          </Grid>
+                        </StackPanel>
+                      </Border>
+
+                      <!-- ROBOT TELEMETRY -->
+                      <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8">
+                        <StackPanel>
+                          <TextBlock Text="ROBOT TELEMETRY" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
+                          <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,5,0,6"/>
+                          <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <TextBlock Text="Controller link" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}"/>
+                            <TextBlock Grid.Column="1" x:Name="S2Link" Text="UNMAPPED" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right"/>
+                            <TextBlock Grid.Row="1" Text="Robot ready" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="S2Ready" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="2" Text="Servo state" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="S2Servo" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="3" Text="Robot mode" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="S2Mode" Text="NO DATA" FontSize="9.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="4" Text="Busy / fault" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="S2Busy" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="5" Text="Homed" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="5" Grid.Column="1" x:Name="S2Homed" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                          </Grid>
+                          <Border Background="#0A1622" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,8,0,0">
+                            <StackPanel>
+                              <TextBlock Text="ACTUAL ROBOT TCP" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}"/>
+                              <UniformGrid Columns="4" Margin="0,4,0,0">
+                                <StackPanel><TextBlock Text="X" FontSize="8.5" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S2X" Text="--" FontSize="10.5" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
+                                <StackPanel><TextBlock Text="Y" FontSize="8.5" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S2Y" Text="--" FontSize="10.5" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
+                                <StackPanel><TextBlock Text="Z" FontSize="8.5" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S2Z" Text="--" FontSize="10.5" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
+                                <StackPanel><TextBlock Text="Rz" FontSize="8.5" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="S2Rz" Text="--" FontSize="10.5" FontFamily="Consolas" Foreground="{StaticResource ScadaAmber}"/></StackPanel>
+                              </UniformGrid>
+                              <TextBlock Text="TCP: NOT AVAILABLE IN PLC IMAGE" FontSize="8" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                          </Border>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </ScrollViewer>
+                </TabItem>
+
+                <!-- Tab 2: SENSORS & I/O -->
+                <TabItem Header="I/O SIGNALS">
+                  <Grid Margin="6">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <StackPanel Margin="0,0,0,5">
+                      <WrapPanel Margin="0,0,0,4">
+                        <Button Content="ALL" Tag="S2|ALL" Click="StationSensorGroup_Click" FontSize="9" Padding="6,2" MinHeight="22" Margin="0,0,3,0"/>
+                        <Button Content="SAFETY" Tag="S2|SAFETY" Click="StationSensorGroup_Click" FontSize="9" Padding="6,2" MinHeight="22" Margin="0,0,3,0"/>
+                        <Button Content="MOTION" Tag="S2|MOTION" Click="StationSensorGroup_Click" FontSize="9" Padding="6,2" MinHeight="22" Margin="0,0,3,0"/>
+                        <Button Content="VISION" Tag="S2|VISION" Click="StationSensorGroup_Click" FontSize="9" Padding="6,2" MinHeight="22"/>
+                      </WrapPanel>
+                      <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBox x:Name="S2SensorSearch" TextChanged="StationSensorSearch_Changed" Tag="S2" FontSize="9.5" MinHeight="22" Padding="6,1" VerticalAlignment="Center" ToolTip="Filter signals"/>
+                        <TextBlock Grid.Column="1" x:Name="S2SensorCount" Text="0/0" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                      </Grid>
+                    </StackPanel>
+                    <Border Grid.Row="1" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4">
+                      <ListBox x:Name="S2SensorList" Background="Transparent" BorderThickness="0" Margin="2" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                          <DataTemplate>
+                            <Grid Height="20">
+                              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                              <TextBlock Text="{Binding Label}" Foreground="{StaticResource ScadaTextSecondary}" FontSize="10" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                              <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{StaticResource ScadaTextSecondary}" FontFamily="Consolas" FontSize="9.5" VerticalAlignment="Center" Margin="4,0,8,0"/>
+                              <Border Grid.Column="2" CornerRadius="2" Padding="5,1" Background="#0A1A26" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding State}" Foreground="{Binding StateBrush}" FontSize="8.5" FontWeight="Bold"/>
+                              </Border>
+                            </Grid>
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                          <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="3,0"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                          </Style>
+                        </ListBox.ItemContainerStyle>
+                      </ListBox>
+                    </Border>
+                  </Grid>
+                </TabItem>
+
+                <!-- Tab 3: PARAMETERS -->
+                <TabItem Header="PARAMS">
+                  <Grid Margin="6">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <TextBlock x:Name="S2ParamCount" Text="0 parameters" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="2,0,0,4"/>
+                    <Border Grid.Row="1" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4">
+                      <ListBox x:Name="S2ParamList" Background="Transparent" BorderThickness="0" Margin="2" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                          <DataTemplate>
+                            <Grid Height="20">
+                              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                              <TextBlock Text="{Binding Label}" Foreground="{StaticResource ScadaTextPrimary}" FontSize="10" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                              <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{StaticResource ScadaAmber}" FontFamily="Consolas" FontSize="10" VerticalAlignment="Center" Margin="6,0,4,0"/>
+                              <TextBlock Grid.Column="2" Text="{Binding Unit}" Foreground="{StaticResource ScadaTextSecondary}" FontSize="8.5" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            </Grid>
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                          <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="3,0"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                          </Style>
+                        </ListBox.ItemContainerStyle>
+                      </ListBox>
+                    </Border>
+                  </Grid>
+                </TabItem>
+
+                <!-- Tab 4: LOCAL EVENTS -->
+                <TabItem Header="EVENTS">
+                  <Grid Margin="6">
+                    <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4">
+                      <ListBox x:Name="S2EventList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource ScadaTextPrimary}" FontFamily="Consolas" FontSize="9.5" Margin="4"/>
+                    </Border>
+                  </Grid>
+                </TabItem>
+              </TabControl>
             </Border>
           </Grid>
 
-          <Border Grid.Row="2" Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,10">
-            <TabControl Background="Transparent" BorderThickness="0" Padding="0">
-              <TabControl.Resources>
-                <Style TargetType="TabItem">
-                  <Setter Property="FontSize" Value="11"/>
-                  <Setter Property="FontWeight" Value="SemiBold"/>
-                  <Setter Property="Foreground" Value="{StaticResource ScadaTextSecondary}"/>
-                  <Setter Property="Margin" Value="0,0,4,0"/>
-                  <Setter Property="Template">
-                    <Setter.Value>
-                      <ControlTemplate TargetType="TabItem">
-                        <Border x:Name="ti2" Background="Transparent" BorderThickness="0,0,0,2" BorderBrush="Transparent" Padding="14,7">
-                          <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                          <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="ti2" Property="BorderBrush" Value="{StaticResource ScadaCyan}"/>
-                            <Setter Property="Foreground" Value="{StaticResource ScadaTextPrimary}"/>
-                          </Trigger>
-                          <MultiTrigger>
-                            <MultiTrigger.Conditions>
-                              <Condition Property="IsMouseOver" Value="True"/>
-                              <Condition Property="IsSelected" Value="False"/>
-                            </MultiTrigger.Conditions>
-                            <Setter Property="Foreground" Value="{StaticResource ScadaTextPrimary}"/>
-                          </MultiTrigger>
-                        </ControlTemplate.Triggers>
-                      </ControlTemplate>
-                    </Setter.Value>
-                  </Setter>
-                </Style>
-              </TabControl.Resources>
-
-              <TabItem Header="SENSORS &amp; I/O">
-                <Grid Margin="10,8,10,8">
-                  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                  <Grid Margin="0,0,0,6">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <WrapPanel VerticalAlignment="Center">
-                      <Button Content="ALL" Tag="S2|ALL" Click="StationSensorGroup_Click" FontSize="10" Padding="9,2" MinHeight="24" Margin="0,0,4,0"/>
-                      <Button Content="SAFETY" Tag="S2|SAFETY" Click="StationSensorGroup_Click" FontSize="10" Padding="9,2" MinHeight="24" Margin="0,0,4,0"/>
-                      <Button Content="MOTION" Tag="S2|MOTION" Click="StationSensorGroup_Click" FontSize="10" Padding="9,2" MinHeight="24" Margin="0,0,4,0"/>
-                      <Button Content="VISION" Tag="S2|VISION" Click="StationSensorGroup_Click" FontSize="10" Padding="9,2" MinHeight="24" Margin="0,0,4,0"/>
-                      <Button Content="GRIPPER" Tag="S2|GLUE" Click="StationSensorGroup_Click" FontSize="10" Padding="9,2" MinHeight="24" Margin="0,0,4,0"/>
-                    </WrapPanel>
-                    <TextBox Grid.Column="1" x:Name="S2SensorSearch" TextChanged="StationSensorSearch_Changed" Tag="S2" FontSize="10.5" MinHeight="24" Padding="8,2" Margin="10,0,10,0" VerticalAlignment="Center" ToolTip="Filter station signals by operator label"/>
-                    <TextBlock Grid.Column="2" x:Name="S2SensorCount" Text="0 / 0 signals" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center"/>
-                  </Grid>
-                  <Border Grid.Row="1" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4">
-                    <ListBox x:Name="S2SensorList" Background="Transparent" BorderThickness="0" Margin="4" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                      <ListBox.ItemTemplate>
-                        <DataTemplate>
-                          <Grid Height="21">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Label}" Foreground="{StaticResource ScadaTextSecondary}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{StaticResource ScadaTextSecondary}" FontFamily="Consolas" FontSize="10.5" VerticalAlignment="Center" Margin="8,0,12,0"/>
-                            <Border Grid.Column="2" CornerRadius="3" Padding="7,1" Background="#0A1A26" VerticalAlignment="Center">
-                              <TextBlock Text="{Binding State}" Foreground="{Binding StateBrush}" FontSize="9" FontWeight="Bold"/>
-                            </Border>
-                          </Grid>
-                        </DataTemplate>
-                      </ListBox.ItemTemplate>
-                      <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                          <Setter Property="Padding" Value="5,0"/>
-                          <Setter Property="Background" Value="Transparent"/>
-                          <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        </Style>
-                      </ListBox.ItemContainerStyle>
-                    </ListBox>
-                  </Border>
-                </Grid>
-              </TabItem>
-
-              <TabItem Header="PARAMETERS">
-                <Grid Margin="10,8,10,8">
-                  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                  <TextBlock x:Name="S2ParamCount" Text="0 / 0 parameters" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" Margin="2,0,0,6"/>
-                  <Border Grid.Row="1" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4">
-                    <ListBox x:Name="S2ParamList" Background="Transparent" BorderThickness="0" Margin="4" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                      <ListBox.ItemTemplate>
-                        <DataTemplate>
-                          <Grid Height="22">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Label}" Foreground="{StaticResource ScadaTextPrimary}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{StaticResource ScadaAmber}" FontFamily="Consolas" FontSize="11" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                            <TextBlock Grid.Column="2" Text="{Binding Unit}" Foreground="{StaticResource ScadaTextSecondary}" FontSize="9.5" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                          </Grid>
-                        </DataTemplate>
-                      </ListBox.ItemTemplate>
-                      <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                          <Setter Property="Padding" Value="5,0"/>
-                          <Setter Property="Background" Value="Transparent"/>
-                          <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        </Style>
-                      </ListBox.ItemContainerStyle>
-                    </ListBox>
-                  </Border>
-                </Grid>
-              </TabItem>
-
-              <TabItem Header="LOCAL EVENTS">
-                <Grid Margin="10,8,10,8">
-                  <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4">
-                    <ListBox x:Name="S2EventList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource ScadaTextPrimary}" FontFamily="Consolas" FontSize="10.5" Margin="6"/>
-                  </Border>
-                </Grid>
-              </TabItem>
-            </TabControl>
-          </Border>
-
-          <Border Grid.Row="3" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="5" Padding="10,6">
+          <!-- C. Local alarm strip -->
+          <Border Grid.Row="2" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="5" Padding="10,5">
             <Grid>
               <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <TextBlock Text="LOCAL ALARM" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-              <TextBlock Grid.Column="1" x:Name="S2AlarmStrip" Text="Station 02 is not commissioned. No camera, robot or tray signal is available." FontSize="10.5" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+              <TextBlock Grid.Column="1" x:Name="S2AlarmStrip" Text="Station 02 is not commissioned. No camera, robot or tray signal is available." FontSize="10" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
               <TextBlock Grid.Column="2" Text="NO ROBOT COMMANDS" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaRed}" VerticalAlignment="Center" Margin="10,0,0,0"/>
             </Grid>
           </Border>
@@ -1045,10 +1165,9 @@
           <Grid Margin="0,0,0,8">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel>
-              <TextBlock Text="SHARED CONVEYOR · ENCODER 01" FontSize="17" FontWeight="Bold" Foreground="#E8F1FC"/>
-              <TextBlock Text="One conveyor and one encoder source provide the shared tracking base for Station 01 and Station 02." FontSize="10" Foreground="#92AABE" Margin="0,3,0,0"/>
+              <TextBlock Text="CONVEYOR · ENCODER 01" FontSize="15" FontWeight="Bold" Foreground="#E8F1FC"/>
             </StackPanel>
-            <TextBlock Grid.Column="1" Text="MONITORING / MANUAL DETAILS" FontSize="9" FontWeight="Bold" Foreground="#27C9EC" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="MONITOR" FontSize="9" FontWeight="Bold" Foreground="#27C9EC" VerticalAlignment="Center"/>
           </Grid>
           <Grid Grid.Row="1">
             <Grid.ColumnDefinitions><ColumnDefinition Width="1.15*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -1095,58 +1214,67 @@
                     </StackPanel>
                   </Border>
                 </Grid>
-                <TextBlock Text="Speed reference and drive output are control references, not measured motor shaft speed or measured voltage." FontSize="9" Foreground="#F4BB45" TextWrapping="Wrap" Margin="2,8,0,0"/>
+                <TextBlock Text="References, not measurements." FontSize="9" Foreground="#F4BB45" Margin="2,8,0,0"/>
               </StackPanel>
             </Border>
             <ScrollViewer Grid.Column="1" Margin="6,0,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel VerticalAlignment="Top">
-              <Border x:Name="ConveyorManualControlPanel" Visibility="Collapsed" Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="6" Padding="12">
+              <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,8">
                 <StackPanel>
-                  <TextBlock Text="CONVEYOR MOTOR CONTROLS · OPERATOR AUTHORIZATION" FontSize="11" FontWeight="Bold" Foreground="#A9BDCC"/>
-                  <TextBlock Text="DISARMED BY DEFAULT. Commissioning prerequisite: physical emergency-stop circuit verified on site." FontSize="9" Foreground="#F4BB45" TextWrapping="Wrap" Margin="0,5,0,9"/>
-                  <CheckBox x:Name="DashControlArm" Content="Arm conveyor HMI commands (this session only)" Foreground="#DCE8F0" Checked="DashArmChanged" Unchecked="DashArmChanged" Margin="0,0,0,8" FontSize="11"/>
+                  <TextBlock Text="SPEED (mm/s) · SHARED" FontSize="10.5" FontWeight="Bold" Foreground="#27C9EC"/>
+                  <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <TextBox x:Name="CvPresetSpeedBox" Text="100" Width="70" MinHeight="24" Padding="5,1" FontSize="11" HorizontalContentAlignment="Right" LostFocus="CvPresetSpeed_LostFocus" ToolTip="Shared mm/s preset used by the AUTO request. Local setpoint only; no PLC write exists."/>
+                    <Button x:Name="CvPresetApplyButton" Content="APPLY" Click="CvPresetSpeedApply_Click" MinHeight="24" Padding="8,1" FontSize="10" Margin="6,0,0,0"/>
+                    <TextBlock x:Name="CvPresetStatus" Text="Hz requires verified calibration." FontSize="9" Foreground="#92AABE" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+              <Border x:Name="ConveyorManualControlPanel" Visibility="Visible" Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="6" Padding="12">
+                <StackPanel>
+                  <TextBlock Text="CONVEYOR MANUAL CONTROL · OPERATOR AUTHORIZATION" FontSize="11" FontWeight="Bold" Foreground="#A9BDCC"/>
+                  <TextBlock Text="DISARMED. Manual operation requires verified E-STOP and speed map." FontSize="9" Foreground="#F4BB45" TextWrapping="Wrap" Margin="0,5,0,9"/>
+                  <CheckBox x:Name="DashControlArm" Content="Arm manual conveyor commands (operator confirmation)" Foreground="#DCE8F0" Checked="DashArmChanged" Unchecked="DashArmChanged" Margin="0,0,0,8" FontSize="11"/>
                   <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                    <TextBlock Text="Speed ref (Hz)" Foreground="#B9CBD8" VerticalAlignment="Center" FontSize="10" Margin="0,0,8,0"/>
-                    <TextBox x:Name="DashHzInput" Width="84" Text="5.0" HorizontalContentAlignment="Center" ToolTip="Allowed range: greater than 0 and up to 25 Hz"/>
+                    <TextBlock Text="Speed Setpoint (mm/s):" Foreground="#B9CBD8" VerticalAlignment="Center" FontSize="10" Margin="0,0,8,0"/>
+                    <TextBlock x:Name="CvManualSpeedDisplay" Text="100.0 mm/s" FontWeight="Bold" FontFamily="Consolas" Foreground="#27C9EC" VerticalAlignment="Center"/>
                   </StackPanel>
                   <StackPanel Orientation="Horizontal">
-                    <Button x:Name="DashStartButton" Content="START" Click="DashStart_Click" Background="#167B69" Foreground="White" IsEnabled="False" MinHeight="30" MinWidth="92"/>
-                    <Button x:Name="DashStopButton" Content="STOP" Click="DashStop_Click" Background="#8E4147" Foreground="White" IsEnabled="False" MinHeight="30" MinWidth="92" Margin="8,2,2,2"/>
+                    <Button x:Name="DashStartButton" Content="MANUAL START" Click="DashStart_Click" Background="#167B69" Foreground="White" IsEnabled="False" MinHeight="30" MinWidth="110" ToolTip="Manual conveyor START request via TwinCAT mailbox. Fails closed if not commissioned."/>
+                    <Button x:Name="DashStopButton" Content="MANUAL STOP" Click="DashStop_Click" Background="#8E4147" Foreground="White" IsEnabled="False" MinHeight="30" MinWidth="110" Margin="8,0,0,0" ToolTip="Manual conveyor STOP request via TwinCAT mailbox. Controlled stop; NOT certified emergency stop."/>
                   </StackPanel>
-                  <TextBlock x:Name="DashControlNote" Text="Manual access does not commission hardware; legacy Hz path requires separate operator authorization." Foreground="#C3D4DE" Margin="0,9,0,0" FontSize="10" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="DashControlNote" Text="Manual belt commands fail-closed. In danger use PHYSICAL E-STOP." Foreground="#C3D4DE" Margin="0,9,0,0" FontSize="9"/>
                 </StackPanel>
               </Border>
               <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,8,0,0">
                 <StackPanel>
-                  <TextBlock x:Name="ConveyorManualModeNote" Text="AUTO VIEW: read-only. Switch to MANUAL MODE from LINE OVERVIEW to show legacy controls (disarmed)." Foreground="#F4BB45" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                  <TextBlock x:Name="ConveyorManualModeNote" Text="AUTO · READ-ONLY. Use MANUAL on LINE OVERVIEW for controls." Foreground="#F4BB45" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,8"/>
                   <TextBlock Text="STATION SYNCHRONIZATION" FontSize="11" FontWeight="Bold" Foreground="#27C9EC"/>
                   <Grid Margin="0,7,0,0">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <TextBlock Text="STATION 01 · GANTRY" FontSize="10" Foreground="#B9CBD8" Margin="0,0,12,4"/>
-                    <TextBlock Grid.Column="1" Text="Encoder source: shared · handshake: PLC-Q FIFO · state: read-only monitoring" FontSize="10" Foreground="#DCE8F0" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                    <TextBlock Grid.Column="1" Text="Shared encoder · PLC-Q FIFO" FontSize="9.5" Foreground="#DCE8F0" Margin="0,0,0,4"/>
                     <TextBlock Grid.Row="1" Text="STATION 02 · SCARA" FontSize="10" Foreground="#B9CBD8" Margin="0,0,12,4"/>
-                    <TextBlock Grid.Row="1" Grid.Column="1" Text="Encoder source: shared (planned) · handshake: NOT COMMISSIONED · unmapped" FontSize="10" Foreground="#F4BB45" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="NOT COMMISSIONED" FontSize="9.5" Foreground="#F4BB45" Margin="0,0,0,4"/>
                     <TextBlock Grid.Row="2" Text="TRIGGER LINE" FontSize="10" Foreground="#B9CBD8" Margin="0,0,12,0"/>
-                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="CvTriggerLine" Text="Direction Y↑ · 50% FOV · adjustable in Settings" FontSize="10" Foreground="#DCE8F0" TextWrapping="Wrap"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="CvTriggerLine" Text="Direction Y↑ · 50% FOV" FontSize="9.5" Foreground="#DCE8F0" TextWrapping="Wrap"/>
                   </Grid>
                 </StackPanel>
               </Border>
               <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,8,0,0">
                 <StackPanel>
-                  <TextBlock Text="SHARED TRACKING MODEL" FontSize="11" FontWeight="Bold" Foreground="#27C9EC"/>
-                  <TextBlock Text="Station 01 and Station 02 both resolve product position from this single encoder distance. No station owns the belt." FontSize="10" Foreground="#B9CBD8" TextWrapping="Wrap" Margin="0,5,0,8"/>
+                  <TextBlock Text="SHARED TRACKING" FontSize="11" FontWeight="Bold" Foreground="#27C9EC"/>
                   <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <TextBlock Text="ENCODER 01" FontSize="10" Foreground="#B9CBD8" Margin="0,0,12,4"/>
-                    <TextBlock Grid.Column="1" Text="ST-5114 · mm/s and integrated mm since PLC reset · read-only" FontSize="10" Foreground="#DCE8F0" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                    <TextBlock Grid.Column="1" Text="ST-5114 · read-only" FontSize="9.5" Foreground="#DCE8F0" Margin="0,0,0,4"/>
                     <TextBlock Grid.Row="1" Text="STATION 01" FontSize="10" Foreground="#B9CBD8" Margin="0,0,12,4"/>
-                    <TextBlock Grid.Row="1" Grid.Column="1" Text="Consumes the shared distance for glue-track positioning · PLC-Q FIFO handshake" FontSize="10" Foreground="#DCE8F0" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="Glue track · PLC-Q FIFO" FontSize="9.5" Foreground="#DCE8F0" Margin="0,0,0,4"/>
                     <TextBlock Grid.Row="2" Text="STATION 02" FontSize="10" Foreground="#B9CBD8" Margin="0,0,12,4"/>
-                    <TextBlock Grid.Row="2" Grid.Column="1" Text="Planned consumer · no queue, tray or pick symbol is validated yet" FontSize="10" Foreground="#F4BB45" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="Planned · not commissioned" FontSize="9.5" Foreground="#F4BB45" Margin="0,0,0,4"/>
                     <TextBlock Grid.Row="3" Text="NOT AVAILABLE" FontSize="10" Foreground="#B9CBD8" Margin="0,0,12,0"/>
-                    <TextBlock Grid.Row="3" Grid.Column="1" Text="Measured motor shaft speed, measured AO voltage, certified safety feedback" FontSize="10" Foreground="#92AABE" TextWrapping="Wrap"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="Not available" FontSize="9.5" Foreground="#92AABE"/>
                   </Grid>
                 </StackPanel>
               </Border>
@@ -1158,7 +1286,7 @@
               <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <TextBlock Text="LINE MIMIC · SHARED CONVEYOR" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
-                <TextBlock Grid.Column="1" Text="SCHEMATIC · NOT TO SCALE · NO ANIMATION FROM SOFTWARE STATE" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/>
+                <TextBlock Grid.Column="1" Text="SCHEMATIC · NO SOFTWARE MOTION" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/>
               </Grid>
               <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,7,0,10"/>
               <Grid Height="78">
@@ -1215,10 +1343,9 @@
           <Grid Margin="0,0,0,8">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel>
-              <TextBlock Text="SETTINGS" FontSize="17" FontWeight="Bold" Foreground="#E8F1FC"/>
-              <TextBlock Text="Central configuration. Station sections are separated; no new PLC writes or robot permissions are added here." FontSize="10" Foreground="#92AABE" Margin="0,3,0,0"/>
+              <TextBlock Text="SETTINGS" FontSize="15" FontWeight="Bold" Foreground="#E8F1FC"/>
             </StackPanel>
-            <TextBlock Grid.Column="1" Text="ACCESS: OPERATOR / MAINTENANCE · ADS WRITE DISABLED" FontSize="9" FontWeight="Bold" Foreground="#F4BB45" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="ACCESS: OPERATOR / MAINTENANCE" FontSize="9" FontWeight="Bold" Foreground="#F4BB45" VerticalAlignment="Center"/>
           </Grid>
           <TabControl Grid.Row="1" x:Name="SettingsSections" Background="#07121E" BorderThickness="0">
             <!-- SYSTEM -->
@@ -1227,30 +1354,55 @@
                 <StackPanel HorizontalAlignment="Stretch">
                   <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="4" Padding="12">
                     <StackPanel>
-                      <TextBlock Text="PLC / ADS MONITORING · READ ONLY" FontSize="12" FontWeight="Bold" Foreground="#27C9EC"/>
-                      <TextBlock Text="Monitor PLC signals without commanding motion or changing robot output bits. ADS port 851, polled once per second." FontSize="10" Foreground="#B9CBD8" TextWrapping="Wrap" Margin="0,5,0,9"/>
-                      <WrapPanel>
-                        <Button Content="READ ADS STATUS" Click="TestAds_Click" MinHeight="28" Padding="10,3" Background="#162C42" Foreground="White"/>
-                        <Button Content="CHECK ADS / BENCH READINESS" Click="CheckLiveReadiness_Click" MinHeight="28" Padding="10,3" Background="#2E6E95" Foreground="White"/>
-                        <Button Content="OPEN DIAGNOSTICS" Click="DashPLC_Click" MinHeight="28" Padding="10,3" Background="#162C42" Foreground="White"/>
+                      <TextBlock Text="PLC / ADS · READ ONLY" FontSize="12" FontWeight="Bold" Foreground="#27C9EC"/>
+                      <WrapPanel Margin="0,6,0,0">
+                        <Button Content="READ ADS" Click="TestAds_Click" MinHeight="26" Padding="10,2" Background="#162C42" Foreground="White"/>
+                        <Button Content="CHECK READINESS" Click="CheckLiveReadiness_Click" MinHeight="26" Padding="10,2" Background="#2E6E95" Foreground="White"/>
+                        <Button Content="DIAGNOSTICS" Click="DashPLC_Click" MinHeight="26" Padding="10,2" Background="#162C42" Foreground="White"/>
+                        <Button x:Name="OpenQaSourcesButton" Content="CAMERA / VIDEO QA" Click="OpenQaSources_Click" MinHeight="26" Padding="10,2" Background="#162C42" Foreground="White" ToolTip="Hidden camera/source diagnostics; not part of normal line operation."/>
                       </WrapPanel>
-                      <TextBlock x:Name="ReadinessStatus" Text="Not checked yet. Requires calibrated vision, encoder/FrameID verification and robot supervision." TextWrapping="Wrap" Margin="2,9,0,0" FontSize="10" Foreground="#92AABE"/>
+                      <TextBlock x:Name="ReadinessStatus" Text="NOT CHECKED" TextWrapping="Wrap" Margin="2,8,0,0" FontSize="10" Foreground="#92AABE"/>
                     </StackPanel>
                   </Border>
                   <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,8,0,0">
                     <StackPanel>
                       <TextBlock Text="APPLICATION" FontSize="12" FontWeight="Bold" Foreground="#27C9EC"/>
                       <Grid Margin="0,7,0,0">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <TextBlock Text="Theme" FontSize="10" Foreground="#92AABE"/>
-                        <TextBlock Grid.Column="1" Text="Dark or light · operator toggle in header" FontSize="10" Foreground="#DCE8F0"/>
-                        <TextBlock Grid.Row="1" Text="Global START / STOP" FontSize="10" Foreground="#92AABE" Margin="0,5,0,0"/>
-                        <TextBlock Grid.Row="1" Grid.Column="1" Text="NOT COMMISSIONED · informational only" FontSize="10" Foreground="#F4BB45" Margin="0,5,0,0"/>
-                        <TextBlock Grid.Row="2" Text="Safety stop" FontSize="10" Foreground="#92AABE" Margin="0,5,0,0"/>
-                        <TextBlock Grid.Row="2" Grid.Column="1" Text="Physical hardware emergency stop only · HMI is not a certified safety device" FontSize="10" Foreground="#FF6E70" Margin="0,5,0,0" TextWrapping="Wrap"/>
-                        <TextBlock Grid.Row="3" Text="Detection pipeline" FontSize="10" Foreground="#92AABE" Margin="0,5,0,0"/>
-                        <TextBlock Grid.Row="3" Grid.Column="1" Text="Camera 1 → track ID → trigger line → PLC-Q FIFO (read-only monitoring)" FontSize="10" Foreground="#DCE8F0" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Global START/STOP" FontSize="10" Foreground="#92AABE"/>
+                        <TextBlock Grid.Column="1" Text="NOT COMMISSIONED" FontSize="10" Foreground="#F4BB45"/>
+                        <TextBlock Grid.Row="1" Text="Safety stop" FontSize="10" Foreground="#92AABE" Margin="0,5,0,0"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="PHYSICAL E-STOP ONLY" FontSize="10" Foreground="#FF6E70" Margin="0,5,0,0"/>
+                        <TextBlock Grid.Row="2" Text="Detection" FontSize="10" Foreground="#92AABE" Margin="0,5,0,0"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="CAM 1 → track → trigger → FIFO" FontSize="10" Foreground="#DCE8F0" Margin="0,5,0,0"/>
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+                  <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,8,0,0">
+                    <StackPanel>
+                      <TextBlock Text="CAMERA SDK &amp; TRANSPORT MATRIX" FontSize="12" FontWeight="Bold" Foreground="#27C9EC"/>
+                      <Grid Margin="0,7,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                          <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                          <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Basler USB3 Vision" FontSize="10" Foreground="#DCE8F0"/>
+                        <TextBlock Grid.Column="1" Text="SUPPORTED" FontSize="10" FontWeight="Bold" Foreground="#39C7A2"/>
+                        <TextBlock Grid.Column="2" Text="pylon 8.1 x64 / USB3 GenTL" FontSize="9.5" Foreground="#92AABE" Margin="10,0,0,0"/>
+                        <TextBlock Grid.Row="1" Text="Basler GigE Vision" FontSize="10" Foreground="#DCE8F0" Margin="0,5,0,0"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="SUPPORTED" FontSize="10" FontWeight="Bold" Foreground="#39C7A2" Margin="0,5,0,0"/>
+                        <TextBlock Grid.Row="1" Grid.Column="2" Text="pylon 8.1 x64 / GigE GenTL" FontSize="9.5" Foreground="#92AABE" Margin="10,5,0,0"/>
+                        <TextBlock Grid.Row="2" Text="Hikrobot GigE Vision" FontSize="10" Foreground="#DCE8F0" Margin="0,5,0,0"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="SUPPORTED" FontSize="10" FontWeight="Bold" Foreground="#39C7A2" Margin="0,5,0,0"/>
+                        <TextBlock Grid.Row="2" Grid.Column="2" Text="MVS GigE native direct / GVCP" FontSize="9.5" Foreground="#92AABE" Margin="10,5,0,0"/>
+                        <TextBlock Grid.Row="3" Text="Hikrobot USB Vision" FontSize="10" Foreground="#DCE8F0" Margin="0,5,0,0"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="NOT SUPPORTED" FontSize="10" FontWeight="Bold" Foreground="#F4BB45" Margin="0,5,0,0"/>
+                        <TextBlock Grid.Row="3" Grid.Column="2" Text="MVS USB kernel driver not installed" FontSize="9.5" Foreground="#92AABE" Margin="10,5,0,0"/>
+                        <TextBlock Grid.Row="4" Text="Generic USB / UVC webcam" FontSize="10" Foreground="#DCE8F0" Margin="0,5,0,0"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" Text="UNSUPPORTED" FontSize="10" FontWeight="Bold" Foreground="#FF6E70" Margin="0,5,0,0"/>
+                        <TextBlock Grid.Row="4" Grid.Column="2" Text="No direct image capture backend" FontSize="9.5" Foreground="#92AABE" Margin="10,5,0,0"/>
                       </Grid>
                     </StackPanel>
                   </Border>
@@ -1408,7 +1560,7 @@
                 <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,8">
                   <StackPanel>
                     <TextBlock Text="READ-ONLY SIGNAL MONITORING" FontSize="12" FontWeight="Bold" Foreground="#27C9EC"/>
-                    <TextBlock Text="Technical ADS symbols are shown only on this engineering surface. LIVE = symbol read succeeded; READ_FAIL = unreadable; RESERVED = future symbol. No command can be issued here." FontSize="10" Foreground="#B9CBD8" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                    <TextBlock Text="Technical ADS symbols are shown only on this engineering surface. LIVE = symbol verified on runtime; SOURCE_ONLY = defined in PLC source but not running; RESERVED = future planned symbol; MISSING = undefined. No live command can be issued here." FontSize="10" Foreground="#B9CBD8" TextWrapping="Wrap" Margin="0,5,0,0"/>
                   </StackPanel>
                 </Border>
                 <DataGrid Grid.Row="1" x:Name="TagMatrixTable" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" RowHeight="26" ColumnHeaderHeight="30" Background="#0D1C2B" Foreground="#DCE9F2" RowBackground="#13293A" AlternatingRowBackground="#1A3446" BorderBrush="#23384D" BorderThickness="1" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#24404F" SelectionMode="Single" FontSize="11">
@@ -1577,7 +1729,7 @@
           </TabControl>
         </Grid>
       </TabItem>
-      <TabItem Header="VISION WORKSPACE" x:Name="VisionOperationTab">
+      <TabItem Header="VISION WORKSPACE (QA ONLY)" x:Name="VisionOperationTab" Visibility="Collapsed">
         <Grid>
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -1734,7 +1886,7 @@
           </Grid>
         </Grid>
       </TabItem>
-      <TabItem Header="CAMERA / SOURCE" x:Name="CameraSourceTab">
+      <TabItem Header="CAMERA / SOURCE (QA ONLY)" x:Name="CameraSourceTab" Visibility="Collapsed">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="8">
           <StackPanel HorizontalAlignment="Stretch">
             <TextBlock Text="CAMERA DEVICES AND SOURCES" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource VDTheme056}" Margin="0,3,0,8" />

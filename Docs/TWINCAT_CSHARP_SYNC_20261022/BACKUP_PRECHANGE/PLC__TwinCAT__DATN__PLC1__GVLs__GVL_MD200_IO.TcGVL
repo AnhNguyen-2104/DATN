@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <GVL Name="GVL_MD200_IO" Id="{d39af6ae-fc3e-46fe-8afb-468aa62abfb1}">
+    <Declaration><![CDATA[VAR_GLOBAL
+    // E-stop circuit HEALTHY auxiliary contact feedback.
+    // REVIEW BEFORE ACTIVATION: maps ST-1228 SLOT 6 / DI0 (physical terminal 0).
+    // This is a PROPOSED wiring channel, not confirmed by cabinet visual inspection.
+    // It must be wired to the healthy auxiliary feedback of an independent
+    // hardwired emergency-stop safety circuit. TRUE = safety chain healthy.
+    // This input alone is NOT an emergency-stop device.
+    {attribute 'TcLinkToOSO' := '<0,1,0>TIID^Device 2 (EtherCAT)^Box 1 (NA-9286,Crevis)^Module 6 (ST-1228)^Input(s)^Byte 0'}
+    bEStopFeedback AT %I* : BOOL := FALSE;
+
+    // MD200 physical process-image channels, staged for deliberate link review.
+    // ST-4424 Module 11 Channel AO1 (physical terminal 1, 0-10V).
+    // UINT 16 bit with 12-bit useful range 0..4095.
+    {attribute 'TcLinkTo' := 'TIID^Device 2 (EtherCAT)^Box 1 (NA-9286,Crevis)^Module 11 (ST-4424)^Output(s)^Analog Output Ch#1 Byte'}
+    nAO1_Raw AT %Q* : UINT := 0;
+
+    // Staged logical RUN: ST-2318 Module 10 immediately before AO module.
+    // DO0 is bit 0 of Output(s)^Byte 0; map ONLY one bit (not entire BYTE).
+    // WARNING: physical DO0/pin 0 must be confirmed unused and NPN wiring
+    // checked by the on-site technician BEFORE activating this configuration.
+    // All runtime software permits remain FALSE by default.
+    {attribute 'TcLinkToOSO' := '<0,1,0>TIID^Device 2 (EtherCAT)^Box 1 (NA-9286,Crevis)^Module 10 (ST-2318)^Output(s)^Byte 0'}
+    bRUN_DO AT %Q* : BOOL := FALSE;
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>

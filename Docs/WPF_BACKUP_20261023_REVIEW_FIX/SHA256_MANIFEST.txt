@@ -1,0 +1,58 @@
+﻿# WPF BACKUP 20261023 REVIEW DEFECT FIX TASK
+# Workspace: E:\Orca\DATN
+# Date: 2026-10-23
+# SHA-256 baseline manifest before review defect fixes
+
+26c2916a8cf701f1cda058a0110713944091cb5b6bb6e79ad0faaf2feae52aea  App\Vision\Vision\LineMailboxProtocol.cs
+613119b9d73f2aa6577c3895f45f2677dee1b8cf9f2c30d60f9fa539eaa64729  App\Vision\Dashboard.cs
+e53b33dab93d65bf0e5a431c56588503a37474401309d2edc676554aa5fc7b09  App\Vision\MainWindow.xaml
+f7927065d4fec4dbf4d5c83ef0a3bb7b5a6fdeaf81c94f25fcaaae8a442bde34  App\Vision\MainWindow.xaml.cs
+c225845b88c56d2a03bd688cbcee591db52e704df3c3c436be86631670ae7063  App\Tests\Program.cs
+
+## git status --short baseline
+ M App/PlateVision50.sln
+ M App/Tests/Program.cs
+ M App/Tests/Tests.csproj
+ M App/Vision/Dashboard.cs
+ M App/Vision/MainWindow.xaml
+ M App/Vision/MainWindow.xaml.cs
+ M App/Vision/StationDashboards.cs
+ M App/Vision/StationOverview.cs
+ M App/Vision/Vision/GvcpDiscovery.cs
+ M Dependencies/BaslerCamera/BaslerCameraService.cs
+ M Dependencies/Devices/HikCameraService.cs
+ M Dependencies/Devices/UnifiedCameraService.cs
+AM PLC/TwinCAT/DATN.project.~u
+ M PLC/TwinCAT/DATN/DATN.tsproj
+ M PLC/TwinCAT/DATN/PLC1/GVLs/GVL_MD200_IO.TcGVL
+ M PLC/TwinCAT/DATN/PLC1/POUs/MAIN.TcPOU
+?? App/Vision/Vision/CameraSlotModel.cs
+?? App/Vision/Vision/LineInterlock.cs
+?? App/Vision/Vision/LineMailboxProtocol.cs
+?? App/Vision/Vision/StationCameraController.cs
+?? Docs/BUILD_FIX_20261021/
+?? Docs/ORCA_DUAL_STATION_CAMERA_UI_RESULT_20261022.md
+?? Docs/ORCA_DUAL_STATION_USB_GIGE_MINIMAL_UI_20261022.md
+?? Docs/ORCA_FIX_CAMERA_SCAN_IP_USB_ONLY_20261022.md
+?? Docs/ORCA_FIX_CAMERA_SCAN_IP_USB_ONLY_RESULT_20261022.md
+?? Docs/ORCA_STATION02_BASLER_USB3_ADDENDUM_20261022.md
+?? Docs/ORCA_STATION_INTERLOCK_IMPLEMENTATION_RESULT_20261021.md
+?? Docs/ORCA_STATION_INTERLOCK_WPF_TASK_20261021.md
+?? Docs/ORCA_TWINCAT_CSHARP_SYNC_PLAN_20261022.md
+?? Docs/ORCA_WPF_ADS_GATEWAY_REVIEW_DEFECTS_20261023.md
+?? Docs/ORCA_WPF_LIVE_ADS_GATEWAY_RESULT_20261023.md
+?? Docs/ORCA_WPF_LIVE_ADS_GATEWAY_TASK_20261023.md
+?? Docs/ORCA_WPF_REAL_ADS_REASSIGN_20261023.md
+?? Docs/ORCA_WPF_REAL_ADS_REASSIGN_RESULT_20261023.md
+?? Docs/TWINCAT_CSHARP_SYNC_20261022/
+?? Docs/TWINCAT_FIXED_K_OFFLINE_20261023/
+?? Docs/TWINCAT_LIVE_PREFLIGHT_20261023.md
+?? Docs/TWINCAT_OPERATOR_COMMISSIONING_CHECKLIST_20261023.md
+?? Docs/TWINCAT_REAL_BELT_CALIBRATION_INPUT_20261023.md
+?? Docs/TwinCAT_Tag_Restore_20261022/
+?? Docs/WPF_BACKUP_20261021_STATION_INTERLOCK/
+?? Docs/WPF_BACKUP_20261023_LIVE_ADS_GATEWAY/
+?? Docs/WPF_BACKUP_20261023_REAL_ADS/
+?? Docs/WPF_BACKUP_20261023_REVIEW_FIX/
+?? Docs/WPF_BACKUP_CAMERA_SCAN_20261022/
+?? Docs/WPF_BACKUP_DUAL_CAMERA_20261022/

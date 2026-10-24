@@ -1,3 +1,4 @@
+using System.Text;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -22,9 +23,7 @@ namespace PlateVision50;
 
 public partial class MainWindow : System.Windows.Window
 {
-    private sealed record CameraSession(CameraInfo Info,UnifiedCameraService Service);
     private readonly UnifiedCameraService _discovery=new();
-    private readonly List<CameraSession> _sessions=new();
     private readonly DispatcherTimer _timer=new() {Interval=TimeSpan.FromMilliseconds(75)};
     private readonly DispatcherTimer _adsTimer=new() {Interval=TimeSpan.FromMilliseconds(600)};
     private readonly VisionOptions _options=new();
@@ -34,8 +33,13 @@ public partial class MainWindow : System.Windows.Window
     private readonly Dictionary<string,TriggerAuditRow> _auditByTrack=new();
     private readonly string _auditCsv=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"PlateVision50_V2","trigger_pipeline.csv");
     private readonly string _themeFile=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"PlateVision50_V2","ui_theme.txt");
-    private HikDirectIpCamera? _directHik;
-    private long _lastHikFrame;
+    private readonly CameraOwnershipRegistry _cameraOwnership=new();
+    private readonly StationCameraController _cam1=new(1,"Station 01");
+    private readonly StationCameraController _cam2=new(2,"Station 02");
+    private long _lastCam1Frame;
+    private long _lastCam2Frame;
+    private bool _scanBusy1;
+    private bool _scanBusy2;
     private bool _trackingEnabled;
     private bool _offlineSimulationEnabled;
     private readonly AdsPreview _ads=new();
@@ -61,6 +65,7 @@ public partial class MainWindow : System.Windows.Window
     private BeltCoordinate _lastBelt=new(0,0,0);
     private FifoSnapshot? _lastSnapshot;
     private readonly VisionLabelOverlay.LabelPlacementTracker _labelPlacements=new();
+    private readonly VisionLabelOverlay.LabelPlacementTracker _labelPlacementsS1=new();
     private string _overlaySourceKey="VIDEO";
     private IReadOnlyList<PlateResult> _overlayDetections=Array.Empty<PlateResult>();
     private IReadOnlyDictionary<int,int> _overlayTrackIds=new Dictionary<int,int>();
@@ -91,11 +96,14 @@ public partial class MainWindow : System.Windows.Window
         RefreshVideos();
         ResetDetectionHud();
         RefreshCaptureMode();
-        StatusText.Text="Select a camera and CONNECT IP for LIVE VIEW; START enables detection | ADS read-only.";
+        StatusText.Text="Camera offline | ADS read-only";
         if(Environment.GetCommandLineArgs().Any(a=>a.Equals("--demo",StringComparison.OrdinalIgnoreCase)))
             Dispatcher.BeginInvoke(new Action(()=>OpenVideo(@"C:\Users\aml\Desktop\DEMO\1.avi")));
+        // QA preview only: --mock starts the conspicuously labelled TEST ONLY interlock
+        // demonstration. It never writes ADS and never commands the conveyor.
+        InitCameraSlots();
     }
-    private bool HasActiveSource => _video!=null || (_directHik?.IsOpen ?? false) || _sessions.Count>0;
+    private bool HasActiveSource => _video!=null || _cam1.IsOpen;
 
     private void ResetDetectionHud()
     {
@@ -111,21 +119,21 @@ public partial class MainWindow : System.Windows.Window
     {
         if(_dashControlArmed)
         {
-            ControlSafetyBanner.Text="HMI: CONVEYOR CONTROL ARMED | GANTRY/SCARA CONTROL DISABLED";
+            ControlSafetyBanner.Text="HMI CONVEYOR ARMED · NO ROBOT";
             return;
         }
         // Distinguish data permission from motion authorization. A live PLC
         // state alone never confers permission to operate the robot.
         ControlSafetyBanner.Text=_benchArmed
-            ?"ADS: SUPERVISED POSE BENCH ONLY | ROBOT MOTION DISABLED"
-            :"ADS: READ ONLY BY DEFAULT | ROBOT MOTION DISABLED";
+            ?"ADS BENCH ONLY · NO MOTION"
+            :"ADS READ-ONLY · NO MOTION";
     }
     private void RefreshCaptureMode()
     {
         UpdateControlSafetyBanner();
         StartTrackingButton.IsEnabled=HasActiveSource && !_trackingEnabled;
         StopTrackingButton.IsEnabled=_trackingEnabled;
-        string src=_directHik!=null?"CAMERA LIVE":_sessions.Count>0?"CAMERA LIVE":_video!=null?"VIDEO DEMO":"NO SOURCE";
+        string src=_cam1.IsOpen?"CAMERA LIVE":_video!=null?"VIDEO DEMO":"NO SOURCE";
         TrackingModeText.Text=src+" | DETECTION: "+(_trackingEnabled?"ACTIVE":"OFF");
         bool dark=DarkModeBox.IsChecked==true;
         TrackingModeText.Foreground=new System.Windows.Media.SolidColorBrush(
@@ -142,8 +150,7 @@ public partial class MainWindow : System.Windows.Window
             RefreshCaptureMode();
             Directory.CreateDirectory(Path.GetDirectoryName(_themeFile)!);
             File.WriteAllText(_themeFile,dark?"dark":"light");
-            StatusText.Text=(dark?"Dark theme":"Light theme")
-                +" • presentation only; ADS and robot settings unchanged.";
+            StatusText.Text="Theme: "+(dark?"dark":"light");
         }
         catch(Exception ex){StatusText.Text="Theme error: "+ex.Message;}
     }
@@ -166,7 +173,7 @@ public partial class MainWindow : System.Windows.Window
         ReadinessStatus.Text="Checking TwinCAT symbols (READ ONLY)...";
         try {
             var plc=await Task.Run(()=>_bridge.InspectLiveReadiness());
-            bool frameReady=_directHik?.IsOpen==true && _directHik.FrameNumber>_lastHikFrame-1;
+            bool frameReady=_cam1.IsOpen && _cam1.Model.IsLive(DateTime.UtcNow,TimeSpan.FromSeconds(3));
             bool scaleReady=_options.FixedMmPerPixel>0;
             ReadinessStatus.Text=plc+" | Camera="+(frameReady?"LIVE":"UNVERIFIED")+
                " | Scale mm/px="+(scaleReady?"ENTERED (NOT COMMISSIONED)":"MISSING")+
@@ -277,19 +284,26 @@ public partial class MainWindow : System.Windows.Window
         FrameInfo.Text=source+"  |  "+image.Width+"x"+image.Height+"  |  LIVE VIEW / DETECTION OFF";
     }
 
-    // Navigation order: 0 LINE OVERVIEW, 1 STATION 01, 2 STATION 02, 3 SHARED CONVEYOR,
-    // 4 SETTINGS, 5 ALARMS & LOGS, 6 VISION WORKSPACE, 7 CAMERA / SOURCE.
+    // Visible navigation: LINE OVERVIEW, STATION 01, STATION 02, SHARED CONVEYOR,
+    // SETTINGS, ALARMS & LOGS. VISION WORKSPACE and CAMERA / SOURCE are QA-only and
+    // collapsed from the toolbar; the camera preparation lives in each station tab.
     private void OpenSettingsPage_Click(object sender,RoutedEventArgs e)
     {
         MainNavigation.SelectedItem=SettingsTab;
     }
     private void OpenMonitorPage_Click(object sender,RoutedEventArgs e)
     {
-        MainNavigation.SelectedItem=VisionOperationTab;
+        MainNavigation.SelectedItem=GantryDetailTab;
     }
     private void OpenVisionWorkspace_Click(object sender,RoutedEventArgs e)
     {
-        MainNavigation.SelectedItem=VisionOperationTab;
+        MainNavigation.SelectedItem=GantryDetailTab;
+    }
+    private void OpenQaSources_Click(object sender,RoutedEventArgs e)
+    {
+        // Hidden QA route: local video / SDK enumeration only, never a line command.
+        MainNavigation.SelectedItem=CameraSourceTab;
+        StatusText.Text="QA SOURCE PICKER: camera/video setup only. Not part of normal line operation.";
     }
 
     private void RefreshVideos()
@@ -338,7 +352,7 @@ public partial class MainWindow : System.Windows.Window
     {
         StopTrackingForSourceChange();
         StopVideo();ResetVideoSession();
-        _directHik?.Dispose();_directHik=null;_lastHikFrame=0;
+        DisconnectSlot(1);
         try
         {
             _video=new VideoCapture(path);
@@ -346,8 +360,8 @@ public partial class MainWindow : System.Windows.Window
             _paused=false;
             _timer.Start();
             RefreshCaptureMode();
-            MainNavigation.SelectedItem=VisionOperationTab;
-            StatusText.Text="VIDEO PLAYBACK: "+Path.GetFileName(path)+" | press START DETECTION to begin tracking.";
+            MainNavigation.SelectedItem=GantryDetailTab;
+            StatusText.Text="VIDEO PLAYBACK: "+Path.GetFileName(path)+" | press DETECT ON for tracking. Image-only test, no encoder sync.";
         }
         catch(Exception ex){StopVideo();RefreshCaptureMode();StatusText.Text="VIDEO: "+ex.Message;}
     }
@@ -361,129 +375,441 @@ public partial class MainWindow : System.Windows.Window
     {
         try
         {
-            StatusText.Text="Scanning HIK/Basler and GVCP using host IP "+HostIpBox.Text.Trim()+"...";
-            var found=new List<CameraInfo>();
-            foreach(var transport in new[]{CameraTransportType.GigE,CameraTransportType.Usb})
+            string hostIp=HostIpBox.Text.Trim();
+            string cameraIp=CameraIpBox.Text.Trim();
+            StatusText.Text="Scanning HIKROBOT/Basler GigE and read-only GVCP on "+hostIp+"...";
+
+            CameraScanResult result=await Task.Run(()=>_cam1.Scan(CameraTransportMode.Ip,cameraIp,hostIp));
+            CameraPicker.ItemsSource=result.Devices;
+            if(result.Devices.Count>0)
             {
-                _discovery.Enumerate(transport);
-                found.AddRange(_discovery.CameraList.Select(v=>new CameraInfo
-                {
-                    BackendIndex=v.BackendIndex,Transport=v.Transport,Vendor=v.Vendor,
-                    Name=v.Name,SerialNumber=v.SerialNumber,Index=found.Count
-                }));
+                CameraPicker.SelectedIndex=0;
+                if(!string.IsNullOrWhiteSpace(result.Devices[0].Address))CameraIpBox.Text=result.Devices[0].Address;
             }
-            IReadOnlyList<string> ipResults=Array.Empty<string>();
-            string gvcpError="";
-            try {
-                ipResults=await GvcpDiscovery.ScanAsync(HostIpBox.Text.Trim(),950);
-            } catch(Exception ex) {gvcpError=ex.Message;}
-            foreach(var ip in ipResults)
-            {
-                // Manual-IP device info is sentinel BackendIndex=-1, never passed to normal enumeration.
-                if(!found.Any(c=>c.Name.Contains(ip,StringComparison.OrdinalIgnoreCase)))
-                    found.Add(new CameraInfo{Vendor=CameraVendor.Hikvision,Transport=CameraTransportType.GigE,
-                        BackendIndex=-1,Index=found.Count,SerialNumber=ip,
-                        Name="HIKROBOT GigE (IP "+ip+")"});
-            }
-            CameraPicker.ItemsSource=found
-                .GroupBy(c=>c.Vendor+"|"+c.Transport+"|"+c.SerialNumber+"|"+c.BackendIndex)
-                .Select(g=>g.First()).ToList();
-            if(CameraPicker.Items.Count>0)CameraPicker.SelectedIndex=0;
-            if(ipResults.Count>0)CameraIpBox.Text=ipResults[0];
-            StatusText.Text=$"Camera: {CameraPicker.Items.Count} cameras; GVCP {ipResults.Count} IP"+(gvcpError==""?"":" | GVCP: "+gvcpError);
+
+            StatusText.Text="Camera: "+result.Summary+
+                (result.HasIssues?" | "+result.Issues[0].Label:"");
         }
         catch(Exception ex){StatusText.Text="Scan error: "+ex.Message;}
     }
-    private void ConnectCameraIp_Click(object sender,RoutedEventArgs e)
+    private bool _cameraUiReady;
+    private readonly bool[] _scannedSlots=new bool[3];
+
+    private CameraSlotModel SlotModel(int slot)=>slot==1?_cam1.Model:_cam2.Model;
+    private StationCameraController SlotController(int slot)=>slot==1?_cam1:_cam2;
+    private ComboBox SlotModeBox(int slot)=>slot==1?S1ModeBox:S2ModeBox;
+    private ComboBox SlotDeviceBox(int slot)=>slot==1?S1DeviceBox:S2DeviceBox;
+    private TextBox SlotIpBox(int slot)=>slot==1?S1CamIpBox:S2CamIpBox;
+    private TextBox SlotNicBox(int slot)=>slot==1?S1HostIpBox:S2HostIpBox;
+    private Button SlotScanButton(int slot)=>slot==1?S1ScanButton:S2ScanButton;
+    private Button SlotConnectButton(int slot)=>slot==1?S1ConnectButton:S2ConnectButton;
+    private Button SlotDisconnectButton(int slot)=>slot==1?S1DisconnectButton:S2DisconnectButton;
+    private TextBlock SlotStateText(int slot)=>slot==1?S1CamLinkText:S2CamLinkText;
+    private FrameworkElement SlotEmptyText(int slot)=>slot==1?S1CamEmpty:S2CamEmpty;
+    private ComboBox SlotVendorBox(int slot)=>slot==1?S1VendorBox:S2VendorBox;
+    private Expander SlotDetailsExpander(int slot)=>slot==1?S1DetailsExpander:S2DetailsExpander;
+    private TextBlock SlotDetailsHeader(int slot)=>slot==1?S1DetailsHeader:S2DetailsHeader;
+    private TextBlock SlotDetailsText(int slot)=>slot==1?S1DetailsText:S2DetailsText;
+    private bool SlotVendorIsBasler(int slot)=>SlotVendorBox(slot).SelectedIndex==1;
+
+    private static CameraTransportMode ModeOf(ComboBox box)=>
+        box.SelectedIndex==1?CameraTransportMode.Usb:CameraTransportMode.Ip;
+
+    private static int ModeIndex(CameraTransportMode mode)=>
+        mode==CameraTransportMode.Usb?1:0;
+
+    private void InitCameraSlots()
     {
-        try
-        {
-            string cameraIp=CameraIpBox.Text.Trim(), localIp=HostIpBox.Text.Trim();
-            if(!System.Net.IPAddress.TryParse(cameraIp,out var camAddr)
-              ||camAddr.AddressFamily!=System.Net.Sockets.AddressFamily.InterNetwork
-              ||!System.Net.IPAddress.TryParse(localIp,out var hostAddr)
-              ||hostAddr.AddressFamily!=System.Net.Sockets.AddressFamily.InterNetwork)
-                throw new ArgumentException("Enter valid IPv4 addresses for the camera and host Ethernet adapter.");
-            bool localAssigned=System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
-                .SelectMany(n=>n.GetIPProperties().UnicastAddresses)
-                .Any(a=>a.Address.Equals(hostAddr));
-            if(!localAssigned)throw new ArgumentException("Local IP "+localIp+" is not configured on any local network adapter. Do not change IP settings automatically.");
-            StopTrackingForSourceChange();
-            _directHik?.Dispose(); _directHik=null;
-            var next=new HikDirectIpCamera(cameraIp,localIp);
-            try {next.Open();} catch {next.Dispose();throw;}
-            foreach(var session in _sessions){try{session.Service.Dispose();}catch{}}
-            _sessions.Clear();
-            _directHik=next; _lastHikFrame=0;
-            StopVideo(); _paused=false; _timer.Start();
-            ResetDetectionHud();RefreshCaptureMode();
-            MainNavigation.SelectedItem=VisionOperationTab;
-            StatusText.Text="Connected to HIKROBOT "+cameraIp+" — LIVE VIEW. Press START DETECTION.";
-        }
-        catch(Exception ex) {RefreshCaptureMode();StatusText.Text="IP connection failed: "+ex.Message;}
+        _cameraUiReady=false;
+        ApplySavedSlot(1);ApplySavedSlot(2);
+        _cameraUiReady=true;
+        UpdateCameraSlotUi(1);UpdateCameraSlotUi(2);
     }
 
-    private void ConnectCamera_Click(object sender,RoutedEventArgs e)
+    private void ApplySavedSlot(int slot)
     {
-        if(CameraPicker.SelectedItem is CameraInfo info)
-        {
-            if(info.BackendIndex<0) {CameraIpBox.Text=info.SerialNumber;ConnectCameraIp_Click(sender,e);}
-            else Connect(info);
-        }
-        else StatusText.Text="Select a camera or enter an IP address.";
+        var saved=CameraSlotSettingsStore.Load(slot);
+        var model=SlotModel(slot);
+        model.Mode=saved.Mode;
+        model.IpText=saved.Ip;
+        SlotModeBox(slot).SelectedIndex=ModeIndex(saved.Mode);
+        SlotVendorBox(slot).SelectedIndex=SlotVendorIsBasler(slot)?1:0;
+        SlotIpBox(slot).Text=saved.Ip;
+        SlotNicBox(slot).Text=saved.Nic;
     }
-    private void ConnectAll_Click(object sender,RoutedEventArgs e)
+
+    private void SaveSlot(int slot)
     {
-        foreach(CameraInfo item in CameraPicker.Items)
-        {
-            if(item.BackendIndex<0){CameraIpBox.Text=item.SerialNumber;ConnectCameraIp_Click(sender,e);}
-            else Connect(item);
-        }
+        var model=SlotModel(slot);
+        CameraSlotSettingsStore.Save(slot,model.Mode,SlotIpBox(slot).Text.Trim(),
+            SlotNicBox(slot).Text.Trim(),model.Selected?.Key??"");
     }
-    private void Connect(CameraInfo info)
+
+    private void BindSlotDevices(int slot)
     {
-        if(_sessions.Any(s=>Same(s.Info,info)))return;
-        StopTrackingForSourceChange();
-        _directHik?.Dispose();_directHik=null;_lastHikFrame=0;
-        UnifiedCameraService? camera=null;
+        var model=SlotModel(slot);
+        var box=SlotDeviceBox(slot);
+        box.ItemsSource=null;
+        box.ItemsSource=model.FilteredDevices;
+        if(model.Selected is not null)box.SelectedItem=model.Selected;
+    }
+
+    private void S1ModeChanged(object sender,SelectionChangedEventArgs e)=>SlotModeChanged(1);
+    private void S2ModeChanged(object sender,SelectionChangedEventArgs e)=>SlotModeChanged(2);
+
+    private void SlotModeChanged(int slot)
+    {
+        if(!_cameraUiReady||_closing)return;
+        var model=SlotModel(slot);
+        model.Mode=ModeOf(SlotModeBox(slot));
+        model.IpText=SlotIpBox(slot).Text.Trim();
+        BindSlotDevices(slot);
+        UpdateCameraSlotUi(slot);
+        SaveSlot(slot);
+    }
+
+    private void S1DeviceChanged(object sender,SelectionChangedEventArgs e)=>SlotDeviceChanged(1);
+    private void S2DeviceChanged(object sender,SelectionChangedEventArgs e)=>SlotDeviceChanged(2);
+
+    private void SlotDeviceChanged(int slot)
+    {
+        if(!_cameraUiReady||_closing)return;
+        if(SlotDeviceBox(slot).SelectedItem is not CameraDevice device)return;
+        SlotModel(slot).SelectDevice(device.Key);
+        SaveSlot(slot);
+        UpdateCameraSlotUi(slot);
+    }
+    private void S1IpTextChanged(object sender,TextChangedEventArgs e)
+    {
+        if(!_cameraUiReady||_closing)return;
+        _cam1.Model.IpText=S1CamIpBox.Text.Trim();
+        UpdateCameraSlotUi(1);
+    }
+    private void S2IpTextChanged(object sender,TextChangedEventArgs e)
+    {
+        if(!_cameraUiReady||_closing)return;
+        _cam2.Model.IpText=S2CamIpBox.Text.Trim();
+        UpdateCameraSlotUi(2);
+    }
+
+    private async void S1Scan_Click(object sender,RoutedEventArgs e)=>await ScanSlotAsync(1);
+    private async void S2Scan_Click(object sender,RoutedEventArgs e)=>await ScanSlotAsync(2);
+
+    private async Task ScanSlotAsync(int slot)
+    {
+        if(slot==1?_scanBusy1:_scanBusy2)return;
+        if(slot==1)_scanBusy1=true;else _scanBusy2=true;
+        var controller=SlotController(slot);
+        var model=controller.Model;
+        int generation=model.ScanGeneration;
+        CameraTransportMode mode=model.Mode;
+        model.IpText=SlotIpBox(slot).Text.Trim();
+        model.MarkScanning();
+        UpdateCameraSlotUi(slot);
         try
         {
-            camera=new UnifiedCameraService();
-            camera.Enumerate(info.Transport);
-            if(!camera.Open(info))throw new Exception("Open refused by camera SDK");
-            camera.Start();
-            _sessions.Add(new(info,camera));
-            StopVideo();_paused=false;_timer.Start();
-            ResetDetectionHud();RefreshCaptureMode();
-            MainNavigation.SelectedItem=VisionOperationTab;
-            StatusText.Text="Connected: "+info.Name+" — LIVE VIEW. Press START DETECTION.";
+            string typedIp=SlotIpBox(slot).Text.Trim();
+            string nic=SlotNicBox(slot).Text.Trim();
+            CameraScanResult result=await Task.Run(()=>controller.Scan(mode,typedIp,nic));
+
+            // Mode changed while the SDK scan was running: the result is stale by definition.
+            if(model.ScanGeneration!=generation||model.Mode!=mode)return;
+
+            var devices=result.Devices.ToList();
+            if(mode==CameraTransportMode.Ip&&CameraTransportPolicy.IsValidAddress(typedIp)&&
+               !SlotVendorIsBasler(slot))
+            {
+                var manual=ManualHikDevice(typedIp);
+                if(devices.All(d=>d.Key!=manual.Key))devices.Add(manual);
+            }
+
+            model.SetScanResult(new CameraScanResult(devices,result.Issues));
+            _scannedSlots[slot]=true;
+            BindSlotDevices(slot);
+
+            if(model.Selected is null&&model.FilteredDevices.Count>0)
+            {
+                var first=model.FilteredDevices[0];
+                if(model.SelectDevice(first.Key))
+                {
+                    if(mode==CameraTransportMode.Ip&&!string.IsNullOrWhiteSpace(first.Address))
+                    {
+                        SlotIpBox(slot).Text=first.Address;
+                        model.IpText=first.Address;
+                    }
+                    SlotDeviceBox(slot).SelectedItem=first;
+                }
+            }
+
+            if(devices.Count==0)
+            {
+                if(result.HasIssues)model.MarkError(result.Issues[0].Summary);
+                else model.MarkOffline();
+            }
+            else model.MarkScanComplete();
+
+            StatusText.Text="CAM "+slot+": "+model.StatusText+
+                (result.HasIssues?" | "+result.Issues[0].Label:"");
         }
-        catch(Exception ex){camera?.Dispose();RefreshCaptureMode();StatusText.Text="Camera: "+ex.Message;}
+        catch(Exception ex){model.MarkError(ex.Message);}
+        finally
+        {
+            if(slot==1)_scanBusy1=false;else _scanBusy2=false;
+            UpdateCameraSlotUi(slot);
+        }
     }
-    private static bool Same(CameraInfo a,CameraInfo b)=>a.Vendor==b.Vendor&&a.Transport==b.Transport
-        &&a.SerialNumber==b.SerialNumber&&a.BackendIndex==b.BackendIndex;
-    private void DisconnectCameras_Click(object sender,RoutedEventArgs e)
+
+    private static CameraDevice ManualHikDevice(string ip)=>new(
+        "Hikvision","GigE","Hikrobot (manual IP)","IP:"+ip,ip,-1);
+
+    private void S1ConnectCamera_Click(object sender,RoutedEventArgs e)=>ConnectSlot(1);
+    private void S2ConnectCamera_Click(object sender,RoutedEventArgs e)=>ConnectSlot(2);
+
+    private void ConnectSlot(int slot)
+    {
+        var controller=SlotController(slot);
+        var model=controller.Model;
+        model.IpText=SlotIpBox(slot).Text.Trim();
+
+        if(model.Mode==CameraTransportMode.Ip&&model.Selected is null&&
+           CameraTransportPolicy.IsValidAddress(model.IpText))
+        {
+            if(SlotVendorIsBasler(slot))
+            {
+                StatusText.Text="BASLER typed IP is not supported: SCAN REQUIRED. Scan in IP mode and select the discovered Basler camera.";
+                UpdateCameraSlotUi(slot);
+                return;
+            }
+
+            var manual=ManualHikDevice(model.IpText);
+            var merged=model.Devices.Where(d=>d.BackendIndex>=0).Append(manual).ToList();
+            model.SetDevices(merged);
+            if(!model.SelectDevice(manual.Key))
+            {
+                StatusText.Text=model.LastError;
+                UpdateCameraSlotUi(slot);
+                return;
+            }
+            BindSlotDevices(slot);
+        }
+
+        var (ok,error)=model.ValidateBeforeConnect(_cameraOwnership);
+        if(!ok){StatusText.Text=error;UpdateCameraSlotUi(slot);return;}
+
+        StopTrackingForSourceChange();
+        if(slot==1)StopVideo();
+
+        string nic=SlotNicBox(slot).Text.Trim();
+        if(!controller.Connect(model.Selected!,model.Mode,model.IpText,nic,_cameraOwnership,out error))
+        {
+            StatusText.Text=error;
+            UpdateCameraSlotUi(slot);
+            return;
+        }
+
+        _paused=false;_timer.Start();
+        if(slot==1)
+        {
+            CameraIpBox.Text=model.IpText;
+            HostIpBox.Text=nic;
+            ResetDetectionHud();
+        }
+        UpdateCameraSlotUi(slot);
+        SaveSlot(slot);
+        StatusText.Text="CAM "+slot+" CONNECTED — WAITING FOR FRAME";
+    }
+
+    private void S1DisconnectCamera_Click(object sender,RoutedEventArgs e)=>DisconnectSlot(1);
+    private void S2DisconnectCamera_Click(object sender,RoutedEventArgs e)=>DisconnectSlot(2);
+
+    private void DisconnectSlot(int slot)
     {
         StopTrackingForSourceChange();
-        foreach(var s in _sessions){try{s.Service.Dispose();}catch{}}
-        _sessions.Clear();
-        _directHik?.Dispose();_directHik=null;_lastHikFrame=0;
-        if(_video==null)_timer.Stop();
-        _paused=false;
-        RefreshCaptureMode();
-        if(_video==null){Preview.Source=null;FrameInfo.Text="Camera disconnected";}
-        StatusText.Text="Camera disconnected; tracking stopped.";
+        SlotController(slot).Disconnect(_cameraOwnership);
+        if(slot==1)
+        {
+            _lastCam1Frame=0;
+            Preview.Source=null;
+            if(_video==null)FrameInfo.Text="No source";
+        }
+        else
+        {
+            _lastCam2Frame=0;
+            Station2Preview.Source=null;
+            Ov2CamImage.Source=null;
+        }
+        if(_video==null&&!_cam1.IsOpen&&!_cam2.IsOpen)_timer.Stop();
+        UpdateCameraSlotUi(slot);
+        SaveSlot(slot);
+        StatusText.Text="CAM "+slot+" OFFLINE";
+        UpdateStationOverviewVision();
     }
+
+    private void S1VisionStart_Click(object sender,RoutedEventArgs e)
+    {
+        StartTracking_Click(sender,e);
+        UpdateCameraSlotUi(1);
+    }
+    private void S1VisionStop_Click(object sender,RoutedEventArgs e)
+    {
+        StopTracking_Click(sender,e);
+        UpdateCameraSlotUi(1);
+    }
+
+    private void UpdateS1CameraLabels()=>UpdateCameraSlotUi(1);
+
+    private void UpdateCameraSlotUi(int slot)
+    {
+        if(!_cameraUiReady||_closing)return;
+        var controller=SlotController(slot);
+        var model=controller.Model;
+        bool open=controller.IsOpen;
+        bool fresh=model.IsLive(DateTime.UtcNow,TimeSpan.FromSeconds(3));
+        bool videoFresh=slot==1&&_video!=null&&
+            DateTime.UtcNow-_stationLastFrameUtc<=TimeSpan.FromSeconds(3);
+        bool shownFresh=fresh||videoFresh;
+        bool scannedEmpty=_scannedSlots[slot]&&model.Devices.Count==0;
+        bool hasIssues=model.ScanIssues.Count>0;
+
+        string state=model.DisplayState;
+        if(!open&&scannedEmpty)
+            state=hasIssues?"ERROR":model.Mode==CameraTransportMode.Usb?"NO USB CAMERA":"NO IP CAMERA";
+        else if(!open&&hasIssues&&!shownFresh)state="SCAN ERR";
+        if(videoFresh)state="VIDEO";
+        var color=DashBrush(shownFresh?"#39C7A2":
+            hasIssues||model.State==CameraSlotState.Error||model.State==CameraSlotState.Lost?"#FF6E70":
+            model.State==CameraSlotState.Offline?"#92AABE":"#F4BB45");
+        SlotStateText(slot).Text=state;
+        SlotStateText(slot).Foreground=color;
+        SlotModeBox(slot).IsEnabled=!open;
+        SlotVendorBox(slot).IsEnabled=!open;
+        SlotScanButton(slot).IsEnabled=!open&&(slot==1?!_scanBusy1:!_scanBusy2);
+        SlotDisconnectButton(slot).IsEnabled=open;
+
+        // CONNECT is only offered for a selected device that the policy can actually dispatch.
+        bool canConnect=!open&&model.Selected is not null&&
+            CameraTransportPolicy.CanDispatch(model.Selected,model.Mode,out _);
+        SlotConnectButton(slot).IsEnabled=canConnect;
+
+        bool showIp=model.Mode==CameraTransportMode.Ip;
+        if(slot==1)S1IpRow.Visibility=showIp?Visibility.Visible:Visibility.Collapsed;
+        else S2IpRow.Visibility=showIp?Visibility.Visible:Visibility.Collapsed;
+
+        string hint=model.State switch
+        {
+            CameraSlotState.Error=>model.LastError.Length>0?model.LastError:"SCAN ERROR",
+            CameraSlotState.Lost=>"NO FRAME",
+            CameraSlotState.Scanning=>"SCANNING",
+            CameraSlotState.Connecting=>"CONNECTING",
+            CameraSlotState.Connected=>"CONNECTED · NO FRAME",
+            _=>"OFFLINE · SCAN / CONNECT"
+        };
+        if(!open&&scannedEmpty)
+        {
+            if(hasIssues)hint=model.ScanIssues[0].Summary;
+            else if(model.Mode==CameraTransportMode.Ip&&SlotVendorIsBasler(slot))
+                hint="SCAN REQUIRED · BASLER typed IP is not supported; scan the camera in IP mode";
+            else if(model.Mode==CameraTransportMode.Usb)
+                hint="NO USB CAMERA · check the USB3 cable/port; Windows and pylon Viewer must list the camera";
+            else
+                hint="NO IP CAMERA · check camera power/link on the camera NIC and SCAN again";
+        }
+        if(slot==1)S1CamEmpty.Text=hint;else S2CamHint.Text=hint;
+        SlotEmptyText(slot).Visibility=shownFresh?Visibility.Collapsed:Visibility.Visible;
+
+        // Diagnostics stay hidden unless a scan recorded a vendor or GVCP failure.
+        bool showDetails=hasIssues;
+        SlotDetailsExpander(slot).Visibility=showDetails?Visibility.Visible:Visibility.Collapsed;
+        if(showDetails)
+        {
+            SlotDetailsHeader(slot).Text=model.ScanIssues[0].Label;
+            var details=new StringBuilder();
+            foreach(var issue in model.ScanIssues)
+            {
+                details.Append(issue.Label).Append(" · ").Append(issue.Transport)
+                       .Append(" · ").Append(issue.ErrorType).AppendLine();
+                details.AppendLine(issue.Message);
+                if(!string.IsNullOrWhiteSpace(issue.Details))details.AppendLine(issue.Details);
+                details.AppendLine();
+            }
+            SlotDetailsText(slot).Text=details.ToString().Trim();
+        }
+        else SlotDetailsText(slot).Text="";
+
+        if(slot==1)
+        {
+            Station1Preview.Opacity=shownFresh?1:.25;
+            Ov1CamImage.Opacity=shownFresh?1:.25;
+            Ov1CamEmpty.Text="CAM 1 "+hint;
+            Ov1CamEmpty.Visibility=shownFresh?Visibility.Collapsed:Visibility.Visible;
+            Ov1CamStatus.Text=fresh?"LIVE":videoFresh?"VIDEO":state;
+            S1CamBadge.Text="CAM 1";
+        }
+        else
+        {
+            Station2Preview.Visibility=fresh?Visibility.Visible:Visibility.Collapsed;
+            Ov2CamImage.Visibility=fresh?Visibility.Visible:Visibility.Collapsed;
+            Ov2CamEmpty.Visibility=fresh?Visibility.Collapsed:Visibility.Visible;
+            Ov2CamStatus.Text=state;
+            S2CamBadge.Text="CAM 2";
+        }
+    }
+
+    private void S1Overlay_SizeChanged(object sender,SizeChangedEventArgs e)=>RefreshPlateLabels();
+
+    private void ConnectCameraIp_Click(object sender,RoutedEventArgs e)
+    {
+        _cam1.Model.Mode=CameraTransportMode.Ip;
+        S1ModeBox.SelectedIndex=ModeIndex(CameraTransportMode.Ip);
+        S1CamIpBox.Text=CameraIpBox.Text.Trim();
+        S1HostIpBox.Text=HostIpBox.Text.Trim();
+        ConnectSlot(1);
+    }
+    private void ConnectCamera_Click(object sender,RoutedEventArgs e)
+    {
+        if(CameraPicker.SelectedItem is CameraInfo info)Connect(CameraInfoToDevice(info));
+        else StatusText.Text="Select a camera or enter an IP address.";
+    }
+    private void ConnectAll_Click(object sender,RoutedEventArgs e)=>ConnectCamera_Click(sender,e);
+    private void Connect(CameraInfo info)=>Connect(CameraInfoToDevice(info));
+
+    private void Connect(CameraDevice device)
+    {
+        var model=_cam1.Model;
+        model.Mode=device.Transport.Contains("USB",StringComparison.OrdinalIgnoreCase)
+            ?CameraTransportMode.Usb:CameraTransportMode.Ip;
+        S1ModeBox.SelectedIndex=ModeIndex(model.Mode);
+        var merged=model.Devices.Where(d=>d.Key!=device.Key).Append(device).ToList();
+        model.SetDevices(merged);
+        model.SelectDevice(device.Key);
+        BindSlotDevices(1);
+        ConnectSlot(1);
+    }
+
+    private static CameraDevice CameraInfoToDevice(CameraInfo info)=>new(
+        info.Vendor.ToString(),
+        info.Transport==CameraTransportType.Usb?"USB":"GigE",
+        info.Name,
+        info.SerialNumber,
+        "",
+        info.BackendIndex);
+
+    private void DisconnectCameras_Click(object sender,RoutedEventArgs e)=>DisconnectSlot(1);
+
     private void StopVideo()
     {
         _video?.Dispose();_video=null;
-        if(_sessions.Count==0 && _directHik==null)_timer.Stop();
+        if(!_cam1.IsOpen&&!_cam2.IsOpen)_timer.Stop();
     }
     private void OnTick(object? sender,EventArgs e)
     {
         if(_paused && _video!=null)return;
         try
         {
+            DateTime now=DateTime.UtcNow;
+            _cam1.RefreshState(now,TimeSpan.FromSeconds(3));
+            _cam2.RefreshState(now,TimeSpan.FromSeconds(3));
+
             if(_video!=null)
             {
                 using var frame=new Mat();
@@ -498,38 +824,43 @@ public partial class MainWindow : System.Windows.Window
                 if(_trackingEnabled)ProcessFrame(frame,frameLabel,true,"DEMO");
                 else PreviewOnly(frame,frameLabel);
             }
-            else if(_directHik!=null)
-            {
-                long frameId=_directHik.FrameNumber;
-                if(frameId>_lastHikFrame)
-                {
-                    using var image=_directHik.CloneLatestFrame();
-                    if(image!=null&&!image.Empty())
-                    {
-                        _lastHikFrame=frameId;
-                        string frameLabel="HIK IP "+_directHik.CameraIp+" #"+frameId;
-                        if(_trackingEnabled)ProcessFrame(image,frameLabel,true,"HIK/"+_directHik.CameraIp);
-                        else PreviewOnly(image,frameLabel);
-                    }
-                }
-                else if(!string.IsNullOrEmpty(_directHik.LastError))StatusText.Text=_directHik.LastError;
-            }
-            else if(_sessions.Count>0)
-            {
-                var chosen=CameraPicker.SelectedItem as CameraInfo;
-                foreach(var session in _sessions)
-                {
-                    using var frame=session.Service.CloneLatestFrame();
-                    if(frame==null||frame.Empty())continue;
-                    bool selected=chosen==null?ReferenceEquals(session,_sessions[0]):Same(session.Info,chosen);
-                    string sourceKey=session.Info.Vendor+"/"+session.Info.Transport+"/"+session.Info.SerialNumber+"/"+session.Info.BackendIndex;
-                    string frameLabel=session.Info.Name+" frame "+(++_frameNumber);
-                    if(_trackingEnabled)ProcessFrame(frame,frameLabel,selected,sourceKey);
-                    else if(selected)PreviewOnly(frame,frameLabel);
-                }
-            }
+            else PollCamera1();
+
+            PollCamera2();
+            UpdateCameraSlotUi(1);
+            UpdateCameraSlotUi(2);
         }
         catch(Exception ex){StatusText.Text="Frame error: "+ex.Message;}
+    }
+
+    private void PollCamera1()
+    {
+        if(!_cam1.IsOpen)return;
+        long id=_cam1.FrameNumber;
+        if(id==_lastCam1Frame)return;
+        using var image=_cam1.CloneLatestFrame();
+        if(image is null||image.Empty())return;
+        _lastCam1Frame=id;
+        _cam1.Model.MarkFrame(DateTime.UtcNow);
+        string frameLabel="CAM1 "+(id)+" #"+id;
+        string sourceKey="CAM1/"+(_cam1.Model.Selected?.Key??"manual");
+        if(_trackingEnabled)ProcessFrame(image,frameLabel,true,sourceKey);
+        else PreviewOnly(image,frameLabel);
+    }
+
+    private void PollCamera2()
+    {
+        if(!_cam2.IsOpen)return;
+        long id=_cam2.FrameNumber;
+        if(id==_lastCam2Frame)return;
+        using var image=_cam2.CloneLatestFrame();
+        if(image is null||image.Empty())return;
+        _lastCam2Frame=id;
+        var bmp=BitmapSourceConverter.ToBitmapSource(image);
+        bmp.Freeze();
+        Station2Preview.Source=bmp;
+        Ov2CamImage.Source=bmp;
+        _cam2.Model.MarkFrame(DateTime.UtcNow);
     }
     private MidlineTracker GetTracker(string source)
     {
@@ -603,12 +934,20 @@ public partial class MainWindow : System.Windows.Window
         if(!_trackingEnabled || _overlayImageWidth<=0 || _overlayImageHeight<=0)
         {
             PlateOverlay.Children.Clear();
+            S1Overlay.Children.Clear();
             return;
         }
         VisionLabelOverlay.Render(PlateOverlay,_overlayDetections,_overlayTrackIds,_options,
             _beltDirection,_overlayImageWidth,_overlayImageHeight,
             PlateOverlay.ActualWidth,PlateOverlay.ActualHeight,
             _labelPlacements,_overlaySourceKey,_lineFraction);
+        // Station 01 shows the same detection overlay over its own viewport; a separate
+        // placement tracker prevents the two surfaces from fighting over label offsets.
+        if(S1Overlay.ActualWidth>1 && S1Overlay.ActualHeight>1)
+            VisionLabelOverlay.Render(S1Overlay,_overlayDetections,_overlayTrackIds,_options,
+                _beltDirection,_overlayImageWidth,_overlayImageHeight,
+                S1Overlay.ActualWidth,S1Overlay.ActualHeight,
+                _labelPlacementsS1,_overlaySourceKey,_lineFraction);
     }
     private void PlateOverlay_SizeChanged(object sender,SizeChangedEventArgs e)
         => RefreshPlateLabels();
@@ -883,8 +1222,8 @@ public partial class MainWindow : System.Windows.Window
                 throw new InvalidOperationException("Disable the virtual FIFO before testing PLC BENCH; do not run them together.");
             if(!_trackingEnabled || !HasActiveSource)
                 throw new InvalidOperationException("Connect a video/camera and start detection before arming BENCH.");
-            if(_directHik!=null && _lastHikFrame<=0)
-                throw new InvalidOperationException("No valid live Hikrobot camera frame. BENCH denied.");
+            if(!_cam1.IsOpen||!_cam1.Model.IsLive(DateTime.UtcNow,TimeSpan.FromSeconds(3)))
+                throw new InvalidOperationException("No valid live CAM 1 frame. BENCH denied.");
             if(_options.FixedMmPerPixel<=0)throw new InvalidOperationException("Set CALIBRATED mm/px (nonzero) first; 50mm auto estimate cannot drive FIFO");
             var st=_bridge.ReadStatus();
             if(!st.SafeMode || st.ErrorCode!=0 || st.Count>=8)
@@ -968,8 +1307,8 @@ public partial class MainWindow : System.Windows.Window
         _timer.Stop();_adsTimer.Stop();_trackingEnabled=false;
         DisarmBench(); // Cancel auto BENCH handshake on window close.
         StopVideo();
-        _directHik?.Dispose();_directHik=null;
-        foreach(var s in _sessions){try{s.Service.Dispose();}catch{}}
+        _cam1.Dispose();_cam2.Dispose();
+        _cameraOwnership.Reset();
         _discovery.Dispose();
         base.OnClosed(e);
     }

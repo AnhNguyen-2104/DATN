@@ -1,0 +1,48 @@
+﻿DATN READ-ONLY CHECK / HOST=AML-IPC / TIME=2026-10-22T19:42:19.9178503+07:00
+SAFETY: audit only; hardware dual-channel EStop has NOT been verified by this script.
+=== NIC ===
+Ethernet 3 Status=Disconnected Speed=0 bps MAC=78-D0-04-2B-02-3B
+Ethernet 4 Status=Up Speed=100 Mbps MAC=C4-00-AD-2B-34-25
+PLC-Q NIC IPv4=192.168.3.40/24
+Active local 192.168.3.0/24 route count=0
+=== TWINCAT ADS STATES AND TAGS (READ ONLY) ===
+Port 10000 ADS=Run DeviceState=1
+Port 851 ADS=Run DeviceState=0
+TAG MAIN.bSystemEStopOK = True
+TAG GVL_MD200_IO.bEStopFeedback = True
+TAG MAIN.bSystemStopRequested = False
+TAG MAIN.bMD200_Start = False
+TAG MAIN.bBeltSpeedMapReady = False
+TAG MAIN.nBeltSpeedMapState = 0
+TAG MAIN.bBeltCalibrationVerified = False
+TAG MAIN.rBeltMeasuredMmPerHz = 0
+TAG MAIN.rMD200_SetSpeed_mm_s = 10
+TAG MAIN.rMD200_SetFrequency_Hz = 0
+TAG MAIN.nMD200_SpeedInputState = 10
+TAG GVL_MD200_IO.bRUN_DO = False
+TAG GVL_MD200_IO.nAO1_Raw = 0
+TAG MAIN.rConveyorSpeed = 0
+TAG MAIN.rConveyorDist = 0
+TAG MAIN.nEncoderPulse = 53978
+TAG MAIN.bPlcQConnected = False
+TAG MAIN.nPlcQErrorID = 2147952460
+TAG MAIN.bServo_Enable = False
+TAG MAIN.bServo_Ready = False
+TAG MAIN.bHmiLinkFresh = False
+TAG MAIN.bHmiCamera1Ready = False
+TAG MAIN.bHmiTracking1Ready = False
+TAG MAIN.bVisionFeedVerified = False
+TAG MAIN.bLineAutoAccepted = False
+TAG MAIN.bLegacyMotionPublisherAllow = False
+TAG MAIN.bAutoDispatchArm = False
+=== OFFLINE CONFIGURATION ===
+Source cQueueMotionCommissioned=FALSE : True
+Source cLineAutoCommissioned=FALSE : True
+Source cBeltMmSCommissioned=FALSE : True
+Encoder source 0.476475=True
+CSharp ProductionCommandSourceApproved disarmed=True
+XML active_links=43 module_IO_links=23 old_device2_owners=0
+=== DECISION ===
+READ-ONLY / OFFLINE TESTS: eligible with normal software controls.
+PHYSICAL MOTION: NO-GO. EtherCAT per-slave OP, certified hardwired EStop, servo NC pairing, encoder calibration, PLC-Q connection and HMI command commissioning require independent verification.
+THIS SCRIPT DOES NOT AUTHORIZE START OR ALTER ANY PLC/HARDWARE STATE.

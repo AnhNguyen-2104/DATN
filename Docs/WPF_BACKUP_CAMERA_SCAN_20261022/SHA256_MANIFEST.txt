@@ -1,0 +1,38 @@
+﻿# WPF CAMERA SCAN BACKUP 20261022
+# Source workspace: E:\Orca\DATN
+# SHA-256 manifest (baseline before DATN-CAMERA-SCAN-CONNECT-FIX-20261022)
+
+455ecb348aff5ccdc3e9057d3740f338317c89db9979f322afdacbaf354059bd  App\Vision\MainWindow.xaml
+2a0da475f222473c11ed0ba99805239ec2cf3c114c6bde19882002a2167db8dd  App\Vision\MainWindow.xaml.cs
+10c51d61c1a360db14841ad23a1fff38e8badc98b47c250c946bc5195c068640  App\Vision\Vision\StationCameraController.cs
+8a387c5e59e2f2ccbf9ca27cfe04a6f2fb403a32c0bf43a0fea0c7c6547945a2  App\Vision\Vision\CameraSlotModel.cs
+6496f3b6a885b8e4ef15af4c02e492e920b4740ad672612867e92144e01b19d9  App\Vision\Vision\GvcpDiscovery.cs
+28f15b251c4325360567cce639c18d411f077608154b01044456b193106cb1b4  App\Tests\Program.cs
+86618e285a3a1b4bb603c79253ea2060adf01da8c1bd6a21a53e83d329f34ab5  Dependencies\Devices\UnifiedCameraService.cs
+a030c698d229e686aad06ce2509dea5339a85daae0240457949584b6368bae50  Dependencies\Devices\HikCameraService.cs
+9431aaf926a1da70278670d56a0a8cd1c71c064cf40f7adb52fedc0220ec7d87  Dependencies\BaslerCamera\BaslerCameraService.cs
+
+## git status --short (baseline)
+ M App/PlateVision50.sln
+ M App/Tests/Program.cs
+ M App/Tests/Tests.csproj
+ M App/Vision/Dashboard.cs
+ M App/Vision/MainWindow.xaml
+ M App/Vision/MainWindow.xaml.cs
+ M App/Vision/StationDashboards.cs
+ M App/Vision/StationOverview.cs
+AM PLC/TwinCAT/DATN.project.~u
+ M PLC/TwinCAT/DATN/DATN.tsproj
+?? App/Vision/Vision/CameraSlotModel.cs
+?? App/Vision/Vision/LineInterlock.cs
+?? App/Vision/Vision/StationCameraController.cs
+?? Docs/BUILD_FIX_20261021/
+?? Docs/ORCA_DUAL_STATION_CAMERA_UI_RESULT_20261022.md
+?? Docs/ORCA_DUAL_STATION_USB_GIGE_MINIMAL_UI_20261022.md
+?? Docs/ORCA_FIX_CAMERA_SCAN_IP_USB_ONLY_20261022.md
+?? Docs/ORCA_STATION02_BASLER_USB3_ADDENDUM_20261022.md
+?? Docs/ORCA_STATION_INTERLOCK_IMPLEMENTATION_RESULT_20261021.md
+?? Docs/ORCA_STATION_INTERLOCK_WPF_TASK_20261021.md
+?? Docs/WPF_BACKUP_20261021_STATION_INTERLOCK/
+?? Docs/WPF_BACKUP_CAMERA_SCAN_20261022/
+?? Docs/WPF_BACKUP_DUAL_CAMERA_20261022/
