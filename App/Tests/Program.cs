@@ -2210,5 +2210,30 @@ var benchItem = (Event: trigEvent, Pose: (poseX: e2ePose.CenterX_mm, poseY: e2eP
 Check("live bench contract: scalar tuple preserves CenterX", Math.Abs(benchItem.Pose.poseX - 0.0) < 1e-4);
 Check("live bench contract: scalar tuple preserves CenterY", Math.Abs(benchItem.Pose.poseY - 0.0) < 1e-4);
 Check("live bench contract: scalar tuple preserves Theta", Math.Abs(benchItem.Pose.poseTheta - 0.0) < 1e-4);
+
+// 21. Camera Slot Persistence Regression: SaveSlot must preserve model.Mode and not hardcode CameraTransportMode.Ip
+string mwPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "App", "Vision", "MainWindow.xaml.cs");
+if (!File.Exists(mwPath))
+{
+    mwPath = Path.Combine("App", "Vision", "MainWindow.xaml.cs");
+}
+Check("slot regression: MainWindow.xaml.cs exists for source audit", File.Exists(mwPath));
+if (File.Exists(mwPath))
+{
+    string mwContent = File.ReadAllText(mwPath);
+    int saveSlotIndex = mwContent.IndexOf("void SaveSlot(int slot)");
+    Check("slot regression: SaveSlot method found in MainWindow.xaml.cs", saveSlotIndex >= 0);
+    if (saveSlotIndex >= 0)
+    {
+        int methodEnd = mwContent.IndexOf("}", saveSlotIndex);
+        string saveSlotMethod = mwContent.Substring(saveSlotIndex, methodEnd - saveSlotIndex + 1);
+
+        bool hardcodesIp = System.Text.RegularExpressions.Regex.IsMatch(saveSlotMethod, @"CameraTransportMode\s+mode\s*=\s*CameraTransportMode\.Ip\s*;");
+        bool preservesModelMode = saveSlotMethod.Contains("model.Mode");
+
+        Check("slot regression: SaveSlot does not hardcode CameraTransportMode.Ip", !hardcodesIp);
+        Check("slot regression: SaveSlot preserves model.Mode when saving slot settings", preservesModelMode);
+    }
+}
 Console.WriteLine("TOTAL_TEST_FAILURES="+failed);
 return failed==0?0:1;

@@ -497,7 +497,7 @@ public partial class MainWindow : System.Windows.Window
     {
         var model=SlotModel(slot);
         string vendor=SlotVendorIsBasler(slot)?"Basler":"Hikrobot";
-        CameraTransportMode mode=CameraTransportMode.Ip;
+        CameraTransportMode mode=model.Mode;
         string ipText=SlotIpBox(slot).Text.Trim();
         CameraSlotSettingsStore.Save(slot,mode,ipText,
             SlotNicBox(slot).Text.Trim(),model.Selected?.Key??"",vendor);
