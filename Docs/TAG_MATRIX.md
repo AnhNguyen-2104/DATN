@@ -20,21 +20,39 @@ Legend: R = read-only on Dashboard; W = operator action only; RESERVED = planned
 | GVL_MD200_IO.bRUN_DO | R | ST-2318 slot10 DO0 actual output image |
 
 ## 3. GANTRY / CAMERA 1
+| Symbol PLC | Direction | Purpose |
+|---|---|---|
+| MAIN.bPlcQConnected | R | PLC-Q Mitsubishi Ethernet MC socket connected |
+| MAIN.bPlcQError | R | PLC-Q MC socket communication error |
+| MAIN.nPlcQErrorID | R | PLC-Q MC socket raw error ID (UDINT) |
 | MAIN.bVisionFeedVerified | R | Vision-to-PLC verification; not HMI Start |
-| MAIN.nQueueCount | R | TwinCAT camera FIFO count |
-| MAIN.nQueueHeadProductID | R | Head product ID |
+| MAIN.nQueueCount | R | TwinCAT camera FIFO count (0..8) |
+| MAIN.nQueueHeadProductID | R | Head product ID in FIFO |
 | MAIN.nQueueAccepted | R | Accumulated queued products |
 | MAIN.nQueueMissed | R | Missed product count |
+| MAIN.nQueueRealCompleted | R | Completed products confirmed after 4 ACKs |
+| MAIN.rQueueHeadX_mm | R | Current X of head product in FIFO (mm) |
+| MAIN.rQueueHeadY_mm | R | Current Y of head product in FIFO (mm) |
+| MAIN.fbPublisher.rTargetX_mm | R | Interception target X for current vertex (mm) |
+| MAIN.fbPublisher.rTargetY_mm | R | Target Y for current vertex (mm) |
 | MAIN.bLegacyMotionPublisherAllow | R | Gate to legacy QD75 dispatcher, OFF by default |
-| MAIN.bGlueCycleBusy | R | Robot execution state |
+| MAIN.bGlueCycleBusy | R | Robot execution state (states 10..45) |
 | MAIN.bGlueCycleDone | R | Completed 4-vertex operation |
 | MAIN.bGlueCycleError | R | Gantry error status |
 | MAIN.nGlueCurVertex | R | 1-4 vertex index |
-| MAIN.nGlueErrorCode | R | Gantry diagnosis |
+| MAIN.nGlueErrorCode | R | Gantry diagnosis (501..503, 900..930) |
+| MAIN.nGlueCommErrorID | R | Raw MC protocol communication error ID |
+| MAIN.bStopCommandConfirmed | R | Verified TCP ACK for M1000=OFF and M105=ON |
+| MAIN.nAutoDispatchState | R | Auto dispatch state machine step |
 | MAIN.bStartGlueCycle | no HMI writing | QD75 motion; commissioning required |
 | MAIN.bCameraTrigger / MAIN.rCameraCenterX,Y / MAIN.rCameraAngleDeg | vision bridge | Camera pose and trigger stage |
-Contract on Mitsubishi: D100..D114; M1000 START held till M1001 ACK; M105 software cancel only.
-Do not use M100/M101 (Mitsubishi homing); independent safety stop is hardwired.
+
+### Gantry Telemetry Limitations & Unmapped Signals:
+- **Actual Tool Center Point (TCP X, Y, Z, Rz)**: NOT available in TwinCAT PLC image. Mitsubishi QD75 buffer memory Md.20 (actual current feed value) is not streamed over MC protocol. Displayed in WPF as `--` / `UNAVAILABLE`. Do NOT invent or estimate actual live TCP.
+- **Homed Status**: NOT available in TwinCAT. Homing is controlled in Mitsubishi ladder `MAIN` via `M100/M101` and is unmapped to TwinCAT ADS.
+- **Drive Ready**: `MAIN.bServo_Ready` belongs to the EziServo rotary axis (Degree), NOT the Gantry QD75 robot ready status. Actual QD75 drive ready is `X0` internal to PLC-Q.
+- Contract on Mitsubishi: D100..D114; M1000 START held till M1001 ACK; M105 software cancel only.
+- Safety: ST-1228 DI0 is auxiliary feedback, not certified E-stop. Software cancel (M105) does not replace physical hardwired E-stop chains.
 
 ## 4. SCARA / CAMERA 2 — RESERVED
 Planned tags, NOT currently defined and NOT used for PLC writes:
@@ -75,3 +93,28 @@ New declarations in existing PLC/TwinCAT/DATN/PLC1/POUs/MAIN.TcPOU, compiled in 
 - Belt status (planned R): MAIN.nBeltCommandResult / rBeltCalculatedSet_Hz / rBeltAppliedSpeed_mm_s. Actual speed remains MAIN.rConveyorSpeed (mm/s).
 - Compile gates cLineAutoCommissioned / cBeltMmSCommissioned / cQueueMotionCommissioned are all FALSE; runtime remains unchanged. DO NOT write new symbols via ADS until authorized deployment/commissioning.
 Read Docs/TWINCAT_LINE_MASTER_HMI_CONTRACT_20261021.md for exact protocol and safety restrictions.
+
+## 8. VISION POSE TRACKING & 4-VERTEX GANTRY OFFLINE CONTRACT (2026-10-29)
+- Spec reference: `docs/superpowers/specs/2026-10-29-tracking-four-point-gantry-design.md`
+- Implementation plan: `docs/superpowers/plans/2026-10-29-tracking-four-point-gantry.md`
+- Audit checkpoint: `Docs/CHECKPOINT_20261029_TRACKING_4PT_GANTRY.md`
+- Contract records: `ConveyorVertex` (Index 1..4), `TrackedWorkpiecePose` (in `App/Vision/Vision/BeltCoordinates.cs`).
+- Canonical Quadrants: V1 (+halfX, +halfY, Quad I), V2 (-halfX, +halfY, Quad II), V3 (-halfX, -halfY, Quad III), V4 (+halfX, -halfY, Quad IV) counter-clockwise in Cartesian conveyor coordinates.
+- Offline SIL Simulation: `CameraPipelineSimulator.Accept` receives measured vertices and preserves them into `Receipt.Corners`.
+- Measured GlueMm/GluePx propagation: contour vertices mapped via `BeltCoordinates.MapVertices`, carried in `TrackedWorkpiecePose`, passed to `CameraPipelineSimulator.Accept`, and verified end-to-end without fallback synthesis when measured points are valid.
+- Motion command: 15-word binary packing (`D100..D114`) conforming to Mitsubishi QD75 buffer memory layout:
+  - D100..D101: Target X ($0.1\ \mu\text{m}$, 1 mm = 10,000)
+  - D102..D103: Target Y ($0.1\ \mu\text{m}$, 1 mm = 10,000)
+  - D104..D105: Target Z Down ($0.1\ \mu\text{m}$)
+  - D106..D107: Speed Approach ($0.01\text{ mm/min}$)
+  - D108..D109: Speed Sync ($0.01\text{ mm/min}$)
+  - D110..D111: DeltaX Sync ($0.1\ \mu\text{m}$)
+  - D112..D113: Target Z Safe ($0.1\ \mu\text{m}$)
+  - D114: Vertex Index (1..4)
+- Safety Boundary: Zero ADS writes to `MAIN.bStartGlueCycle` or `MAIN.bTest_WriteM1000`. Hardware motion strictly disarmed by compile-time gate `MAIN.bLegacyMotionPublisherAllow = FALSE`.
+- Remaining Commissioning Prerequisites:
+  1. Fast hardware encoder latch: Strobe/flash out of camera to Crevis ST-5114 counter module for exact `EncoderAtExposure_mm`.
+  2. Physical camera calibration: Laser/caliper survey of `rCameraToWorkStart_mm` ($200.0\text{ mm}$ nominal) and lateral offset `rCameraOffsetY_mm` ($85.0\text{ mm}$ nominal).
+  3. Crevis ST-5114 mm/count calibration against 1-meter physical belt run.
+  4. GX Works2 PLC-Q verification: Single-writer verification for Y20 (Servo 1 enable/brake in `MAIN`) vs Y25 (physical glue pump trigger in `FB_TrackingMotion`), M1000/M1001 handshake verification.
+  5. Certified physical emergency stop chain and mechanical overtravel limit inspection.

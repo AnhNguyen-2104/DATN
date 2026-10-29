@@ -22,6 +22,19 @@ Operating contracts: Docs\TAG_MATRIX.md, Docs\build_single_instance.log
 3. GANTRY+Camera1: HIK/Basler/video detection, trigger 50% FOV, PID tracking,
    read live FIFO and Mitsubishi PLC-Q status. Robot start/move not enabled
    by dashboard; real M1000/M1001 handshake and calibration require commissioning.
+   - 4-Vertex Planar Tracking Contract (2026-10-29): Canonical counter-clockwise Cartesian quadrant
+     vertices V1..V4 (Quad I..IV) computed via BeltCoordinates.MapVertices.
+   - Offline SIL Simulation: Propagates measured GlueMm/GluePx through CameraPipelineSimulator into
+     Receipt.Corners and generates 15-word binary QD75 motion command payloads (D100..D114:
+     target X/Y in 0.1 µm, approach/sync speeds in 0.01 mm/min, vertex index 1..4).
+   - Zero ADS Writes: ZERO writes to MAIN.bStartGlueCycle or MAIN.bTest_WriteM1000; motion publisher
+     remains disarmed by compile-time gate MAIN.bLegacyMotionPublisherAllow = FALSE.
+   - Docs & Spec: docs/superpowers/specs/2026-10-29-tracking-four-point-gantry-design.md,
+     docs/superpowers/plans/2026-10-29-tracking-four-point-gantry.md,
+     Docs/CHECKPOINT_20261029_TRACKING_4PT_GANTRY.md, Docs/TAG_MATRIX.md.
+   - Commissioning Prerequisites (Unverified): Crevis ST-5114 exposure hardware encoder latch,
+     physical laser survey for camera offsets (nominal 200 mm travel, 85 mm lateral), GX Works2
+     verification of Y20 (Servo/Brake) vs Y25 (Glue pump trigger), and physical safety sign-off.
 4. SCARA+Camera2: RESERVED, disabled/no fake ONLINE state, future deployment.
    Share same conveyor encoder; maintain own camera, robot queue and acknowledgements.
    SCARA PLC commands must be separated from Gantry and never reuse M1000 blindly.

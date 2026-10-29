@@ -55,3 +55,18 @@
 - Có thêm App/Tests/Tests.csproj, build pass.
 - Thư mục Visual Studio cũ Desktop/PlateVision50_V2 đã chuyển vào D sau khi xác minh VS Insiders mở chính DATN/App/PlateVision50.sln.
 - Các thư mục TwinCAT_AI_OFFLINE và TwinCAT_Original rỗng sau lưu trữ đã được dọn khi Windows giải phóng handle; tất cả dữ liệu đều trên ổ D.
+
+## 7. CẬP NHẬT 2026-10-29 — VISION POSE TRACKING & 4-VERTEX GANTRY OFFLINE CONTRACT
+- Đặc tả kỹ thuật: `docs/superpowers/specs/2026-10-29-tracking-four-point-gantry-design.md`.
+- Kế hoạch triển khai: `docs/superpowers/plans/2026-10-29-tracking-four-point-gantry.md`.
+- Biên bản nghiệm thu offline: `Docs/CHECKPOINT_20261029_TRACKING_4PT_GANTRY.md`.
+- Ma trận biến ADS/PLC: `Docs/TAG_MATRIX.md` (Mục 8).
+- Hợp đồng 4 đỉnh chuẩn tắc (Canonical 4 Vertices): Cấu trúc `ConveyorVertex` (Index 1..4) và `TrackedWorkpiecePose` trong `App/Vision/Vision/BeltCoordinates.cs`, ánh xạ theo 4 góc phần tư hệ trục Descartes ngược chiều kim đồng hồ: V1 (+halfX, +halfY, Quad I), V2 (-halfX, +halfY, Quad II), V3 (-halfX, -halfY, Quad III), V4 (+halfX, -halfY, Quad IV).
+- Truyền tọa độ đo đạc quang học (Measured GlueMm/GluePx): Tọa độ đo thực tế được ánh xạ qua `BeltCoordinates.MapVertices`, lưu trong `TrackedWorkpiecePose` và đưa vào mô phỏng SIL qua `CameraPipelineSimulator.Accept` -> `Receipt.Corners`. Không fallback về kích thước danh định 40x40 mm trừ khi dữ liệu đo bị null hoặc suy biến.
+- Khung lệnh chuyển động Mitsubishi QD75: Đóng gói 15-word nhị phân `D100..D114` (tọa độ vị trí X, Y, Z đơn vị $0.1\ \mu\text{m}$, vận tốc $0.01\text{ mm/min}$, chỉ số đỉnh 1..4) khớp với cấu trúc bộ đệm QD75.
+- Ranh giới an toàn (Zero ADS writes): 0 lần ghi ADS tới `MAIN.bStartGlueCycle` hoặc `MAIN.bTest_WriteM1000`. Cổng phát lệnh phần cứng `MAIN.bLegacyMotionPublisherAllow = FALSE` giữ nguyên.
+- Điều kiện tiền đề nghiệm thu phần cứng còn lại (Chưa thực hiện trên máy thật):
+  1. Chốt xung encoder phần cứng ST-5114 theo tín hiệu phơi sáng camera (Exposure hardware latch).
+  2. Đo đạc hiệu chuẩn vật lý bằng laser/thước cặp cho cự ly camera - bàn gantry ($200.0\text{ mm}$) và độ lệch ngang ($85.0\text{ mm}$).
+  3. Đối chiếu chương trình thang PLC Mitsubishi trong GX Works2: kiểm tra đơn quyền điều khiển ngõ ra Y20 (Servo enable/phanh) vs Y25 (kích van bơm keo), kiểm tra handshake M1000/M1001.
+  4. Nghiệm thu mạch E-stop phần cứng và giới hạn hành trình trục trước khi kích hoạt chuyển động thật.
