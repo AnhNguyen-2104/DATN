@@ -1,3 +1,4 @@
+using PlateVision50.TwinCAT;
 using OpenCvSharp;
 using PlateVision50.Vision;
 using PlateVision50.Trigger;
@@ -5,6 +6,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Net;
+using WpfYolo_DotNet.Devices;
 int failed=0;
 void Check(string name,bool value){Console.WriteLine((value?"PASS ":"FAIL ")+name);if(!value)failed++;}
 Check("fixed nominal K UI: 100 mm/s previews 15.00 Hz",LineSpeedPreset.NominalPreviewHz(100).Contains("15.00 Hz"));
@@ -453,25 +455,121 @@ Check("interlock: mock off restores production NotReady on failed check",
     Check("camera mode: only Usb and Ip remain, no Auto",
         camModeNames.Length==2&&camModeNames.Contains("Usb")&&camModeNames.Contains("Ip")&&
         !camModeNames.Any(m=>m.Contains("auto",StringComparison.OrdinalIgnoreCase)));
-    Check("camera mode: station 1 defaults to IP and station 2 to USB",
+    Check("camera mode: station 1 and station 2 both default to IP",
         CameraSlotDefaults.DefaultMode(1)==CameraTransportMode.Ip&&
-        CameraSlotDefaults.DefaultMode(2)==CameraTransportMode.Usb);
+        CameraSlotDefaults.DefaultMode(2)==CameraTransportMode.Ip);
+    Check("camera vendor: station 1 defaults to Basler and station 2 to Hikrobot",
+        CameraSlotDefaults.DefaultVendor(1)=="Basler"&&
+        CameraSlotDefaults.DefaultVendor(2)=="Hikrobot");
     Check("camera mode: slot models start in their station default with no scan issues",
         new CameraSlotModel(1,"Station 01").Mode==CameraTransportMode.Ip&&
-        new CameraSlotModel(2,"Station 02").Mode==CameraTransportMode.Usb&&
+        new CameraSlotModel(2,"Station 02").Mode==CameraTransportMode.Ip&&
         new CameraSlotModel(2,"Station 02").ScanIssues.Count==0);
     Check("camera mode: legacy Auto, blank and invalid values migrate to the station default",
         CameraSlotDefaults.MigrateMode(null,1)==CameraTransportMode.Ip&&
         CameraSlotDefaults.MigrateMode("Auto",1)==CameraTransportMode.Ip&&
-        CameraSlotDefaults.MigrateMode("auto",2)==CameraTransportMode.Usb&&
+        CameraSlotDefaults.MigrateMode("auto",2)==CameraTransportMode.Ip&&
         CameraSlotDefaults.MigrateMode("AUTO",1)==CameraTransportMode.Ip&&
-        CameraSlotDefaults.MigrateMode("",2)==CameraTransportMode.Usb&&
+        CameraSlotDefaults.MigrateMode("",2)==CameraTransportMode.Ip&&
         CameraSlotDefaults.MigrateMode("nonsense",1)==CameraTransportMode.Ip);
     Check("camera mode: saved USB and IP survive migration case-insensitively",
         CameraSlotDefaults.MigrateMode("USB",1)==CameraTransportMode.Usb&&
         CameraSlotDefaults.MigrateMode("usb",2)==CameraTransportMode.Usb&&
         CameraSlotDefaults.MigrateMode("IP",2)==CameraTransportMode.Ip&&
         CameraSlotDefaults.MigrateMode("ip",1)==CameraTransportMode.Ip);
+    Check("camera vendor: legacy, null and invalid values migrate to the station default",
+        CameraSlotDefaults.MigrateVendor(null,1)=="Basler"&&
+        CameraSlotDefaults.MigrateVendor("Auto",1)=="Basler"&&
+        CameraSlotDefaults.MigrateVendor("",2)=="Hikrobot"&&
+        CameraSlotDefaults.MigrateVendor("Hikvision",1)=="Hikrobot"&&
+        CameraSlotDefaults.MigrateVendor("Basler",2)=="Basler");
+    Check("vendor recognition: Basler recognized case-insensitively and trimmed",
+        CameraTransportPolicy.IsBaslerVendor("Basler") &&
+        CameraTransportPolicy.IsBaslerVendor("basler") &&
+        CameraTransportPolicy.IsBaslerVendor("BASLER") &&
+        CameraTransportPolicy.IsBaslerVendor("  Basler  "));
+    Check("vendor recognition: Basler rejects Hik, unknown vendors, and empty/null",
+        !CameraTransportPolicy.IsBaslerVendor("Hikrobot") &&
+        !CameraTransportPolicy.IsBaslerVendor("Hikvision") &&
+        !CameraTransportPolicy.IsBaslerVendor("Sony") &&
+        !CameraTransportPolicy.IsBaslerVendor("") &&
+        !CameraTransportPolicy.IsBaslerVendor("   ") &&
+        !CameraTransportPolicy.IsBaslerVendor(null));
+    Check("vendor recognition: Hikrobot and Hikvision recognized case-insensitively and trimmed",
+        CameraTransportPolicy.IsHikVendor("Hikvision") &&
+        CameraTransportPolicy.IsHikVendor("hikvision") &&
+        CameraTransportPolicy.IsHikVendor("HIKVISION") &&
+        CameraTransportPolicy.IsHikVendor("Hikrobot") &&
+        CameraTransportPolicy.IsHikVendor("hikrobot") &&
+        CameraTransportPolicy.IsHikVendor("HIKROBOT") &&
+        CameraTransportPolicy.IsHikVendor("  Hikrobot  ") &&
+        CameraTransportPolicy.IsHikVendor("  Hikvision  "));
+    Check("vendor recognition: Hik rejects Basler, unknown vendors, and empty/null",
+        !CameraTransportPolicy.IsHikVendor("Basler") &&
+        !CameraTransportPolicy.IsHikVendor("Sony") &&
+        !CameraTransportPolicy.IsHikVendor("FLIR") &&
+        !CameraTransportPolicy.IsHikVendor("") &&
+        !CameraTransportPolicy.IsHikVendor(null));
+    Check("vendor recognition: Basler and Hik recognition are mutually exclusive",
+        !(CameraTransportPolicy.IsBaslerVendor("Hikrobot") && CameraTransportPolicy.IsHikVendor("Hikrobot")) &&
+        !(CameraTransportPolicy.IsBaslerVendor("Basler") && CameraTransportPolicy.IsHikVendor("Basler")));
+    Check("vendor key compatibility: Basler accepts Basler keys and rejects Hik keys",
+        CameraSlotDefaults.IsKeyCompatibleWithVendor("BASLER|40098765", "Basler") &&
+        CameraSlotDefaults.IsKeyCompatibleWithVendor("basler|40098765", "Basler") &&
+        !CameraSlotDefaults.IsKeyCompatibleWithVendor("HIKROBOT|DA7403922", "Basler") &&
+        !CameraSlotDefaults.IsKeyCompatibleWithVendor("HIKVISION|00F12345", "Basler") &&
+        !CameraSlotDefaults.IsKeyCompatibleWithVendor("HIK|1234", "Basler") &&
+        !CameraSlotDefaults.IsKeyCompatibleWithVendor("", "Basler") &&
+        !CameraSlotDefaults.IsKeyCompatibleWithVendor(null, "Basler"));
+    Check("vendor key compatibility: Hikrobot accepts Hik keys and rejects Basler keys",
+        CameraSlotDefaults.IsKeyCompatibleWithVendor("HIKROBOT|DA7403922", "Hikrobot") &&
+        CameraSlotDefaults.IsKeyCompatibleWithVendor("HIKVISION|00F12345", "Hikrobot") &&
+        CameraSlotDefaults.IsKeyCompatibleWithVendor("hikrobot|da7403922", "Hikrobot") &&
+        !CameraSlotDefaults.IsKeyCompatibleWithVendor("BASLER|40098765", "Hikrobot") &&
+        !CameraSlotDefaults.IsKeyCompatibleWithVendor("basler|40098765", "Hikrobot") &&
+        !CameraSlotDefaults.IsKeyCompatibleWithVendor("", "Hikrobot") &&
+        !CameraSlotDefaults.IsKeyCompatibleWithVendor(null, "Hikrobot"));
+
+    // Camera slot normalization (reproducing persisted camera_slots.json regression)
+    var claimedTestKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var normS1 = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.1", "", "HIKROBOT|J95682667", "Basler", claimedTestKeys);
+    var normS2 = CameraSlotDefaults.NormalizeSlot(2, "Ip", "169.254.113.1", "", "HIKROBOT|J95682667", "Hikrobot", claimedTestKeys);
+
+    Check("camera slot normalization: slot 1 Basler normalizes to IP mode, blanks mismatched Hikrobot IP and clears key",
+        normS1.Mode == CameraTransportMode.Ip &&
+        string.IsNullOrEmpty(normS1.Ip) &&
+        string.IsNullOrEmpty(normS1.DeviceKey) &&
+        normS1.Vendor == "Basler");
+
+    var claimedBaslerKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var normBaslerS1 = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.5", "", "BASLER|40098765", "Basler", claimedBaslerKeys);
+    Check("camera slot normalization: slot 1 Basler normalizes to IP mode and preserves valid Basler IP and identity",
+        normBaslerS1.Mode == CameraTransportMode.Ip &&
+        normBaslerS1.Ip == "169.254.113.5" &&
+        normBaslerS1.DeviceKey == "BASLER|40098765" &&
+        normBaslerS1.Vendor == "Basler");
+
+    Check("camera slot normalization: slot 2 Hikrobot normalizes to IP mode, preserves 169.254.113.1 with actual Hikrobot key",
+        normS2.Mode == CameraTransportMode.Ip &&
+        normS2.Ip == "169.254.113.1" &&
+        normS2.DeviceKey == "HIKROBOT|J95682667" &&
+        normS2.Vendor == "Hikrobot");
+
+    Check("camera slot normalization: slot 1 and slot 2 do not share any device key",
+        string.IsNullOrEmpty(normS1.DeviceKey) || normS1.DeviceKey != normS2.DeviceKey);
+
+    var claimedDupKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var normDup1 = CameraSlotDefaults.NormalizeSlot(1, "Usb", "", "", "BASLER|40098765", "Basler", claimedDupKeys);
+    var normDup2 = CameraSlotDefaults.NormalizeSlot(2, "Ip", "169.254.113.1", "", "BASLER|40098765", "Hikrobot", claimedDupKeys);
+    Check("camera slot normalization: clears duplicate and vendor-mismatched key on slot 2",
+        normDup1.DeviceKey == "BASLER|40098765" && string.IsNullOrEmpty(normDup2.DeviceKey) && string.IsNullOrEmpty(normDup2.Ip));
+
+    var claimedDupIps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var claimedDupKeys2 = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var normDupIp1 = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.1", "", "BASLER|40098765", "Basler", claimedDupKeys2, claimedDupIps);
+    var normDupIp2 = CameraSlotDefaults.NormalizeSlot(2, "Ip", "169.254.113.1", "", "HIKROBOT|DA7403922", "Hikrobot", claimedDupKeys2, claimedDupIps);
+    Check("camera slot normalization: enforces IP deduplication across slots",
+        normDupIp1.Ip == "169.254.113.1" && string.IsNullOrEmpty(normDupIp2.Ip));
 
     Check("camera policy: Basler and Hikvision USB/GigE supported",
         CameraTransportPolicy.IsSupported(camBaslerUsb)&&CameraTransportPolicy.IsSupported(camHikGigE)&&
@@ -534,6 +632,86 @@ Check("interlock: mock off restores production NotReady on failed check",
         CameraTransportPolicy.MatchesMode(camHikrobotGigE,CameraTransportMode.Ip)&&
         !CameraTransportPolicy.MatchesMode(camHikrobotGigE,CameraTransportMode.Usb)&&
         !CameraTransportPolicy.MatchesMode(camBaslerUsb,CameraTransportMode.Ip));
+    Check("transport matching: USB mode matches USB/USB3 variants and rejects GigE/IP/unsupported",
+        CameraTransportPolicy.MatchesMode(Cam("Basler", "USB", "B-1", "m"), CameraTransportMode.Usb) &&
+        CameraTransportPolicy.MatchesMode(Cam("Basler", "USB3", "B-2", "m"), CameraTransportMode.Usb) &&
+        CameraTransportPolicy.MatchesMode(Cam("Hikrobot", "usb", "H-1", "m"), CameraTransportMode.Usb) &&
+        !CameraTransportPolicy.MatchesMode(Cam("Basler", "GigE", "B-3", "m"), CameraTransportMode.Usb) &&
+        !CameraTransportPolicy.MatchesMode(Cam("Hikrobot", "IP", "H-2", "m"), CameraTransportMode.Usb) &&
+        !CameraTransportPolicy.MatchesMode(Cam("Basler", "CameraLink", "B-4", "m"), CameraTransportMode.Usb) &&
+        !CameraTransportPolicy.MatchesMode(Cam("Basler", "", "B-5", "m"), CameraTransportMode.Usb));
+    Check("transport matching: IP mode matches GigE/IP variants and rejects USB/unsupported",
+        CameraTransportPolicy.MatchesMode(Cam("Basler", "GigE", "B-1", "m"), CameraTransportMode.Ip) &&
+        CameraTransportPolicy.MatchesMode(Cam("Hikrobot", "gige", "H-1", "m"), CameraTransportMode.Ip) &&
+        CameraTransportPolicy.MatchesMode(Cam("Hikvision", "IP", "H-2", "m"), CameraTransportMode.Ip) &&
+        CameraTransportPolicy.MatchesMode(Cam("Basler", "GigE Vision", "B-2", "m"), CameraTransportMode.Ip) &&
+        !CameraTransportPolicy.MatchesMode(Cam("Basler", "USB", "B-3", "m"), CameraTransportMode.Ip) &&
+        !CameraTransportPolicy.MatchesMode(Cam("Hikrobot", "USB3", "H-3", "m"), CameraTransportMode.Ip) &&
+        !CameraTransportPolicy.MatchesMode(Cam("Basler", "CoaXPress", "B-4", "m"), CameraTransportMode.Ip) &&
+        !CameraTransportPolicy.MatchesMode(Cam("Basler", "", "B-5", "m"), CameraTransportMode.Ip));
+    Check("transport matching: null camera device matches neither mode",
+        !CameraTransportPolicy.MatchesMode(null!, CameraTransportMode.Usb) &&
+        !CameraTransportPolicy.MatchesMode(null!, CameraTransportMode.Ip));
+
+    var dBaslerUsb = Cam("Basler", "USB", "B-U", "acA");
+    var dBaslerGigE = Cam("Basler", "GigE", "B-G", "acA", 0, "169.254.113.5");
+    var dHikrobotUsb = Cam("Hikrobot", "USB", "HR-U", "MV-U");
+    var dHikrobotGigE = Cam("Hikrobot", "GigE", "HR-G", "MV-G", 0, "169.254.113.1");
+    var dHikvisionUsb = Cam("Hikvision", "USB", "HV-U", "MV-U");
+    var dHikvisionGigE = Cam("Hikvision", "GigE", "HV-G", "MV-G", 0, "169.254.113.1");
+
+    Check("dispatch matrix: Basler USB allowed in USB and rejected in IP",
+        CameraTransportPolicy.CanDispatch(dBaslerUsb, CameraTransportMode.Usb, out var rBU_U) && rBU_U.Length == 0 &&
+        !CameraTransportPolicy.CanDispatch(dBaslerUsb, CameraTransportMode.Ip, out var rBU_I) &&
+        rBU_I.Contains("IP mode") && rBU_I.Contains("GigE"));
+    Check("dispatch matrix: Basler GigE allowed in IP and rejected in USB",
+        CameraTransportPolicy.CanDispatch(dBaslerGigE, CameraTransportMode.Ip, out var rBG_I) && rBG_I.Length == 0 &&
+        !CameraTransportPolicy.CanDispatch(dBaslerGigE, CameraTransportMode.Usb, out var rBG_U) &&
+        rBG_U.Contains("USB mode") && rBG_U.Contains("USB transport"));
+    Check("dispatch matrix: Hikrobot USB allowed in USB and rejected in IP",
+        CameraTransportPolicy.CanDispatch(dHikrobotUsb, CameraTransportMode.Usb, out var rHU_U) && rHU_U.Length == 0 &&
+        !CameraTransportPolicy.CanDispatch(dHikrobotUsb, CameraTransportMode.Ip, out var rHU_I) &&
+        rHU_I.Contains("IP mode") && rHU_I.Contains("GigE"));
+    Check("dispatch matrix: Hikrobot GigE allowed in IP and rejected in USB",
+        CameraTransportPolicy.CanDispatch(dHikrobotGigE, CameraTransportMode.Ip, out var rHG_I) && rHG_I.Length == 0 &&
+        !CameraTransportPolicy.CanDispatch(dHikrobotGigE, CameraTransportMode.Usb, out var rHG_U) &&
+        rHG_U.Contains("USB mode") && rHG_U.Contains("USB transport"));
+    Check("dispatch matrix: Hikvision USB allowed in USB and rejected in IP",
+        CameraTransportPolicy.CanDispatch(dHikvisionUsb, CameraTransportMode.Usb, out _) &&
+        !CameraTransportPolicy.CanDispatch(dHikvisionUsb, CameraTransportMode.Ip, out _));
+    Check("dispatch matrix: Hikvision GigE allowed in IP and rejected in USB",
+        CameraTransportPolicy.CanDispatch(dHikvisionGigE, CameraTransportMode.Ip, out _) &&
+        !CameraTransportPolicy.CanDispatch(dHikvisionGigE, CameraTransportMode.Usb, out _));
+
+    var manHikrobotDirect = new CameraDevice("Hikrobot", "GigE", "MV-CS016", "HR-IP-1", "169.254.113.1", -1);
+    var gvcpHikrobotDirect = new CameraDevice("Hikrobot", "GigE", "MV-CS016", "HR-GVCP", "169.254.113.1", -2);
+    var manHikvisionDirect = new CameraDevice("Hikvision", "GigE", "MV-CA050", "HV-IP-1", "169.254.113.1", -1);
+    var gvcpHikvisionDirect = new CameraDevice("Hikvision", "GigE", "MV-CA050", "HV-GVCP", "169.254.113.1", -2);
+    var manBaslerDirect = new CameraDevice("Basler", "GigE", "acA1300", "B-IP-1", "169.254.113.5", -1);
+    var gvcpBaslerDirect = new CameraDevice("Basler", "GigE", "acA1300", "B-GVCP", "169.254.113.5", -2);
+
+    Check("manual-IP policy: Hikrobot manual IP (-1) and GVCP direct (-2) are dispatchable in IP mode",
+        CameraTransportPolicy.CanDispatchManual(manHikrobotDirect, out var rManHR) && rManHR.Length == 0 &&
+        CameraTransportPolicy.CanDispatch(manHikrobotDirect, CameraTransportMode.Ip, out _) &&
+        CameraTransportPolicy.CanDispatchManual(gvcpHikrobotDirect, out var rGvcpHR) && rGvcpHR.Length == 0 &&
+        CameraTransportPolicy.CanDispatch(gvcpHikrobotDirect, CameraTransportMode.Ip, out _));
+    Check("manual-IP policy: Hikvision manual IP (-1) and GVCP direct (-2) are dispatchable in IP mode",
+        CameraTransportPolicy.CanDispatchManual(manHikvisionDirect, out _) &&
+        CameraTransportPolicy.CanDispatch(manHikvisionDirect, CameraTransportMode.Ip, out _) &&
+        CameraTransportPolicy.CanDispatchManual(gvcpHikvisionDirect, out _) &&
+        CameraTransportPolicy.CanDispatch(gvcpHikvisionDirect, CameraTransportMode.Ip, out _));
+    Check("manual-IP policy: Basler manual IP (-1) is rejected as SCAN REQUIRED with action hint",
+        !CameraTransportPolicy.CanDispatchManual(manBaslerDirect, out var rManBasler) &&
+        rManBasler.Contains("SCAN REQUIRED", StringComparison.OrdinalIgnoreCase) &&
+        rManBasler.Contains("Only Hikrobot/Hikvision", StringComparison.OrdinalIgnoreCase) &&
+        !CameraTransportPolicy.CanDispatch(manBaslerDirect, CameraTransportMode.Ip, out _));
+    Check("manual-IP policy: Basler GVCP direct (-2) is rejected as SCAN REQUIRED",
+        !CameraTransportPolicy.CanDispatchManual(gvcpBaslerDirect, out var rGvcpBasler) &&
+        rGvcpBasler.Contains("SCAN REQUIRED", StringComparison.OrdinalIgnoreCase) &&
+        !CameraTransportPolicy.CanDispatch(gvcpBaslerDirect, CameraTransportMode.Ip, out _));
+    Check("manual-IP policy: scanned Basler GigE (index >= 0) is never blocked by manual restriction",
+        CameraTransportPolicy.CanDispatchManual(dBaslerGigE, out var rScanBasler) && rScanBasler.Length == 0 &&
+        CameraTransportPolicy.CanDispatch(dBaslerGigE, CameraTransportMode.Ip, out _));
 
     foreach(string camValid in new[]{"169.254.113.1","10.0.0.1","0.0.0.0","255.255.255.255"," 192.168.1.20 ","gige-cam-01","camera01.plant.local","HIK-CAM"})
         Check("camera address accepted: "+camValid,CameraTransportPolicy.IsValidAddress(camValid));
@@ -563,6 +741,78 @@ Check("interlock: mock off restores production NotReady on failed check",
         camPartialScan.HasIssues&&camPartialScan.Summary.Length>0);
     Check("scan result: issue summary stays nonempty for the details pane",
         camPartialScan.Issues[0].Summary.Length>0&&camPartialScan.Summary.Length>0);
+    var issueHikvision = new CameraScanIssue("Hikvision", "GigE", "Timeout", "Device 169.254.113.1 unreachable", "detail");
+    var issueHikrobotLower = new CameraScanIssue("hikrobot", "usb", "", "Failed to open device", "detail");
+    var issueBaslerLower = new CameraScanIssue("basler", "USB", "PylonError", "Enumeration failed", "detail");
+    var issueGvcpLower = new CameraScanIssue("gvcp", "GigE", "SocketError", "Port 3956 in use", "detail");
+    var issueUnknownVendor = new CameraScanIssue("Sony", "USB", "NotSupported", "Unknown vendor", "detail");
+    var issueEmptyVendor = new CameraScanIssue("", "GigE", "UnknownError", "Generic error", "detail");
+    var issueNullVendor = new CameraScanIssue(null!, "USB", "Err", "Null vendor", "detail");
+    var issueMultiline = new CameraScanIssue("Basler", "GigE", "PylonError", "Line 1\r\nLine 2\nLine 3", "detail");
+    var issueNoTransport = new CameraScanIssue("GVCP", "", "SocketError", "Discovery failed", "detail");
+
+    Check("scan issues: Hikvision and lowercase hikrobot labelled HIK SDK ERROR",
+        issueHikvision.Label == "HIK SDK ERROR" && issueHikrobotLower.Label == "HIK SDK ERROR");
+    Check("scan issues: lowercase basler labelled BASLER SDK ERROR",
+        issueBaslerLower.Label == "BASLER SDK ERROR");
+    Check("scan issues: lowercase gvcp labelled GVCP ERROR",
+        issueGvcpLower.Label == "GVCP ERROR");
+    Check("scan issues: unknown vendor labelled with uppercase vendor name",
+        issueUnknownVendor.Label == "SONY ERROR");
+    Check("scan issues: empty or null vendor labelled CAMERA ERROR",
+        issueEmptyVendor.Label == "CAMERA ERROR" && issueNullVendor.Label == "CAMERA ERROR");
+    Check("scan issues: summary format includes uppercase transport, message, and error type",
+        issueHikvision.Summary == "HIK SDK ERROR · GIGE: Device 169.254.113.1 unreachable [Timeout]");
+    Check("scan issues: summary omits error type brackets when error type is empty",
+        issueHikrobotLower.Summary == "HIK SDK ERROR · USB: Failed to open device");
+    Check("scan issues: summary replaces CRLF and LF newlines with spaces",
+        issueMultiline.Summary == "BASLER SDK ERROR · GIGE: Line 1  Line 2 Line 3 [PylonError]");
+    Check("scan issues: summary omits transport separator when transport is empty",
+        issueNoTransport.Summary == "GVCP ERROR: Discovery failed [SocketError]");
+
+    // MVS native runtime loader regression tests
+    var mvsComputedPath1 = MvsNativeLoader.ComputePrependedPath(@"C:\Windows;C:\Tools", @"C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64", is64BitProcess: true);
+    Check("mvs loader: prepends runtime dir to path",
+        mvsComputedPath1.StartsWith(@"C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64;C:\Windows;C:\Tools", StringComparison.OrdinalIgnoreCase));
+
+    var mvsComputedPath2 = MvsNativeLoader.ComputePrependedPath(
+        @"C:\Program Files (x86)\Common Files\MVS\Runtime\Win32_i86;C:\Windows",
+        @"C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64",
+        is64BitProcess: true);
+    Check("mvs loader: filters Win32_i86 from path in 64-bit mode",
+        !mvsComputedPath2.Contains("Win32_i86", StringComparison.OrdinalIgnoreCase) &&
+        mvsComputedPath2.StartsWith(@"C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64", StringComparison.OrdinalIgnoreCase));
+
+    var mvsComputedPath3 = MvsNativeLoader.ComputePrependedPath(
+        @"C:\Windows;C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64;C:\Tools",
+        @"C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64",
+        is64BitProcess: true);
+    Check("mvs loader: deduplicates existing runtime directory when prepending",
+        mvsComputedPath3 == @"C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64;C:\Windows;C:\Tools");
+
+    Check("mvs loader: handles empty path cleanly",
+        MvsNativeLoader.ComputePrependedPath("", @"C:\MVS", true) == @"C:\MVS");
+    Check("mvs loader: handles empty directory cleanly",
+        MvsNativeLoader.ComputePrependedPath(@"C:\Windows", "", true) == @"C:\Windows");
+
+    Check("mvs loader: standard path ends with Win64_x64",
+        MvsNativeLoader.GetStandardCommonFilesPath().EndsWith(@"MVS\Runtime\Win64_x64", StringComparison.OrdinalIgnoreCase));
+
+    Check("mvs loader: invalid runtime directory returns false",
+        !MvsNativeLoader.IsValidRuntimeDirectory(null) &&
+        !MvsNativeLoader.IsValidRuntimeDirectory(@"C:\Nonexistent_Directory_12345"));
+
+    var mvsDiscovered = MvsNativeLoader.DiscoverRuntime();
+    Check("mvs loader: discovers installed x64 runtime on host",
+        mvsDiscovered != null && File.Exists(Path.Combine(mvsDiscovered, "MvCameraControl.dll")));
+
+    bool mvsEnsured = MvsNativeLoader.Ensure();
+    Check("mvs loader: Ensure returns true and populates RuntimeDirectory",
+        mvsEnsured && !string.IsNullOrWhiteSpace(MvsNativeLoader.RuntimeDirectory));
+
+    var mvsProcPath = Environment.GetEnvironmentVariable("PATH") ?? "";
+    Check("mvs loader: process PATH starts with discovered runtime directory",
+        mvsProcPath.StartsWith(MvsNativeLoader.RuntimeDirectory!, StringComparison.OrdinalIgnoreCase));
 
     // Real captured GVCP DISCOVERY_ACK from MV-CS016-10GC serial DA7403922 (read-only intro).
     const string camGvcpAckHex=
@@ -619,17 +869,69 @@ Check("interlock: mock off restores production NotReady on failed check",
     Check("camera slots: scan order is USB then GigE then model",
         camSlot.Devices.Count==3&&camSlot.Devices[0].Key==camBaslerUsb.Key&&
         camSlot.Devices[1].Key==camUvc.Key&&camSlot.Devices[2].Key==camHikGigE.Key);
-    Check("camera slots: default IP mode lists only the GigE device",
-        camSlot.FilteredDevices.Count==1&&camSlot.FilteredDevices[0].Key==camHikGigE.Key);
     camSlot.Mode=CameraTransportMode.Usb;
-    Check("camera slots: USB mode filters to USB transport",
+    Check("camera slots: default USB mode lists USB devices",
         camSlot.FilteredDevices.Count==2&&camSlot.FilteredDevices.All(d=>d.Transport.Contains("USB")));
-    var camUsbCount=camSlot.FilteredDevices.Count;
     camSlot.Mode=CameraTransportMode.Ip;
+    Check("camera slots: IP mode filters to GigE transport",
+        camSlot.FilteredDevices.Count==1&&camSlot.FilteredDevices[0].Key==camHikGigE.Key);
     var camIpCount=camSlot.FilteredDevices.Count;
+    camSlot.Mode=CameraTransportMode.Usb;
+    var camUsbCount=camSlot.FilteredDevices.Count;
     Check("camera slots: USB plus IP filtering covers every scanned device",
         camUsbCount==2&&camIpCount==1&&camUsbCount+camIpCount==camSlot.Devices.Count);
+    camSlot.Mode=CameraTransportMode.Ip;
     Check("camera slots: GigE device selects in IP mode",camSlot.SelectDevice(camHikGigE.Key));
+    // AutoSelectForSlot station remap: Slot 1 prefers/requires Basler, Slot 2 prefers/requires Hikrobot
+    var s1Slot = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Usb };
+    s1Slot.SetDevices(new[] { camBaslerUsb, Cam("Hikvision", "USB", "HK-U", "MV-USB") });
+    var s1Chosen = s1Slot.AutoSelectForSlot(1);
+    Check("station remap: slot 1 AutoSelectForSlot selects Basler when both vendors present",
+        s1Chosen is not null && CameraTransportPolicy.IsBaslerVendor(s1Chosen.Vendor));
+    var s1HikOnlySlot = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Usb };
+    s1HikOnlySlot.SetDevices(new[] { Cam("Hikvision", "USB", "HK-U", "MV-USB") });
+    var s1HikReject = s1HikOnlySlot.AutoSelectForSlot(1);
+    Check("station remap: slot 1 AutoSelectForSlot rejects Hikrobot when no Basler present",
+        s1HikReject is null && s1HikOnlySlot.Selected is null);
+    var s2Slot = new CameraSlotModel(2, "Station 02") { Mode = CameraTransportMode.Ip };
+    s2Slot.SetDevices(new[] { camBaslerUsb, camHikGigE });
+    var s2Chosen = s2Slot.AutoSelectForSlot(2);
+    Check("station remap: slot 2 AutoSelectForSlot selects Hikrobot when both vendors present",
+        s2Chosen is not null && CameraTransportPolicy.IsHikVendor(s2Chosen.Vendor));
+    var s2BaslerOnlySlot = new CameraSlotModel(2, "Station 02") { Mode = CameraTransportMode.Ip };
+    s2BaslerOnlySlot.SetDevices(new[] { Cam("Basler", "GigE", "B-G", "acA", 0, "10.0.0.3") });
+    var s2BaslerReject = s2BaslerOnlySlot.AutoSelectForSlot(2);
+    Check("station remap: slot 2 AutoSelectForSlot rejects Basler when no Hikrobot present",
+        s2BaslerReject is null && s2BaslerOnlySlot.Selected is null);
+    var s1MixedGigE = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip };
+    s1MixedGigE.SetDevices(new[] { dHikrobotGigE, dBaslerGigE });
+    Check("station remap: slot 1 AutoSelectForSlot selects Basler GigE over Hikrobot GigE in IP mode",
+        s1MixedGigE.AutoSelectForSlot(1)?.Key == dBaslerGigE.Key);
+    var s1HikGigEOnly = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip };
+    s1HikGigEOnly.SetDevices(new[] { dHikrobotGigE });
+    Check("station remap: slot 1 AutoSelectForSlot rejects Hikrobot GigE in IP mode",
+        s1HikGigEOnly.AutoSelectForSlot(1) is null && s1HikGigEOnly.Selected is null);
+    var s2HikvisionSlot = new CameraSlotModel(2, "Station 02") { Mode = CameraTransportMode.Usb };
+    s2HikvisionSlot.SetDevices(new[] { dBaslerUsb, dHikvisionUsb });
+    Check("station remap: slot 2 AutoSelectForSlot accepts Hikvision vendor in USB mode",
+        s2HikvisionSlot.AutoSelectForSlot(2)?.Key == dHikvisionUsb.Key);
+    var s2BaslerGigEOnly = new CameraSlotModel(2, "Station 02") { Mode = CameraTransportMode.Ip };
+    s2BaslerGigEOnly.SetDevices(new[] { dBaslerGigE });
+    Check("station remap: slot 2 AutoSelectForSlot rejects Basler GigE in IP mode",
+        s2BaslerGigEOnly.AutoSelectForSlot(2) is null && s2BaslerGigEOnly.Selected is null);
+
+    var slotManualTest = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip };
+    slotManualTest.SetDevices(new[] { manHikrobotDirect, manBaslerDirect, dBaslerGigE });
+    Check("slot selection: Hikrobot direct IP device selects successfully in IP mode",
+        slotManualTest.SelectDevice(manHikrobotDirect.Key) &&
+        slotManualTest.Selected?.Key == manHikrobotDirect.Key &&
+        slotManualTest.LastError.Length == 0);
+    Check("slot selection: Basler direct IP device is rejected by SelectDevice with SCAN REQUIRED",
+        !slotManualTest.SelectDevice(manBaslerDirect.Key) &&
+        slotManualTest.LastError.Contains("SCAN REQUIRED", StringComparison.OrdinalIgnoreCase));
+    Check("slot selection: scanned Basler GigE device selects successfully in IP mode",
+        slotManualTest.SelectDevice(dBaslerGigE.Key) &&
+        slotManualTest.Selected?.Key == dBaslerGigE.Key);
     camSlot.SetDevices(new[]{camBaslerUsb,camHikGigE,camUvc,camHikGigE});
     Check("camera slots: duplicate scan keys are deduplicated",camSlot.Devices.Count==3);
     Check("camera slots: selection survives a rescan containing it",
@@ -686,7 +988,7 @@ Check("interlock: mock off restores production NotReady on failed check",
     var camNoDevice=camEmptySlot.ValidateBeforeConnect(new CameraOwnershipRegistry());
     Check("camera slots: connect without a device rejected",
         !camNoDevice.ok&&camNoDevice.error=="Select a camera device");
-    var camModeSlot=new CameraSlotModel(1,"Camera 01");
+    var camModeSlot=new CameraSlotModel(2,"Camera 02");
     camModeSlot.SetDevices(new[]{camBaslerUsb,camHikGigE});
     camModeSlot.IpText="169.254.113.1";
     Check("camera slots: IP default keeps the GigE selection",
@@ -702,7 +1004,7 @@ Check("interlock: mock off restores production NotReady on failed check",
     camModeSlot.Mode=CameraTransportMode.Ip;
     Check("camera slots: switching back to IP clears the USB selection",
         camModeSlot.Selected is null&&camModeSlot.FilteredDevices.Count==1&&camModeSlot.FilteredDevices[0].Key==camHikGigE.Key);
-    var camDirectSlot=new CameraSlotModel(1,"Camera 01");
+    var camDirectSlot=new CameraSlotModel(2,"Camera 02");
     camDirectSlot.SetDevices(new[]{camHikrobotGigE});
     camDirectSlot.IpText="169.254.113.1";
     Check("camera slots: GVCP-identified Hikrobot direct device is selectable",
@@ -1245,6 +1547,207 @@ Check("ADS failure: failed SET speed write is reported and NOT successful",
     !failedSpeedResult.Success && failedSpeedResult.Message.Contains("speed setpoint not written"));
 Check("ADS failure: SET pulse is NEVER asserted after failed speed write",
     !failedSpeedWrite.Writes.Any(w => w.Symbol == "MAIN.bHmiBeltSetReq" && (bool)w.Value));
+// 14. Gantry Robot Telemetry: Source Symbols & Quality Classification
+string[] gantrySymbols = {
+    "MAIN.bPlcQError",
+    "MAIN.nPlcQErrorID",
+    "MAIN.nGlueCommErrorID",
+    "MAIN.bStopCommandConfirmed",
+    "MAIN.nAutoDispatchState",
+    "MAIN.nQueueRealCompleted",
+    "MAIN.rQueueHeadX_mm",
+    "MAIN.rQueueHeadY_mm",
+    "MAIN.fbPublisher.rTargetX_mm",
+    "MAIN.fbPublisher.rTargetY_mm"
+};
+foreach (var sym in gantrySymbols)
+{
+    Check($"gantry symbol registered in KnownSourceSymbols: {sym}",
+        LineMailboxProtocol.KnownSourceSymbols.Contains(sym));
+    Check($"gantry symbol quality SOURCE_ONLY when offline: {sym}",
+        LineMailboxProtocol.ClassifyQuality(sym, false) == "SOURCE_ONLY");
+    Check($"gantry symbol quality LIVE when present: {sym}",
+        LineMailboxProtocol.ClassifyQuality(sym, true) == "LIVE");
+}
+
+// 15. Gantry Read-Only Telemetry Safety & Actual TCP / Homed Unmapped Contract
+var gantryTransport = new FakeAdsMailboxTransport();
+gantryTransport.SetSymbol("MAIN.bPlcQError", false);
+gantryTransport.SetSymbol("MAIN.nPlcQErrorID", 0u);
+gantryTransport.SetSymbol("MAIN.nGlueCommErrorID", 0u);
+gantryTransport.SetSymbol("MAIN.bStopCommandConfirmed", true);
+gantryTransport.SetSymbol("MAIN.nAutoDispatchState", (short)10);
+gantryTransport.SetSymbol("MAIN.nQueueRealCompleted", 5u);
+gantryTransport.SetSymbol("MAIN.rQueueHeadX_mm", 45.2);
+gantryTransport.SetSymbol("MAIN.rQueueHeadY_mm", 85.0);
+gantryTransport.SetSymbol("MAIN.fbPublisher.rTargetX_mm", 45.2);
+gantryTransport.SetSymbol("MAIN.fbPublisher.rTargetY_mm", 85.0);
+
+Check("gantry read-only: bPlcQError read correctly",
+    gantryTransport.TryRead<bool>("MAIN.bPlcQError", out var qErr) && !qErr);
+Check("gantry read-only: bStopCommandConfirmed read correctly",
+    gantryTransport.TryRead<bool>("MAIN.bStopCommandConfirmed", out var stopAck) && stopAck);
+Check("gantry read-only: nAutoDispatchState read correctly",
+    gantryTransport.TryRead<short>("MAIN.nAutoDispatchState", out var autoSt) && autoSt == 10);
+Check("gantry read-only: nQueueRealCompleted read correctly",
+    gantryTransport.TryRead<uint>("MAIN.nQueueRealCompleted", out var qReal) && qReal == 5);
+Check("gantry read-only: rQueueHeadX_mm read correctly",
+    gantryTransport.TryRead<double>("MAIN.rQueueHeadX_mm", out var qx) && Math.Abs(qx - 45.2) < 0.001);
+Check("gantry read-only: fbPublisher.rTargetX_mm read correctly",
+    gantryTransport.TryRead<double>("MAIN.fbPublisher.rTargetX_mm", out var tx) && Math.Abs(tx - 45.2) < 0.001);
+
+// Actual TCP position (Md.20) and homed status MUST NOT be simulated or invented as available
+Check("actual TCP unmapped: QD75 Md.20 actual X is absent from TwinCAT symbols",
+    !LineMailboxProtocol.KnownSourceSymbols.Contains("MAIN.rActualTcpX"));
+Check("actual TCP unmapped: QD75 Md.20 actual Y is absent from TwinCAT symbols",
+    !LineMailboxProtocol.KnownSourceSymbols.Contains("MAIN.rActualTcpY"));
+Check("homed unmapped: homed feedback symbol is absent from TwinCAT symbols",
+    !LineMailboxProtocol.KnownSourceSymbols.Contains("MAIN.bHomed"));
+
+// Strict safety check: gateway has ZERO robot write methods and zero writes performed to motion tags
+Check("safety contract: no writes performed to robot motion tags",
+    !gantryTransport.Writes.Any(w => w.Symbol == "MAIN.bStartGlueCycle" || w.Symbol == "MAIN.bTest_WriteM1000"));
+
+// 16. Safe Offline Simulation: Trigger -> FIFO -> TwinCAT QD75 Coordinate Contract (Zero ADS Writes)
+var offSim = new CameraPipelineSimulator(cameraToWorkStartMm: 200, cameraFineXmm: 0, cameraOffsetYmm: 85, cameraYawDegrees: 0, pitchXmm: 40, pitchYmm: 40);
+
+var emptySnap = offSim.GetSnapshot(0, 0);
+Check("offline sim: empty snapshot has zero count and no head product",
+    emptySnap.Count == 0 && emptySnap.HeadProduct == 0 && emptySnap.GluePoints.Length == 0 && !emptySnap.Inside);
+
+var offAck = offSim.Accept("OFFLINE_VIDEO/1", 0.0, 0.0, 0.0, 100.0);
+Check("offline sim: accepted trigger into virtual FIFO", offAck.ProductId == 1 && offSim.QueueCount == 1);
+
+var approachSnap = offSim.GetSnapshot(100.0, 100.0);
+Check("offline sim: approaching workpiece distance to work is 200mm and inside is false",
+    approachSnap.Count == 1 && approachSnap.HeadProduct == 1 && Math.Abs(approachSnap.DistanceToWorkMm - 200.0) < 1e-6 && !approachSnap.Inside);
+
+Check("offline sim: head inside workspace is false when X < 0", !offSim.IsHeadInsideWorkspace(100.0));
+
+var earlyCmd = offSim.BuildQd75Command(vertexIndex: 1, conveyorSpeedMmS: 100.0, currentEncoderMm: 100.0);
+Check("offline sim: QD75 command rejected with error 501 when workpiece outside workspace",
+    !earlyCmd.IsValid && earlyCmd.ErrorCode == 501);
+
+var inWorkSnap = offSim.GetSnapshot(320.0, 100.0);
+Check("offline sim: in-workspace snapshot reports inside=true, HeadX=20mm, remaining=0mm",
+    inWorkSnap.Inside && Math.Abs(inWorkSnap.HeadXmm - 20.0) < 1e-6 && Math.Abs(inWorkSnap.DistanceToWorkMm) < 1e-6);
+Check("offline sim: IsHeadInsideWorkspace is true at encoder 320mm", offSim.IsHeadInsideWorkspace(320.0));
+
+var v1Cmd = offSim.BuildQd75Command(vertexIndex: 1, conveyorSpeedMmS: 100.0, currentEncoderMm: 320.0);
+Check("offline sim: vertex 1 command is valid", v1Cmd.IsValid && v1Cmd.ErrorCode == 0);
+Check("offline sim: vertex 1 Target_X is 520,000 (52.0 mm)", v1Cmd.TargetX_0_1um == 520000);
+Check("offline sim: vertex 1 Target_Y is 1,050,000 (105.0 mm)", v1Cmd.TargetY_0_1um == 1050000);
+Check("offline sim: vertex 1 Target_Z_Down is 40,000 (4.0 mm)", v1Cmd.TargetZDown_0_1um == 40000);
+Check("offline sim: vertex 1 Speed_Approach is 3,000,000 (500 mm/s)", v1Cmd.SpeedApproach_0_01mmMin == 3000000);
+Check("offline sim: vertex 1 Speed_Sync is 600,000 (100 mm/s)", v1Cmd.SpeedSync_0_01mmMin == 600000);
+Check("offline sim: vertex 1 DeltaX_Sync is 60,000 (6.0 mm)", v1Cmd.DeltaXSync_0_1um == 60000);
+Check("offline sim: vertex 1 Target_Z_Safe is 0", v1Cmd.TargetZSafe_0_1um == 0);
+Check("offline sim: vertex 1 Vertex_Index is 1", v1Cmd.VertexIndex == 1);
+
+var melsecWords = v1Cmd.ToMelsecWords();
+Check("offline sim: Melsec payload is exactly 15 words (30 bytes)", melsecWords.Length == 15);
+Check("offline sim: D100..D101 Target_X unpacks correctly", (melsecWords[0] | (melsecWords[1] << 16)) == 520000);
+Check("offline sim: D102..D103 Target_Y unpacks correctly", (melsecWords[2] | (melsecWords[3] << 16)) == 1050000);
+Check("offline sim: D104..D105 Target_Z_Down unpacks correctly", (melsecWords[4] | (melsecWords[5] << 16)) == 40000);
+Check("offline sim: D106..D107 Speed_Approach unpacks correctly", (melsecWords[6] | (melsecWords[7] << 16)) == 3000000);
+Check("offline sim: D108..D109 Speed_Sync unpacks correctly", (melsecWords[8] | (melsecWords[9] << 16)) == 600000);
+Check("offline sim: D110..D111 DeltaX_Sync unpacks correctly", (melsecWords[10] | (melsecWords[11] << 16)) == 60000);
+Check("offline sim: D112..D113 Target_Z_Safe unpacks correctly", (melsecWords[12] | (melsecWords[13] << 16)) == 0);
+Check("offline sim: D114 Vertex_Index is 1", melsecWords[14] == 1);
+
+var v2Cmd = offSim.BuildQd75Command(vertexIndex: 2, conveyorSpeedMmS: 100.0, currentEncoderMm: 320.0);
+var v3Cmd = offSim.BuildQd75Command(vertexIndex: 3, conveyorSpeedMmS: 100.0, currentEncoderMm: 320.0);
+var v4Cmd = offSim.BuildQd75Command(vertexIndex: 4, conveyorSpeedMmS: 100.0, currentEncoderMm: 320.0);
+Check("offline sim: vertex 2, 3, 4 commands are all valid",
+    v2Cmd.IsValid && v3Cmd.IsValid && v4Cmd.IsValid);
+Check("offline sim: vertex 2 Target_X is 120,000 (12.0 mm) and Target_Y is 1,050,000",
+    v2Cmd.TargetX_0_1um == 120000 && v2Cmd.TargetY_0_1um == 1050000);
+Check("offline sim: vertex 3 Target_X is 120,000 (12.0 mm) and Target_Y is 650,000",
+    v3Cmd.TargetX_0_1um == 120000 && v3Cmd.TargetY_0_1um == 650000);
+Check("offline sim: vertex 4 Target_X is 520,000 (52.0 mm) and Target_Y is 650,000",
+    v4Cmd.TargetX_0_1um == 520000 && v4Cmd.TargetY_0_1um == 650000);
+
+var lateCmd = offSim.BuildQd75Command(vertexIndex: 1, conveyorSpeedMmS: 100.0, currentEncoderMm: 500.0);
+Check("offline sim: overtravel beyond X=180mm rejected with error 501",
+    !lateCmd.IsValid && lateCmd.ErrorCode == 501);
+
+Check("offline sim: zero speed rejected with error 501",
+    !offSim.BuildQd75Command(1, 0.0, 320.0).IsValid);
+Check("offline sim: invalid vertex index 5 rejected with error 501",
+    !offSim.BuildQd75Command(5, 100.0, 320.0).IsValid);
+
+offSim.CompleteHead();
+Check("offline sim: CompleteHead empties queue and rejects command on empty queue",
+    offSim.QueueCount == 0 && !offSim.BuildQd75Command(1, 100.0, 320.0).IsValid);
+
+// 16. PLC-Q Offline Source Safety & Wiring Conflict Verification
+string stPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "PLC", "Mitsubishi", "Sources_20261019", "Source", "PLC_Q_Session2_Logic.st");
+if (!File.Exists(stPath))
+{
+    stPath = Path.Combine("PLC", "Mitsubishi", "Sources_20261019", "Source", "PLC_Q_Session2_Logic.st");
+}
+Check("PLC-Q ST source exists for load package", File.Exists(stPath));
+if (File.Exists(stPath))
+{
+    string stContent = File.ReadAllText(stPath);
+    Check("PLC-Q ST: Glue valve output mapped to Y25 (physical pump trigger)",
+        stContent.Contains("Y25 :=") || stContent.Contains("Y25:="));
+    Check("PLC-Q ST: Stale Y20 glue valve assignment is REMOVED (prevent Servo 1 torque loss)",
+        !stContent.Contains("Y20 := bValve_Open") && !stContent.Contains("Y20:=bValve_Open"));
+    Check("PLC-Q ST: Servo 1..3 Enables (Y20..Y22) and Brake (Y23) have zero writes in Tracking ST (owned by MAIN)",
+        !System.Text.RegularExpressions.Regex.IsMatch(stContent, @"\bY2[0-3]\s*:="));
+    Check("PLC-Q ST: Handshake Start bit is M1000",
+        stContent.Contains("M1000"));
+    Check("PLC-Q ST: Handshake Ack bit is M1001",
+        stContent.Contains("M1001 :=") || stContent.Contains("M1001:="));
+    Check("PLC-Q ST: Abort bit is M105",
+        stContent.Contains("M105"));
+    Check("PLC-Q ST: Single-writer Y0 is NOT written in Tracking (owned by MAIN via SM400)",
+        !System.Text.RegularExpressions.Regex.IsMatch(stContent, @"\bY0\s*:="));
+    Check("PLC-Q ST: Y10 is pulsed via M110, NOT directly written",
+        stContent.Contains("M110 :=") && !System.Text.RegularExpressions.Regex.IsMatch(stContent, @"\bY10\s*:="));
+}
+
+// 17. Vision Pose Tracking & 4-Vertex Gantry Planar Contract Verification
+// Test canonical vertex ordering across 0, 15, -30, 44 deg
+var testOpt = new VisionOptions { PlateSizeMm = 50, HolePitchMm = 40, FixedMmPerPixel = 0.1, OriginPxX = 320, OriginPxY = 240, OffsetXmm = 0, OffsetYmm = 0 };
+double mmPerPx = 0.1;
+int fw = 640, fh = 480;
+
+// Case 1: unrotated square 40x40mm pitch centered at (320, 240)
+// Optical offsets: TL=(-200px, -200px), TR=(+200px, -200px), BR=(+200px, +200px), BL=(-200px, +200px)
+var pts0 = new DetectionPoint[] {
+    new(120, 40),  // TL in image: x=120, y=40 (py < oy => v = +20mm, u = -20mm)
+    new(520, 40),  // TR in image: x=520, y=40 (py < oy => v = +20mm, u = +20mm)
+    new(520, 440), // BR in image: x=520, y=440 (py > oy => v = -20mm, u = +20mm)
+    new(120, 440)  // BL in image: x=120, y=440 (py > oy => v = -20mm, u = -20mm)
+};
+var vOrder0 = BeltCoordinates.MapVertices(pts0, 0.0, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.XPlus);
+Check("vertex ordering: MapVertices returns exactly 4 vertices", vOrder0.Length == 4);
+Check("vertex ordering: v1 is Quad I (+20, +20)", vOrder0[0].Index == 1 && Math.Abs(vOrder0[0].X_ConveyorMm - 20.0) < 1e-4 && Math.Abs(vOrder0[0].Y_ConveyorMm - 20.0) < 1e-4);
+Check("vertex ordering: v2 is Quad II (-20, +20)", vOrder0[1].Index == 2 && Math.Abs(vOrder0[1].X_ConveyorMm - (-20.0)) < 1e-4 && Math.Abs(vOrder0[1].Y_ConveyorMm - 20.0) < 1e-4);
+Check("vertex ordering: v3 is Quad III (-20, -20)", vOrder0[2].Index == 3 && Math.Abs(vOrder0[2].X_ConveyorMm - (-20.0)) < 1e-4 && Math.Abs(vOrder0[2].Y_ConveyorMm - (-20.0)) < 1e-4);
+Check("vertex ordering: v4 is Quad IV (+20, -20)", vOrder0[3].Index == 4 && Math.Abs(vOrder0[3].X_ConveyorMm - 20.0) < 1e-4 && Math.Abs(vOrder0[3].Y_ConveyorMm - (-20.0)) < 1e-4);
+
+// Test rotated case theta = 15 deg
+var vOrder15 = BeltCoordinates.MapVertices(pts0, 15.0, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.XPlus);
+Check("vertex ordering: 15 deg retains canonical indices 1..4",
+    vOrder15[0].Index == 1 && vOrder15[1].Index == 2 && vOrder15[2].Index == 3 && vOrder15[3].Index == 4);
+
+// Review Focus 3: Degenerate or collinear points handling
+bool caughtDegenerate = false;
+try {
+    var degeneratePts = new DetectionPoint[] { new(320, 240), new(320, 240), new(320, 240), new(320, 240) };
+    BeltCoordinates.MapVertices(degeneratePts, 0.0, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.XPlus);
+} catch (ArgumentException) { caughtDegenerate = true; }
+Check("review focus 3: MapVertices rejects degenerate coincident points", caughtDegenerate);
+
+// Review Focus 4: Out-of-tolerance pitch in CreateTrackedPose
+var outOfTolResult = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95,
+    new DetectionPoint[] { new(100, 40), new(540, 40), new(540, 440), new(100, 440) }, // 44mm pitch X (> 42mm tolerance)
+    [], [], "OK");
+var outOfTolPose = BeltCoordinates.CreateTrackedPose(1, "CAM1", outOfTolResult, testOpt, fw, fh, BeltDirection.XPlus, 0.0);
+Check("review focus 4: TrackedPose marks IsOpticalMeasured=false when pitch exceeds tolerance", !outOfTolPose.IsOpticalMeasured);
 
 Console.WriteLine("TOTAL_TEST_FAILURES="+failed);
 return failed==0?0:1;
