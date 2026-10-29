@@ -2027,5 +2027,91 @@ Check("build command non-finite: NaN zSafeMm rejected with error 501",
     !simAsym.BuildQd75Command(1, 100.0, 345.0, zSafeMm: double.NaN).IsValid && simAsym.BuildQd75Command(1, 100.0, 345.0, zSafeMm: double.NaN).ErrorCode == 501);
 Check("build command non-finite: NaN workspace boundary rejected with error 501",
     !simAsym.BuildQd75Command(1, 100.0, 345.0, xMaxMm: double.NaN).IsValid && simAsym.BuildQd75Command(1, 100.0, 345.0, xMaxMm: double.NaN).ErrorCode == 501);
+// 19. Task 3: UI Label Overlay Canonical Quadrant Reconciliation
+var dummyPlate = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95, pts0, [], [], "OK");
+var overlayVerts = BeltCoordinates.MapVertices(dummyPlate.GluePx, dummyPlate.AngleDeg, fw, fh, dummyPlate.MmPerPixel, 320, 240, 0, 0, BeltDirection.XPlus);
+Check("ui overlay contract: P1 corresponds to Quad I (Index 1)", overlayVerts[0].Index == 1);
+Check("ui overlay contract: P4 corresponds to Quad IV (Index 4)", overlayVerts[3].Index == 4);
+
+// Render verification on STA thread: ensure overlay renders canonical P1..P4 and handles fallback
+string p1Text = "";
+string p2Text = "";
+string p3Text = "";
+string p4Text = "";
+int textBlockCount = 0;
+var staThread = new System.Threading.Thread(() => {
+    var canvas = new System.Windows.Controls.Canvas();
+    VisionLabelOverlay.Render(canvas, [dummyPlate], new System.Collections.Generic.Dictionary<int, int> { { 0, 1 } }, testOpt, BeltDirection.XPlus, fw, fh, 640, 480);
+    if (canvas.Children.Count > 0 && canvas.Children[0] is System.Windows.Controls.StackPanel sp)
+    {
+        var textBlocks = sp.Children.OfType<System.Windows.Controls.TextBlock>().ToArray();
+        textBlockCount = textBlocks.Length;
+        if (textBlocks.Length >= 7)
+        {
+            p1Text = textBlocks[3].Text;
+            p2Text = textBlocks[4].Text;
+            p3Text = textBlocks[5].Text;
+            p4Text = textBlocks[6].Text;
+        }
+    }
+});
+staThread.SetApartmentState(System.Threading.ApartmentState.STA);
+staThread.Start();
+staThread.Join();
+
+Check("ui overlay render: 4 vertex textblocks rendered", textBlockCount == 7);
+Check("ui overlay render: P1 is Quad I (+20, +20)", p1Text.Contains("P1") && p1Text.Contains("X=   20.00") && p1Text.Contains("Y=   20.00"));
+Check("ui overlay render: P2 is Quad II (-20, +20)", p2Text.Contains("P2") && p2Text.Contains("X=  -20.00") && p2Text.Contains("Y=   20.00"));
+Check("ui overlay render: P3 is Quad III (-20, -20)", p3Text.Contains("P3") && p3Text.Contains("X=  -20.00") && p3Text.Contains("Y=  -20.00"));
+Check("ui overlay render: P4 is Quad IV (+20, -20)", p4Text.Contains("P4") && p4Text.Contains("X=   20.00") && p4Text.Contains("Y=  -20.00"));
+
+// Fallback verification: fewer than 4 points, null GluePx, and degenerate/collinear points
+int count2Pt = 0;
+string fbP1Text = "";
+string fbP2Text = "";
+int countNullPt = 0;
+int countCollinear = 0;
+string colP1Text = "";
+
+var fallbackThread = new System.Threading.Thread(() => {
+    // 1. Fewer than 4 points (2 points)
+    var canvas2Pt = new System.Windows.Controls.Canvas();
+    var dummy2Pt = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95, [pts0[0], pts0[1]], [], [], "OK");
+    VisionLabelOverlay.Render(canvas2Pt, [dummy2Pt], new System.Collections.Generic.Dictionary<int, int> { { 0, 1 } }, testOpt, BeltDirection.XPlus, fw, fh, 640, 480);
+    if (canvas2Pt.Children.Count > 0 && canvas2Pt.Children[0] is System.Windows.Controls.StackPanel sp2)
+    {
+        var tbs = sp2.Children.OfType<System.Windows.Controls.TextBlock>().ToArray();
+        count2Pt = tbs.Length;
+        if (tbs.Length >= 5) { fbP1Text = tbs[3].Text; fbP2Text = tbs[4].Text; }
+    }
+
+    // 2. Null GluePx
+    var canvasNull = new System.Windows.Controls.Canvas();
+    var dummyNull = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95, null!, [], [], "OK");
+    VisionLabelOverlay.Render(canvasNull, [dummyNull], new System.Collections.Generic.Dictionary<int, int> { { 0, 1 } }, testOpt, BeltDirection.XPlus, fw, fh, 640, 480);
+    if (canvasNull.Children.Count > 0 && canvasNull.Children[0] is System.Windows.Controls.StackPanel spNull)
+    {
+        countNullPt = spNull.Children.OfType<System.Windows.Controls.TextBlock>().Count();
+    }
+
+    // 3. Collinear points (MapVertices throws ArgumentException -> gracefully falls back to raw indexing)
+    var canvasCollinear = new System.Windows.Controls.Canvas();
+    var collinearPts = new DetectionPoint[] { new(100, 100), new(200, 200), new(300, 300), new(400, 400) };
+    var dummyCollinear = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95, collinearPts, [], [], "OK");
+    VisionLabelOverlay.Render(canvasCollinear, [dummyCollinear], new System.Collections.Generic.Dictionary<int, int> { { 0, 1 } }, testOpt, BeltDirection.XPlus, fw, fh, 640, 480);
+    if (canvasCollinear.Children.Count > 0 && canvasCollinear.Children[0] is System.Windows.Controls.StackPanel spCol)
+    {
+        var tbs = spCol.Children.OfType<System.Windows.Controls.TextBlock>().ToArray();
+        countCollinear = tbs.Length;
+        if (tbs.Length >= 4) { colP1Text = tbs[3].Text; }
+    }
+});
+fallbackThread.SetApartmentState(System.Threading.ApartmentState.STA);
+fallbackThread.Start();
+fallbackThread.Join();
+
+Check("ui overlay fallback: 2-point detection renders 2 vertex lines", count2Pt == 5 && fbP1Text.StartsWith("P1") && fbP2Text.StartsWith("P2"));
+Check("ui overlay fallback: null GluePx renders header without crashing", countNullPt == 3);
+Check("ui overlay fallback: collinear points gracefully fall back to raw indexing without crashing", countCollinear == 7 && colP1Text.StartsWith("P1"));
 Console.WriteLine("TOTAL_TEST_FAILURES="+failed);
 return failed==0?0:1;

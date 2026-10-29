@@ -193,16 +193,41 @@ public static class VisionLabelOverlay
                 Text=$"Angle θ = {val(pose.ThetaDeg)}°",
                 FontFamily=new FontFamily("Segoe UI"),FontSize=12.5,FontWeight=FontWeights.SemiBold,
                 Foreground=Brush("#F8D477"),Margin=new Thickness(0,2,0,4)});
-            for(int i=0;i<Math.Min(4,p.GluePx.Length);i++)
+            bool mappedCanonical = false;
+            if (p.GluePx != null && p.GluePx.Length == 4)
             {
-                var gp=p.GluePx[i];
-                var point=BeltCoordinates.Map(gp.X,gp.Y,p.AngleDeg,imageWidth,imageHeight,
-                    p.MmPerPixel,options.OriginPxX,options.OriginPxY,options.OffsetXmm,options.OffsetYmm,belt);
-                display.Children.Add(new TextBlock {
-                    Text=$"P{i+1}  X={val(point.Xmm),8}  Y={val(point.Ymm),8}",
-                    FontFamily=new FontFamily("Consolas"),FontSize=11.8,
-                    Foreground=Brush("#BAEAF7"),Margin=new Thickness(0,1,0,0)
-                });
+                try
+                {
+                    var vertices = BeltCoordinates.MapVertices(p.GluePx, p.AngleDeg, imageWidth, imageHeight,
+                        p.MmPerPixel, options.OriginPxX, options.OriginPxY, options.OffsetXmm, options.OffsetYmm, belt);
+                    foreach (var v in vertices)
+                    {
+                        display.Children.Add(new TextBlock {
+                            Text=$"P{v.Index}  X={val(v.X_ConveyorMm),8}  Y={val(v.Y_ConveyorMm),8}",
+                            FontFamily=new FontFamily("Consolas"),FontSize=11.8,
+                            Foreground=Brush("#BAEAF7"),Margin=new Thickness(0,1,0,0)
+                        });
+                    }
+                    mappedCanonical = true;
+                }
+                catch (ArgumentException)
+                {
+                    mappedCanonical = false;
+                }
+            }
+            if (!mappedCanonical)
+            {
+                for(int i=0;i<Math.Min(4,p.GluePx?.Length ?? 0);i++)
+                {
+                    var gp=p.GluePx![i];
+                    var point=BeltCoordinates.Map(gp.X,gp.Y,p.AngleDeg,imageWidth,imageHeight,
+                        p.MmPerPixel,options.OriginPxX,options.OriginPxY,options.OffsetXmm,options.OffsetYmm,belt);
+                    display.Children.Add(new TextBlock {
+                        Text=$"P{i+1}  X={val(point.Xmm),8}  Y={val(point.Ymm),8}",
+                        FontFamily=new FontFamily("Consolas"),FontSize=11.8,
+                        Foreground=Brush("#BAEAF7"),Margin=new Thickness(0,1,0,0)
+                    });
+                }
             }
             // Chỉ giữ chữ nổi trên video: KHÔNG nền, KHÔNG viền,
             // KHÔNG đường nối. Không che phần tâm, góc và 4 lỗ của phôi.
