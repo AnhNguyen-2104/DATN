@@ -117,6 +117,23 @@ public static class BeltCoordinates
         double cx = mapped.Average(p => p.X);
         double cy = mapped.Average(p => p.Y);
 
+        // Sort by polar angle around center to calculate enclosed polygon area
+        var polarSorted = mapped
+            .Select(p => (Point: p, Angle: Math.Atan2(p.Y - cy, p.X - cx)))
+            .OrderBy(a => a.Angle)
+            .Select(a => a.Point)
+            .ToArray();
+
+        double shoelaceArea2 = 0.0;
+        for (int i = 0; i < 4; i++)
+        {
+            int next = (i + 1) % 4;
+            shoelaceArea2 += polarSorted[i].X * polarSorted[next].Y - polarSorted[next].X * polarSorted[i].Y;
+        }
+        double polygonArea = Math.Abs(shoelaceArea2) / 2.0;
+        if (polygonArea < 1.0)
+            throw new ArgumentException("Collinear or degenerate points detected: enclosed area is too small");
+
         double convTheta = ToConveyorTheta(thetaDeg, direction);
         double rad = convTheta * Math.PI / 180.0;
         double cos = Math.Cos(rad), sin = Math.Sin(rad);
@@ -179,31 +196,52 @@ public static class BeltCoordinates
         double encoderAtCrossingMm = 0.0,
         DateTime? utcCrossing = null)
     {
-        if (!double.IsFinite(calibration.HolePitchMm) || calibration.HolePitchMm <= 0)
-            throw new ArgumentException("calibration.HolePitchMm must be finite and > 0");
+        TrackedWorkpiecePose FailClosedPose(double conf = 0.0) => new(
+            productId,
+            $"{source}/{productId}",
+            utcCrossing ?? DateTime.UtcNow,
+            encoderAtCrossingMm,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            conf,
+            Array.Empty<ConveyorVertex>(),
+            false);
 
-        if (detection == null || !detection.Found || detection.GluePx == null || detection.GluePx.Length != 4)
+        if (calibration == null
+            || !double.IsFinite(calibration.HolePitchMm) || calibration.HolePitchMm <= 0
+            || (!double.IsNaN(calibration.OriginPxX) && !double.IsFinite(calibration.OriginPxX))
+            || (!double.IsNaN(calibration.OriginPxY) && !double.IsFinite(calibration.OriginPxY))
+            || !double.IsFinite(calibration.OffsetXmm) || !double.IsFinite(calibration.OffsetYmm))
         {
-            return new TrackedWorkpiecePose(
-                productId,
-                $"{source}/{productId}",
-                utcCrossing ?? DateTime.UtcNow,
-                encoderAtCrossingMm,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                detection?.Confidence ?? 0.0,
-                Array.Empty<ConveyorVertex>(),
-                false);
+            return FailClosedPose(detection?.Confidence ?? 0.0);
         }
 
-        var centerCoord = FromDetection(detection, calibration, frameWidth, frameHeight, direction);
-        var vertices = MapVertices(detection.GluePx, detection.AngleDeg, frameWidth, frameHeight,
-            detection.MmPerPixel, calibration.OriginPxX, calibration.OriginPxY,
-            calibration.OffsetXmm, calibration.OffsetYmm, direction);
+        if (detection == null || !detection.Found
+            || !double.IsFinite(detection.CenterPxX) || !double.IsFinite(detection.CenterPxY)
+            || !double.IsFinite(detection.AngleDeg)
+            || !double.IsFinite(detection.MmPerPixel) || detection.MmPerPixel <= 0
+            || detection.GluePx == null || detection.GluePx.Length != 4
+            || !detection.GluePx.All(p => p != null && double.IsFinite(p.X) && double.IsFinite(p.Y)))
+        {
+            return FailClosedPose(detection?.Confidence ?? 0.0);
+        }
 
+        BeltCoordinate centerCoord;
+        ConveyorVertex[] vertices;
+        try
+        {
+            centerCoord = FromDetection(detection, calibration, frameWidth, frameHeight, direction);
+            vertices = MapVertices(detection.GluePx, detection.AngleDeg, frameWidth, frameHeight,
+                detection.MmPerPixel, calibration.OriginPxX, calibration.OriginPxY,
+                calibration.OffsetXmm, calibration.OffsetYmm, direction);
+        }
+        catch (ArgumentException)
+        {
+            return FailClosedPose(detection.Confidence);
+        }
         static double Dist(ConveyorVertex a, ConveyorVertex b) =>
             Math.Sqrt(Math.Pow(a.X_ConveyorMm - b.X_ConveyorMm, 2) + Math.Pow(a.Y_ConveyorMm - b.Y_ConveyorMm, 2));
 

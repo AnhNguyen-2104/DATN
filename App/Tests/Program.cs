@@ -1729,10 +1729,43 @@ Check("vertex ordering: v2 is Quad II (-20, +20)", vOrder0[1].Index == 2 && Math
 Check("vertex ordering: v3 is Quad III (-20, -20)", vOrder0[2].Index == 3 && Math.Abs(vOrder0[2].X_ConveyorMm - (-20.0)) < 1e-4 && Math.Abs(vOrder0[2].Y_ConveyorMm - (-20.0)) < 1e-4);
 Check("vertex ordering: v4 is Quad IV (+20, -20)", vOrder0[3].Index == 4 && Math.Abs(vOrder0[3].X_ConveyorMm - 20.0) < 1e-4 && Math.Abs(vOrder0[3].Y_ConveyorMm - (-20.0)) < 1e-4);
 
-// Test rotated case theta = 15 deg
-var vOrder15 = BeltCoordinates.MapVertices(pts0, 15.0, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.XPlus);
-Check("vertex ordering: 15 deg retains canonical indices 1..4",
-    vOrder15[0].Index == 1 && vOrder15[1].Index == 2 && vOrder15[2].Index == 3 && vOrder15[3].Index == 4);
+// Geometric assertions for rotation across angles and directions (replacing tautological index checks)
+static DetectionPoint[] MakeRotatedOpticalPts(double thetaDeg, double cx = 320, double cy = 240, double halfPitchMm = 20.0, double scale = 0.1)
+{
+    double rad = thetaDeg * Math.PI / 180.0;
+    double cos = Math.Cos(rad), sin = Math.Sin(rad);
+    // Optical corners: TL, TR, BR, BL
+    (double u, double v)[] localOptical = [(-halfPitchMm, halfPitchMm), (halfPitchMm, halfPitchMm), (halfPitchMm, -halfPitchMm), (-halfPitchMm, -halfPitchMm)];
+    return localOptical.Select(pt => {
+        double rotU = pt.u * cos - pt.v * sin;
+        double rotV = pt.u * sin + pt.v * cos;
+        return new DetectionPoint(cx + rotU / scale, cy - rotV / scale);
+    }).ToArray();
+}
+
+// Case -30 deg, XPlus
+var ptsNeg30 = MakeRotatedOpticalPts(-30.0);
+var vOrderNeg30 = BeltCoordinates.MapVertices(ptsNeg30, -30.0, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.XPlus);
+double r30 = -30.0 * Math.PI / 180.0;
+double c30 = Math.Cos(r30), s30 = Math.Sin(r30);
+double expP1_X = 20 * c30 - 20 * s30, expP1_Y = 20 * s30 + 20 * c30;
+double expP2_X = -20 * c30 - 20 * s30, expP2_Y = -20 * s30 + 20 * c30;
+Check("geometric assertion: -30 deg XPlus v1 matches expected Cartesian Quad I",
+    vOrderNeg30[0].Index == 1 && Math.Abs(vOrderNeg30[0].X_ConveyorMm - expP1_X) < 1e-3 && Math.Abs(vOrderNeg30[0].Y_ConveyorMm - expP1_Y) < 1e-3);
+Check("geometric assertion: -30 deg XPlus v2 matches expected Cartesian Quad II",
+    vOrderNeg30[1].Index == 2 && Math.Abs(vOrderNeg30[1].X_ConveyorMm - expP2_X) < 1e-3 && Math.Abs(vOrderNeg30[1].Y_ConveyorMm - expP2_Y) < 1e-3);
+
+// Case 44 deg, non-XPlus (YPlus)
+var pts44 = MakeRotatedOpticalPts(44.0);
+var vOrder44_YPlus = BeltCoordinates.MapVertices(pts44, 44.0, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.YPlus);
+double r44 = 44.0 * Math.PI / 180.0;
+double c44 = Math.Cos(r44), s44 = Math.Sin(r44);
+double expP1_YPlus_X = 20 * c44 - 20 * s44, expP1_YPlus_Y = 20 * s44 + 20 * c44;
+double expP2_YPlus_X = -20 * c44 - 20 * s44, expP2_YPlus_Y = -20 * s44 + 20 * c44;
+Check("geometric assertion: 44 deg YPlus v1 matches expected Cartesian Quad I",
+    vOrder44_YPlus[0].Index == 1 && Math.Abs(vOrder44_YPlus[0].X_ConveyorMm - expP1_YPlus_X) < 1e-3 && Math.Abs(vOrder44_YPlus[0].Y_ConveyorMm - expP1_YPlus_Y) < 1e-3);
+Check("geometric assertion: 44 deg YPlus v2 matches expected Cartesian Quad II",
+    vOrder44_YPlus[1].Index == 2 && Math.Abs(vOrder44_YPlus[1].X_ConveyorMm - expP2_YPlus_X) < 1e-3 && Math.Abs(vOrder44_YPlus[1].Y_ConveyorMm - expP2_YPlus_Y) < 1e-3);
 
 // Review Focus 3: Degenerate or collinear points handling
 bool caughtDegenerate = false;
@@ -1741,6 +1774,14 @@ try {
     BeltCoordinates.MapVertices(degeneratePts, 0.0, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.XPlus);
 } catch (ArgumentException) { caughtDegenerate = true; }
 Check("review focus 3: MapVertices rejects degenerate coincident points", caughtDegenerate);
+
+// Review Issue 3: MapVertices rejects four distinct collinear points
+bool caughtCollinear = false;
+try {
+    var collinearPts = new DetectionPoint[] { new(100, 240), new(200, 240), new(300, 240), new(400, 240) };
+    BeltCoordinates.MapVertices(collinearPts, 0.0, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.XPlus);
+} catch (ArgumentException) { caughtCollinear = true; }
+Check("review issue 3: MapVertices rejects four distinct collinear points", caughtCollinear);
 
 // Review Focus 4: Out-of-tolerance pitch in CreateTrackedPose
 var outOfTolResult = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95,
@@ -1791,12 +1832,33 @@ var customPitchResult = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95,
 var customPitchPose = BeltCoordinates.CreateTrackedPose(3, "CAM1", customPitchResult, customPitchOpt, fw, fh, BeltDirection.XPlus, 0.0);
 Check("review finding 4: CreateTrackedPose uses calibration.HolePitchMm", customPitchPose.IsOpticalMeasured && Math.Abs(customPitchPose.MeasuredPitchX_mm - 30.0) < 1e-4);
 
-bool caughtInvalidNominalPitch = false;
-try {
-    var badPitchOpt = new VisionOptions { PlateSizeMm = 50, HolePitchMm = 0, FixedMmPerPixel = 0.1, OriginPxX = 320, OriginPxY = 240, OffsetXmm = 0, OffsetYmm = 0 };
-    BeltCoordinates.CreateTrackedPose(4, "CAM1", customPitchResult, badPitchOpt, fw, fh, BeltDirection.XPlus, 0.0);
-} catch (ArgumentException) { caughtInvalidNominalPitch = true; }
-Check("review finding 4: CreateTrackedPose rejects HolePitchMm <= 0", caughtInvalidNominalPitch);
+// Review Issue 1: CreateTrackedPose fail-closed on null calibration, invalid pitch, or non-finite detection
+var nullCalibPose = BeltCoordinates.CreateTrackedPose(4, "CAM1", customPitchResult, null!, fw, fh, BeltDirection.XPlus, 0.0);
+Check("review issue 1: CreateTrackedPose returns fail-closed pose on null calibration without throwing",
+    !nullCalibPose.IsOpticalMeasured && nullCalibPose.Vertices.Length == 0);
+
+var badPitchCalib = new VisionOptions { PlateSizeMm = 50, HolePitchMm = -10, FixedMmPerPixel = 0.1, OriginPxX = 320, OriginPxY = 240, OffsetXmm = 0, OffsetYmm = 0 };
+var badPitchPose = BeltCoordinates.CreateTrackedPose(5, "CAM1", customPitchResult, badPitchCalib, fw, fh, BeltDirection.XPlus, 0.0);
+Check("review issue 1: CreateTrackedPose returns fail-closed pose on HolePitchMm <= 0 without throwing",
+    !badPitchPose.IsOpticalMeasured && badPitchPose.Vertices.Length == 0);
+
+var nanCenterResult = new PlateResult(true, double.NaN, 240, 0, 0, 0, 0.1, 0.95,
+    new DetectionPoint[] { new(170, 90), new(470, 90), new(470, 390), new(170, 390) }, [], [], "OK");
+var nanCenterPose = BeltCoordinates.CreateTrackedPose(6, "CAM1", nanCenterResult, customPitchOpt, fw, fh, BeltDirection.XPlus, 0.0);
+Check("review issue 1: CreateTrackedPose returns fail-closed pose on NaN center",
+    !nanCenterPose.IsOpticalMeasured && nanCenterPose.Vertices.Length == 0);
+
+var badScaleResult = new PlateResult(true, 320, 240, 0, 0, 0, 0.0, 0.95,
+    new DetectionPoint[] { new(170, 90), new(470, 90), new(470, 390), new(170, 390) }, [], [], "OK");
+var badScalePose = BeltCoordinates.CreateTrackedPose(7, "CAM1", badScaleResult, customPitchOpt, fw, fh, BeltDirection.XPlus, 0.0);
+Check("review issue 1: CreateTrackedPose returns fail-closed pose on MmPerPixel <= 0",
+    !badScalePose.IsOpticalMeasured && badScalePose.Vertices.Length == 0);
+
+var nanPointResult = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95,
+    new DetectionPoint[] { new(double.NaN, 90), new(470, 90), new(470, 390), new(170, 390) }, [], [], "OK");
+var nanPointPose = BeltCoordinates.CreateTrackedPose(8, "CAM1", nanPointResult, customPitchOpt, fw, fh, BeltDirection.XPlus, 0.0);
+Check("review issue 1: CreateTrackedPose returns fail-closed pose on NaN GluePx point",
+    !nanPointPose.IsOpticalMeasured && nanPointPose.Vertices.Length == 0);
 
 Console.WriteLine("TOTAL_TEST_FAILURES="+failed);
 return failed==0?0:1;
