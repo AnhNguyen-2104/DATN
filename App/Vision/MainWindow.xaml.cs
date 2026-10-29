@@ -162,10 +162,25 @@ public partial class MainWindow : System.Windows.Window
         PipelineMockStatus.Text=_offlineSimulationEnabled
             ?"VIRTUAL FIFO ENABLED · no ADS write; each Track ID is counted once."
             :"VIRTUAL FIFO OFF · TwinCAT ADS remains read-only.";
-        if(_offlineSimulationEnabled && BenchQueueBox.IsChecked==true)
+        if(_offlineSimulationEnabled)
         {
-            BenchQueueBox.IsChecked=false;
-            DisarmBench();
+            if(BenchQueueBox.IsChecked==true)
+            {
+                BenchQueueBox.IsChecked=false;
+                DisarmBench();
+            }
+            var s=_offlineQueue.GetSnapshot();
+            FifoCount.Text=s.Count.ToString();
+            FifoProduct.Text="—";
+            FifoProgress.Text="VIRTUAL FIFO READY (0/8) · Awaiting camera/video triggers";
+            FifoGluePoints.Text="No active product";
+        }
+        else
+        {
+            FifoCount.Text="—";
+            FifoProduct.Text="—";
+            FifoProgress.Text="PLC not available";
+            FifoGluePoints.Text="No PLC tracking";
         }
     }
     private async void CheckLiveReadiness_Click(object sender,RoutedEventArgs e)
@@ -198,8 +213,48 @@ public partial class MainWindow : System.Windows.Window
             try {test.Accept("SELFTEST/1",0,0,0,100);}
             catch(InvalidOperationException){duplicateRejected=true;}
             if(!duplicateRejected)throw new InvalidOperationException("Duplicate Track ID accepted.");
-            PipelineMockStatus.Text="PASS: FIFO ACK #1, four corners ±20 mm, encoder +25 mm, duplicate Track ID blocked; PC memory only.";
-            StatusText.Text="SIM PASS: Camera pose → virtual FIFO → four moving points; no PLC writes.";
+
+            // 1. Workspace arrival check at encoder 320mm (+220mm travel -> X = +20mm)
+            if(!test.IsHeadInsideWorkspace(320.0))
+                throw new InvalidOperationException("Head product should be inside workspace at encoder 320mm.");
+            var inWorkSnap = test.GetSnapshot(320.0, 100.0);
+            if(!inWorkSnap.Inside || Math.Abs(inWorkSnap.HeadXmm - 20.0) > 1e-6)
+                throw new InvalidOperationException("In-work snapshot mismatch.");
+
+            // 2. TwinCAT QD75 Command contract for all 4 vertices (D100..D114)
+            for(int v = 1; v <= 4; v++)
+            {
+                var cmd = test.BuildQd75Command(v, 100.0, 320.0);
+                if(!cmd.IsValid || cmd.ErrorCode != 0)
+                    throw new InvalidOperationException($"Vertex {v} command rejected: error {cmd.ErrorCode}");
+                var words = cmd.ToMelsecWords();
+                if(words.Length != 15)
+                    throw new InvalidOperationException($"Melsec words length {words.Length} != 15");
+            }
+            var v1Cmd = test.BuildQd75Command(1, 100.0, 320.0);
+            if(v1Cmd.TargetX_0_1um != 520000 || v1Cmd.TargetY_0_1um != 1050000 ||
+               v1Cmd.SpeedApproach_0_01mmMin != 3000000 || v1Cmd.SpeedSync_0_01mmMin != 600000 ||
+               v1Cmd.DeltaXSync_0_1um != 60000 || v1Cmd.TargetZDown_0_1um != 40000)
+                throw new InvalidOperationException("Vertex 1 QD75 parameters mismatch TwinCAT contract.");
+
+            // 3. Boundary rejection check (upstream encoder 100mm -> outside workspace)
+            var earlyCmd = test.BuildQd75Command(1, 100.0, 100.0);
+            if(earlyCmd.IsValid || earlyCmd.ErrorCode != 501)
+                throw new InvalidOperationException("Early upstream command should fail with error 501.");
+
+            // 4. Complete head product
+            test.CompleteHead();
+            if(test.QueueCount != 0)
+                throw new InvalidOperationException("Queue not empty after CompleteHead.");
+
+            // Update UI widgets
+            FifoCount.Text = inWorkSnap.Count.ToString();
+            FifoProduct.Text = inWorkSnap.HeadProduct.ToString();
+            FifoProgress.Text = $"SIMULATED 4-VERTEX TEST PASSED\nTarget: X={v1Cmd.TargetX_mm:F1} mm, Y={v1Cmd.TargetY_mm:F1} mm | V_sync=100.0 mm/s\nQD75 Words: D100=520000, D102=1050000, D104=40000 (Z_down)";
+            FifoGluePoints.Text = string.Join("\n", inWorkSnap.GluePoints.Select((p, i) => $"P{i+1}  X={p.X,8:F2}  Y={p.Y,8:F2} mm"));
+
+            PipelineMockStatus.Text = "PASS: Trigger → FIFO → 4 corners → TwinCAT QD75 contract (D100..D114 15 words) verified; PC memory only, 0 ADS writes.";
+            StatusText.Text = "OFFLINE TEST PASS: Trigger → FIFO → TwinCAT QD75 coordinate contract verified (0 ADS writes).";
         }
         catch(Exception ex){PipelineMockStatus.Text="FAIL: "+ex.Message;}
     }
@@ -433,7 +488,7 @@ public partial class MainWindow : System.Windows.Window
         model.Mode=saved.Mode;
         model.IpText=saved.Ip;
         SlotModeBox(slot).SelectedIndex=ModeIndex(saved.Mode);
-        SlotVendorBox(slot).SelectedIndex=SlotVendorIsBasler(slot)?1:0;
+        SlotVendorBox(slot).SelectedIndex=saved.Vendor.Equals("Basler",StringComparison.OrdinalIgnoreCase)?1:0;
         SlotIpBox(slot).Text=saved.Ip;
         SlotNicBox(slot).Text=saved.Nic;
     }
@@ -441,8 +496,11 @@ public partial class MainWindow : System.Windows.Window
     private void SaveSlot(int slot)
     {
         var model=SlotModel(slot);
-        CameraSlotSettingsStore.Save(slot,model.Mode,SlotIpBox(slot).Text.Trim(),
-            SlotNicBox(slot).Text.Trim(),model.Selected?.Key??"");
+        string vendor=SlotVendorIsBasler(slot)?"Basler":"Hikrobot";
+        CameraTransportMode mode=CameraTransportMode.Ip;
+        string ipText=SlotIpBox(slot).Text.Trim();
+        CameraSlotSettingsStore.Save(slot,mode,ipText,
+            SlotNicBox(slot).Text.Trim(),model.Selected?.Key??"",vendor);
     }
 
     private void BindSlotDevices(int slot)
@@ -467,9 +525,18 @@ public partial class MainWindow : System.Windows.Window
         UpdateCameraSlotUi(slot);
         SaveSlot(slot);
     }
-
     private void S1DeviceChanged(object sender,SelectionChangedEventArgs e)=>SlotDeviceChanged(1);
     private void S2DeviceChanged(object sender,SelectionChangedEventArgs e)=>SlotDeviceChanged(2);
+
+    private void S1VendorChanged(object sender,SelectionChangedEventArgs e)=>SlotVendorChanged(1);
+    private void S2VendorChanged(object sender,SelectionChangedEventArgs e)=>SlotVendorChanged(2);
+
+    private void SlotVendorChanged(int slot)
+    {
+        if(!_cameraUiReady||_closing)return;
+        SaveSlot(slot);
+        UpdateCameraSlotUi(slot);
+    }
 
     private void SlotDeviceChanged(int slot)
     {
@@ -529,15 +596,19 @@ public partial class MainWindow : System.Windows.Window
 
             if(model.Selected is null&&model.FilteredDevices.Count>0)
             {
-                var first=model.FilteredDevices[0];
-                if(model.SelectDevice(first.Key))
+                var chosen=model.AutoSelectForSlot(slot);
+                if(chosen is not null)
                 {
-                    if(mode==CameraTransportMode.Ip&&!string.IsNullOrWhiteSpace(first.Address))
+                    if(mode==CameraTransportMode.Ip&&!string.IsNullOrWhiteSpace(chosen.Address))
                     {
-                        SlotIpBox(slot).Text=first.Address;
-                        model.IpText=first.Address;
+                        SlotIpBox(slot).Text=chosen.Address;
+                        model.IpText=chosen.Address;
                     }
-                    SlotDeviceBox(slot).SelectedItem=first;
+                    SlotDeviceBox(slot).SelectedItem=chosen;
+                }
+                else
+                {
+                    SlotDeviceBox(slot).SelectedItem=null;
                 }
             }
 
@@ -906,11 +977,36 @@ public partial class MainWindow : System.Windows.Window
             AngleValue.Text=_last.Found?_last.AngleDeg.ToString("F2",CultureInfo.InvariantCulture)+"°":"—";
             ConfidenceText.Text=_last.Found?"Quality "+_last.Confidence.ToString("P0"):"Quality —";
             ScaleText.Text=_last.Found?$"{_last.MmPerPixel:F4} mm/px"+(_options.FixedMmPerPixel<=0?" DEMO":""):"Scale —";
-            HoleCoordinates.Text=_last.Found?string.Join("\n",_last.GluePx.Select((p,i)=>{
-                var pos=BeltCoordinates.Map(p.X,p.Y,_last.AngleDeg,image.Width,image.Height,
-                    _last.MmPerPixel,_options.OriginPxX,_options.OriginPxY,_options.OffsetXmm,_options.OffsetYmm,_beltDirection);
-                return $"P{i+1}  X={pos.Xmm,8:F2}  Y={pos.Ymm,8:F2}";
-            })):"No plate";
+            if (!_last.Found || _last.GluePx == null || _last.GluePx.Length == 0)
+            {
+                HoleCoordinates.Text="No plate";
+            }
+            else
+            {
+                bool mappedCanonical = false;
+                if (_last.GluePx.Length == 4)
+                {
+                    try
+                    {
+                        var vertices = BeltCoordinates.MapVertices(_last.GluePx, _last.AngleDeg, image.Width, image.Height,
+                            _last.MmPerPixel, _options.OriginPxX, _options.OriginPxY, _options.OffsetXmm, _options.OffsetYmm, _beltDirection);
+                        HoleCoordinates.Text = string.Join("\n", vertices.Select(v => $"P{v.Index}  X={v.X_ConveyorMm,8:F2}  Y={v.Y_ConveyorMm,8:F2}"));
+                        mappedCanonical = true;
+                    }
+                    catch
+                    {
+                        mappedCanonical = false;
+                    }
+                }
+                if (!mappedCanonical)
+                {
+                    HoleCoordinates.Text = string.Join("\n", _last.GluePx.Select((p, i) => {
+                        var pos = BeltCoordinates.Map(p.X, p.Y, _last.AngleDeg, image.Width, image.Height,
+                            _last.MmPerPixel, _options.OriginPxX, _options.OriginPxY, _options.OffsetXmm, _options.OffsetYmm, _beltDirection);
+                        return $"P{i+1}  X={pos.Xmm,8:F2}  Y={pos.Ymm,8:F2}";
+                    }));
+                }
+            }
             FrameInfo.Text=source+"  |  "+image.Width+"×"+image.Height+"  |  dir "+_beltDirection;
         }
         if(detections.Count>0 && (!_lastCsvBySource.TryGetValue(key,out var last) || DateTime.UtcNow-last>TimeSpan.FromMilliseconds(250)))
@@ -990,6 +1086,15 @@ public partial class MainWindow : System.Windows.Window
     {
         if(!_trackingEnabled)return;
         var pose=BeltCoordinates.FromDetection(trigger.Pose,_options,width,height,_beltDirection);
+        ConveyorVertex[]? measuredVertices = null;
+        if (trigger.Pose.GluePx != null && trigger.Pose.GluePx.Length == 4)
+        {
+            try {
+                measuredVertices = BeltCoordinates.MapVertices(trigger.Pose.GluePx, trigger.Pose.AngleDeg,
+                    width, height, trigger.Pose.MmPerPixel, _options.OriginPxX, _options.OriginPxY,
+                    _options.OffsetXmm, _options.OffsetYmm, _beltDirection);
+            } catch { measuredVertices = null; }
+        }
         _triggersTotal++;
         TriggerCounter.Text=_triggersTotal.ToString();
         string line=FormattableString.Invariant($"#{trigger.ProductId}  {trigger.Source}  X={pose.Xmm:F2}  Y={pose.Ymm:F2}  A={pose.ThetaDeg:F2}°");
@@ -1012,12 +1117,18 @@ public partial class MainWindow : System.Windows.Window
         {
             try {
                 // This is in-memory PLC contract simulation, NEVER an ADS transaction.
-                var virtualAck=_offlineQueue.Accept(rowKey,pose.Xmm,pose.Ymm,pose.ThetaDeg,0);
+                var virtualAck=_offlineQueue.Accept(rowKey,pose.Xmm,pose.Ymm,pose.ThetaDeg,0,measuredVertices);
                 row.Delivery="VIRTUAL FIFO ACK #"+virtualAck.ProductId;
-                row.Plc="SIMULATED 4 POINTS - NO PLC WRITE";
-                PipelineMockStatus.Text=$"VIRTUAL ACK #{virtualAck.ProductId} | FIFO={virtualAck.QueueCount}/8 | 4 points: "+
+                row.Plc=measuredVertices != null ? "MEASURED 4 VERTICES - NO PLC WRITE" : "SIMULATED 4 POINTS - NO PLC WRITE";
+                string vertexLabel = measuredVertices != null ? "4 vertices: " : "4 points: ";
+                PipelineMockStatus.Text=$"VIRTUAL ACK #{virtualAck.ProductId} | FIFO={virtualAck.QueueCount}/8 | {vertexLabel}"+
                     string.Join(" ; ",virtualAck.Corners.Select((p,i)=>$"P{i+1}=({p.X:F1},{p.Y:F1})"));
                 AppendPipelineCsv(row,"SIMULATED_FIFO_ACK",PipelineMockStatus.Text);
+                var snap=_offlineQueue.GetSnapshot();
+                FifoCount.Text=snap.Count.ToString();
+                FifoProduct.Text=snap.HeadProduct>0?snap.HeadProduct.ToString():"—";
+                FifoProgress.Text=$"VIRTUAL FIFO (PC MEMORY · ZERO ADS)\nHead: X={snap.HeadXmm:F1}, Y={snap.HeadYmm:F1} mm | window={(snap.Inside?"INSIDE":"WAIT")}\nAccepted={snap.Accepted}, Count={snap.Count}/8";
+                FifoGluePoints.Text=snap.Count>0?string.Join("\n",snap.GluePoints.Select((p,i)=>$"P{i+1}  X={p.X,8:F2}  Y={p.Y,8:F2} mm")):"No simulated product";
             }
             catch(Exception ex)
             {
@@ -1138,11 +1249,24 @@ public partial class MainWindow : System.Windows.Window
         }
         catch(Exception ex)
         {
-            _lastSnapshot=null;
-            FifoCount.Text="—";FifoProduct.Text="—";
-            FifoProgress.Text="PLC not available";
-            FifoGluePoints.Text="No PLC tracking";
-            if(!_benchArmed)AdsStatus.Text="ADS: "+ex.Message;
+            if(_offlineSimulationEnabled)
+            {
+                var s=_offlineQueue.GetSnapshot();
+                _lastSnapshot=s;
+                FifoCount.Text=s.Count.ToString();
+                FifoProduct.Text=s.HeadProduct>0?s.HeadProduct.ToString():"—";
+                FifoProgress.Text=$"VIRTUAL FIFO (PC MEMORY · ZERO ADS)\nHead: X={s.HeadXmm:F1}, Y={s.HeadYmm:F1} mm | window={(s.Inside?"INSIDE":"WAIT")}\nAccepted={s.Accepted}, Count={s.Count}/8";
+                FifoGluePoints.Text=s.Count>0?string.Join("\n",s.GluePoints.Select((p,i)=>$"P{i+1}  X={p.X,8:F2}  Y={p.Y,8:F2} mm")):"No simulated product";
+                if(!_benchArmed)AdsStatus.Text="OFFLINE SIMULATION ACTIVE · ZERO ADS WRITES · Virtual FIFO ready";
+            }
+            else
+            {
+                _lastSnapshot=null;
+                FifoCount.Text="—";FifoProduct.Text="—";
+                FifoProgress.Text="PLC not available";
+                FifoGluePoints.Text="No PLC tracking";
+                if(!_benchArmed)AdsStatus.Text="ADS: "+ex.Message;
+            }
         }
         finally{_adsPolling=false;}
     }

@@ -2113,5 +2113,102 @@ fallbackThread.Join();
 Check("ui overlay fallback: 2-point detection renders 2 vertex lines", count2Pt == 5 && fbP1Text.StartsWith("P1") && fbP2Text.StartsWith("P2"));
 Check("ui overlay fallback: null GluePx renders header without crashing", countNullPt == 3);
 Check("ui overlay fallback: collinear points gracefully fall back to raw indexing without crashing", countCollinear == 7 && colP1Text.StartsWith("P1"));
+
+// 20. Task 4: Main Application Trigger Wiring & End-to-End SIL Simulation
+// End-to-end SIL simulation: TriggerEvent -> MapVertices -> Simulator -> BuildQd75Command
+var simE2E = new CameraPipelineSimulator(cameraToWorkStartMm: 200, cameraFineXmm: 0, cameraOffsetYmm: 85, cameraYawDegrees: 0, pitchXmm: 40, pitchYmm: 40);
+var dummyResult = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95, pts0, [], [], "OK");
+var trigEvent = new TriggerEvent(42, "OFFLINE_CAM", dummyResult, 100, DateTime.UtcNow);
+
+var e2ePose = BeltCoordinates.CreateTrackedPose(trigEvent.ProductId, trigEvent.Source, trigEvent.Pose, testOpt, fw, fh, BeltDirection.XPlus, 50.0);
+Check("e2e: TrackedPose created with 4 canonical vertices", e2ePose.Vertices.Length == 4 && e2ePose.IsOpticalMeasured);
+
+var e2eAck = simE2E.Accept(e2ePose.SourceTrackKey, e2ePose.CenterX_mm, e2ePose.CenterY_mm, e2ePose.Theta_deg, e2ePose.EncoderAtCrossingMm, e2ePose.Vertices);
+Check("e2e: simulator accepted tracked pose with measured vertices", e2eAck.ProductId == 1 && e2eAck.Corners.Length == 4);
+
+// Advance virtual encoder to 270mm (travel = 220mm, HeadX = -200 + 20 + 220 = 40mm inside workspace)
+var e2eCmd = simE2E.BuildQd75Command(vertexIndex: 1, conveyorSpeedMmS: 100.0, currentEncoderMm: 270.0);
+Check("e2e: QD75 command generated successfully from measured vertex", e2eCmd.IsValid && e2eCmd.ErrorCode == 0);
+var e2eWords = e2eCmd.ToMelsecWords();
+Check("e2e: 15-word binary payload generated", e2eWords.Length == 15 && e2eWords[14] == 1);
+
+// RecordTrigger pipeline logic: MapVertices directly from TriggerEvent.Pose.GluePx
+ConveyorVertex[]? trigMeasuredVertices = null;
+if (trigEvent.Pose.GluePx != null && trigEvent.Pose.GluePx.Length == 4)
+{
+    try {
+        trigMeasuredVertices = BeltCoordinates.MapVertices(trigEvent.Pose.GluePx, trigEvent.Pose.AngleDeg,
+            fw, fh, trigEvent.Pose.MmPerPixel, testOpt.OriginPxX, testOpt.OriginPxY,
+            testOpt.OffsetXmm, testOpt.OffsetYmm, BeltDirection.XPlus);
+    } catch { trigMeasuredVertices = null; }
+}
+Check("record trigger: MapVertices yields 4 canonical vertices", trigMeasuredVertices != null && trigMeasuredVertices.Length == 4);
+Check("record trigger: P1 is Quad I (+20, +20)", Math.Abs(trigMeasuredVertices![0].X_ConveyorMm - 20.0) < 1e-4 && Math.Abs(trigMeasuredVertices[0].Y_ConveyorMm - 20.0) < 1e-4);
+Check("record trigger: P2 is Quad II (-20, +20)", Math.Abs(trigMeasuredVertices[1].X_ConveyorMm - (-20.0)) < 1e-4 && Math.Abs(trigMeasuredVertices[1].Y_ConveyorMm - 20.0) < 1e-4);
+Check("record trigger: P3 is Quad III (-20, -20)", Math.Abs(trigMeasuredVertices[2].X_ConveyorMm - (-20.0)) < 1e-4 && Math.Abs(trigMeasuredVertices[2].Y_ConveyorMm - (-20.0)) < 1e-4);
+Check("record trigger: P4 is Quad IV (+20, -20)", Math.Abs(trigMeasuredVertices[3].X_ConveyorMm - 20.0) < 1e-4 && Math.Abs(trigMeasuredVertices[3].Y_ConveyorMm - (-20.0)) < 1e-4);
+
+var simTrig = new CameraPipelineSimulator(cameraToWorkStartMm: 200, cameraFineXmm: 0, cameraOffsetYmm: 85, cameraYawDegrees: 0, pitchXmm: 40, pitchYmm: 40);
+var trigAck = simTrig.Accept("TRIG/1", 0.0, 0.0, 0.0, 0.0, trigMeasuredVertices);
+Check("record trigger: simulator accepted with encoder=0 placeholder", trigAck.ProductId == 1 && trigAck.EncoderAtTrigger == 0.0);
+Check("record trigger: corners match measured vertices",
+    Math.Abs(trigAck.Corners[0].X - (-180.0)) < 1e-4 && Math.Abs(trigAck.Corners[0].Y - 105.0) < 1e-4 &&
+    Math.Abs(trigAck.Corners[1].X - (-220.0)) < 1e-4 && Math.Abs(trigAck.Corners[1].Y - 105.0) < 1e-4);
+
+// Asymmetric plate in RecordTrigger (42x38 mm)
+var ptsAsymPlate = new DetectionPoint[] {
+    new(110, 50),  // py < oy => v = +19mm, u = -21mm
+    new(530, 50),  // py < oy => v = +19mm, u = +21mm
+    new(530, 430), // py > oy => v = -19mm, u = +21mm
+    new(110, 430)  // py > oy => v = -19mm, u = -21mm
+};
+var dummyAsymPlate = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95, ptsAsymPlate, [], [], "OK");
+var trigEventAsym = new TriggerEvent(99, "OFFLINE_CAM", dummyAsymPlate, 100, DateTime.UtcNow);
+ConveyorVertex[]? asymVertices = null;
+if (trigEventAsym.Pose.GluePx != null && trigEventAsym.Pose.GluePx.Length == 4)
+{
+    try {
+        asymVertices = BeltCoordinates.MapVertices(trigEventAsym.Pose.GluePx, trigEventAsym.Pose.AngleDeg,
+            fw, fh, trigEventAsym.Pose.MmPerPixel, testOpt.OriginPxX, testOpt.OriginPxY,
+            testOpt.OffsetXmm, testOpt.OffsetYmm, BeltDirection.XPlus);
+    } catch { asymVertices = null; }
+}
+Check("record trigger asym: mapped 4 vertices", asymVertices != null && asymVertices.Length == 4);
+var trigAckAsym = simTrig.Accept("TRIG/2", 0.0, 0.0, 0.0, 0.0, asymVertices);
+Check("record trigger asym: V1 RobotX preserves measured 21mm (-179.0mm)", Math.Abs(trigAckAsym.Corners[0].X - (-179.0)) < 1e-4);
+Check("record trigger asym: V1 RobotY preserves measured 19mm (104.0mm)", Math.Abs(trigAckAsym.Corners[0].Y - 104.0) < 1e-4);
+
+// RecordTrigger fallback: collinear points fail-closed to null measured vertices
+var collinearPtsTrig = new DetectionPoint[] { new(100, 100), new(200, 200), new(300, 300), new(400, 400) };
+var dummyCollinearTrig = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95, collinearPtsTrig, [], [], "OK");
+var trigEventCollinear = new TriggerEvent(100, "OFFLINE_CAM", dummyCollinearTrig, 100, DateTime.UtcNow);
+ConveyorVertex[]? collinearVertices = null;
+if (trigEventCollinear.Pose.GluePx != null && trigEventCollinear.Pose.GluePx.Length == 4)
+{
+    try {
+        collinearVertices = BeltCoordinates.MapVertices(trigEventCollinear.Pose.GluePx, trigEventCollinear.Pose.AngleDeg,
+            fw, fh, trigEventCollinear.Pose.MmPerPixel, testOpt.OriginPxX, testOpt.OriginPxY,
+            testOpt.OffsetXmm, testOpt.OffsetYmm, BeltDirection.XPlus);
+    } catch { collinearVertices = null; }
+}
+Check("record trigger collinear: gracefully caught and set to null", collinearVertices == null);
+var trigAckCollinear = simTrig.Accept("TRIG/3", 0.0, 0.0, 0.0, 0.0, collinearVertices);
+Check("record trigger collinear: falls back to nominal 40x40 corners",
+    Math.Abs(trigAckCollinear.Corners[0].X - (-180.0)) < 1e-4 && Math.Abs(trigAckCollinear.Corners[0].Y - 105.0) < 1e-4);
+
+// Sidebar HoleCoordinates canonical ordering:
+var sidebarVerts = BeltCoordinates.MapVertices(dummyPlate.GluePx, dummyPlate.AngleDeg, fw, fh,
+    dummyPlate.MmPerPixel, testOpt.OriginPxX, testOpt.OriginPxY, testOpt.OffsetXmm, testOpt.OffsetYmm, BeltDirection.XPlus);
+var sidebarLines = sidebarVerts.Select(v => $"P{v.Index}  X={v.X_ConveyorMm,8:F2}  Y={v.Y_ConveyorMm,8:F2}").ToArray();
+Check("sidebar canonical order: line 1 is P1", sidebarLines[0].StartsWith("P1") && sidebarLines[0].Contains("X=   20.00") && sidebarLines[0].Contains("Y=   20.00"));
+Check("sidebar canonical order: line 2 is P2", sidebarLines[1].StartsWith("P2") && sidebarLines[1].Contains("X=  -20.00") && sidebarLines[1].Contains("Y=   20.00"));
+Check("sidebar canonical order: line 3 is P3", sidebarLines[2].StartsWith("P3") && sidebarLines[2].Contains("X=  -20.00") && sidebarLines[2].Contains("Y=  -20.00"));
+Check("sidebar canonical order: line 4 is P4", sidebarLines[3].StartsWith("P4") && sidebarLines[3].Contains("X=   20.00") && sidebarLines[3].Contains("Y=  -20.00"));
+
+// Guarded live bench path: scalar center/theta ADS contract unchanged, zero vertex fields sent over ADS
+var benchItem = (Event: trigEvent, Pose: (poseX: e2ePose.CenterX_mm, poseY: e2ePose.CenterY_mm, poseTheta: e2ePose.Theta_deg));
+Check("live bench contract: scalar tuple preserves CenterX", Math.Abs(benchItem.Pose.poseX - 0.0) < 1e-4);
+Check("live bench contract: scalar tuple preserves CenterY", Math.Abs(benchItem.Pose.poseY - 0.0) < 1e-4);
+Check("live bench contract: scalar tuple preserves Theta", Math.Abs(benchItem.Pose.poseTheta - 0.0) < 1e-4);
 Console.WriteLine("TOTAL_TEST_FAILURES="+failed);
 return failed==0?0:1;
