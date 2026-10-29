@@ -1860,5 +1860,158 @@ var nanPointPose = BeltCoordinates.CreateTrackedPose(8, "CAM1", nanPointResult, 
 Check("review issue 1: CreateTrackedPose returns fail-closed pose on NaN GluePx point",
     !nanPointPose.IsOpticalMeasured && nanPointPose.Vertices.Length == 0);
 
+
+// 18. Task 2: Simulator Measured Vertex Acceptance & Workspace Envelope
+var simAsym = new CameraPipelineSimulator(cameraToWorkStartMm: 200, cameraFineXmm: 0, cameraOffsetYmm: 85, cameraYawDegrees: 0, pitchXmm: 40, pitchYmm: 40);
+var measuredAsym = new ConveyorVertex[] {
+    new(1, 21.0, 19.0),   // Quad I: halfX=21, halfY=19 => 42x38mm
+    new(2, -21.0, 19.0),  // Quad II
+    new(3, -21.0, -19.0), // Quad III
+    new(4, 21.0, -19.0)   // Quad IV
+};
+var ackAsym = simAsym.Accept("ASYM_TEST/1", 0.0, 0.0, 0.0, 100.0, measuredAsym);
+Check("sim measured: accepted receipt has 4 corners", ackAsym.Corners.Length == 4);
+Check("sim measured: V1 RobotX is -179.0mm", Math.Abs(ackAsym.Corners[0].X - (-179.0)) < 1e-4);
+Check("sim measured: V1 RobotY is 104.0mm", Math.Abs(ackAsym.Corners[0].Y - 104.0) < 1e-4);
+Check("sim measured: V2 RobotX is -221.0mm", Math.Abs(ackAsym.Corners[1].X - (-221.0)) < 1e-4);
+Check("sim measured: V2 RobotY is 104.0mm", Math.Abs(ackAsym.Corners[1].Y - 104.0) < 1e-4);
+Check("sim measured: V3 RobotX is -221.0mm", Math.Abs(ackAsym.Corners[2].X - (-221.0)) < 1e-4);
+Check("sim measured: V3 RobotY is 66.0mm", Math.Abs(ackAsym.Corners[2].Y - 66.0) < 1e-4);
+Check("sim measured: V4 RobotX is -179.0mm", Math.Abs(ackAsym.Corners[3].X - (-179.0)) < 1e-4);
+Check("sim measured: V4 RobotY is 66.0mm", Math.Abs(ackAsym.Corners[3].Y - 66.0) < 1e-4);
+
+// Permuted vertex order gets sorted canonically into 1..4
+var permutedMeasured = new ConveyorVertex[] {
+    new(4, 21.0, -19.0),
+    new(2, -21.0, 19.0),
+    new(1, 21.0, 19.0),
+    new(3, -21.0, -19.0)
+};
+var simPerm = new CameraPipelineSimulator(cameraToWorkStartMm: 200, cameraFineXmm: 0, cameraOffsetYmm: 85, cameraYawDegrees: 0, pitchXmm: 40, pitchYmm: 40);
+var ackPerm = simPerm.Accept("PERM_TEST/1", 0.0, 0.0, 0.0, 100.0, permutedMeasured);
+Check("sim measured: permuted inputs sorted canonically (V1 X is -179mm)", Math.Abs(ackPerm.Corners[0].X - (-179.0)) < 1e-4);
+Check("sim measured: permuted inputs sorted canonically (V4 X is -179mm)", Math.Abs(ackPerm.Corners[3].X - (-179.0)) < 1e-4);
+
+// Backward compatibility: null measuredVertices preserves nominal synthesis
+var ackNominal = simAsym.Accept("NOMINAL_TEST/1", 0.0, 0.0, 0.0, 100.0, null);
+Check("sim nominal: accepted receipt has 4 corners when measuredVertices is null", ackNominal.Corners.Length == 4);
+Check("sim nominal: V1 RobotX matches nominal 40x40 pitch (-180mm)", Math.Abs(ackNominal.Corners[0].X - (-180.0)) < 1e-4);
+Check("sim nominal: V1 RobotY matches nominal 40x40 pitch (105mm)", Math.Abs(ackNominal.Corners[0].Y - 105.0) < 1e-4);
+Check("sim nominal: V3 RobotX matches nominal 40x40 pitch (-220mm)", Math.Abs(ackNominal.Corners[2].X - (-220.0)) < 1e-4);
+Check("sim nominal: V3 RobotY matches nominal 40x40 pitch (65mm)", Math.Abs(ackNominal.Corners[2].Y - 65.0) < 1e-4);
+
+// Review Focus 1: Non-finite coordinate rejection
+bool caughtNan = false;
+try {
+    var nanVertices = new ConveyorVertex[] {
+        new(1, double.NaN, 19.0), new(2, -21.0, 19.0), new(3, -21.0, -19.0), new(4, 21.0, -19.0)
+    };
+    simAsym.Accept("NAN_TEST/1", 0.0, 0.0, 0.0, 100.0, nanVertices);
+} catch (ArgumentException) { caughtNan = true; }
+Check("review focus 1: Accept rejects NaN measured vertex coordinates", caughtNan);
+
+bool caughtInf = false;
+try {
+    var infVertices = new ConveyorVertex[] {
+        new(1, 21.0, double.PositiveInfinity), new(2, -21.0, 19.0), new(3, -21.0, -19.0), new(4, 21.0, -19.0)
+    };
+    simAsym.Accept("INF_TEST/1", 0.0, 0.0, 0.0, 100.0, infVertices);
+} catch (ArgumentException) { caughtInf = true; }
+Check("review focus 1: Accept rejects Infinity measured vertex coordinates", caughtInf);
+
+// Review Focus 2: Vertex count mismatch rejection
+bool caughtLengthMismatch3 = false;
+try {
+    var badLen3 = new ConveyorVertex[] { new(1, 21.0, 19.0), new(2, -21.0, 19.0), new(3, -21.0, -19.0) };
+    simAsym.Accept("LEN3_TEST/1", 0.0, 0.0, 0.0, 100.0, badLen3);
+} catch (ArgumentException) { caughtLengthMismatch3 = true; }
+Check("review focus 2: Accept rejects vertex array of length 3", caughtLengthMismatch3);
+
+bool caughtLengthMismatch5 = false;
+try {
+    var badLen5 = new ConveyorVertex[] {
+        new(1, 21.0, 19.0), new(2, -21.0, 19.0), new(3, -21.0, -19.0), new(4, 21.0, -19.0), new(5, 0.0, 0.0)
+    };
+    simAsym.Accept("LEN5_TEST/1", 0.0, 0.0, 0.0, 100.0, badLen5);
+} catch (ArgumentException) { caughtLengthMismatch5 = true; }
+Check("review focus 2: Accept rejects vertex array of length 5", caughtLengthMismatch5);
+
+// Non-canonical index set rejection
+bool caughtBadIndices = false;
+try {
+    var badIndices = new ConveyorVertex[] {
+        new(1, 21.0, 19.0), new(2, -21.0, 19.0), new(3, -21.0, -19.0), new(5, 21.0, -19.0)
+    };
+    simAsym.Accept("BAD_IDX/1", 0.0, 0.0, 0.0, 100.0, badIndices);
+} catch (ArgumentException) { caughtBadIndices = true; }
+Check("canonical indices: Accept rejects non-canonical vertex indices (1,2,3,5)", caughtBadIndices);
+
+bool caughtDuplicateIndices = false;
+try {
+    var dupIndices = new ConveyorVertex[] {
+        new(1, 21.0, 19.0), new(2, -21.0, 19.0), new(2, -21.0, -19.0), new(4, 21.0, -19.0)
+    };
+    simAsym.Accept("DUP_IDX/1", 0.0, 0.0, 0.0, 100.0, dupIndices);
+} catch (ArgumentException) { caughtDuplicateIndices = true; }
+Check("canonical indices: Accept rejects duplicate vertex indices (1,2,2,4)", caughtDuplicateIndices);
+
+// Null element inside measuredVertices array rejection
+bool caughtNullVertex = false;
+try {
+    var nullElemVertices = new ConveyorVertex[] {
+        new(1, 21.0, 19.0), null!, new(3, -21.0, -19.0), new(4, 21.0, -19.0)
+    };
+    simAsym.Accept("NULL_ELEM/1", 0.0, 0.0, 0.0, 100.0, nullElemVertices);
+} catch (ArgumentException) { caughtNullVertex = true; }
+Check("null validation: Accept rejects null elements in measuredVertices", caughtNullVertex);
+
+// Atomic queue state preservation on rejection
+int qCountBeforeAtomic = simAsym.QueueCount;
+uint acceptedBeforeAtomic = simAsym.Accepted;
+bool caughtAtomicRejection = false;
+try {
+    simAsym.Accept("ATOMIC_PROBE/1", 0.0, 0.0, 0.0, 100.0, [new ConveyorVertex(1, double.NaN, 0.0)]);
+} catch (ArgumentException) { caughtAtomicRejection = true; }
+Check("atomic preservation: rejection threw ArgumentException", caughtAtomicRejection);
+Check("atomic preservation: QueueCount unchanged on rejected accept", simAsym.QueueCount == qCountBeforeAtomic);
+Check("atomic preservation: Accepted counter unchanged on rejected accept", simAsym.Accepted == acceptedBeforeAtomic);
+var retryAtomic = simAsym.Accept("ATOMIC_PROBE/1", 0.0, 0.0, 0.0, 100.0, measuredAsym);
+Check("atomic preservation: key not polluted, re-acceptance succeeds", retryAtomic != null && retryAtomic.SourceTrackKey == "ATOMIC_PROBE/1");
+
+// BuildQd75Command with measured asymmetric vertices in-workspace
+var validAsymCmd = simAsym.BuildQd75Command(vertexIndex: 1, conveyorSpeedMmS: 100.0, currentEncoderMm: 345.0);
+Check("sim measured: BuildQd75Command produces valid command when in workspace",
+    validAsymCmd.IsValid && validAsymCmd.ErrorCode == 0);
+Check("sim measured: TargetX_0_1um is 780,000 (78.0mm)", validAsymCmd.TargetX_0_1um == 780000);
+Check("sim measured: TargetY_0_1um is 1,040,000 (104.0mm)", validAsymCmd.TargetY_0_1um == 1040000);
+
+// Review Focus 5: Dynamic sync lead pushes vertex overtravel
+// At encoder = 345mm, corner X = -179 + 345 - 100 = 66mm (in bounds)
+// At encoder = 455mm, corner X = -179 + 455 - 100 = 176mm (inside 180mm static envelope)
+// Lead = 100 mm/s * 0.12s = 12mm; DeltaXSync = 100 mm/s * 0.06s = 6mm.
+// TargetX + DeltaXSync = 176 + 12 + 6 = 194mm > 180mm => MUST reject with 501
+var overtravelCmd = simAsym.BuildQd75Command(vertexIndex: 1, conveyorSpeedMmS: 100.0, currentEncoderMm: 455.0);
+Check("review focus 5: BuildQd75Command rejects dynamic sync lead overtravel with error 501",
+    !overtravelCmd.IsValid && overtravelCmd.ErrorCode == 501);
+
+// Fail-closed validation for non-finite inputs to BuildQd75Command
+Check("build command non-finite: NaN currentEncoderMm rejected with error 501",
+    !simAsym.BuildQd75Command(1, 100.0, double.NaN).IsValid && simAsym.BuildQd75Command(1, 100.0, double.NaN).ErrorCode == 501);
+Check("build command non-finite: Infinity currentEncoderMm rejected with error 501",
+    !simAsym.BuildQd75Command(1, 100.0, double.PositiveInfinity).IsValid && simAsym.BuildQd75Command(1, 100.0, double.PositiveInfinity).ErrorCode == 501);
+Check("build command non-finite: NaN speed rejected with error 501",
+    !simAsym.BuildQd75Command(1, double.NaN, 345.0).IsValid && simAsym.BuildQd75Command(1, double.NaN, 345.0).ErrorCode == 501);
+Check("build command non-finite: NaN approach speed rejected with error 501",
+    !simAsym.BuildQd75Command(1, 100.0, 345.0, approachSpeedMmS: double.NaN).IsValid && simAsym.BuildQd75Command(1, 100.0, 345.0, approachSpeedMmS: double.NaN).ErrorCode == 501);
+Check("build command non-finite: NaN flyTimeS rejected with error 501",
+    !simAsym.BuildQd75Command(1, 100.0, 345.0, flyTimeS: double.NaN).IsValid && simAsym.BuildQd75Command(1, 100.0, 345.0, flyTimeS: double.NaN).ErrorCode == 501);
+Check("build command non-finite: NaN syncTimeS rejected with error 501",
+    !simAsym.BuildQd75Command(1, 100.0, 345.0, syncTimeS: double.NaN).IsValid && simAsym.BuildQd75Command(1, 100.0, 345.0, syncTimeS: double.NaN).ErrorCode == 501);
+Check("build command non-finite: NaN zDownMm rejected with error 501",
+    !simAsym.BuildQd75Command(1, 100.0, 345.0, zDownMm: double.NaN).IsValid && simAsym.BuildQd75Command(1, 100.0, 345.0, zDownMm: double.NaN).ErrorCode == 501);
+Check("build command non-finite: NaN zSafeMm rejected with error 501",
+    !simAsym.BuildQd75Command(1, 100.0, 345.0, zSafeMm: double.NaN).IsValid && simAsym.BuildQd75Command(1, 100.0, 345.0, zSafeMm: double.NaN).ErrorCode == 501);
+Check("build command non-finite: NaN workspace boundary rejected with error 501",
+    !simAsym.BuildQd75Command(1, 100.0, 345.0, xMaxMm: double.NaN).IsValid && simAsym.BuildQd75Command(1, 100.0, 345.0, xMaxMm: double.NaN).ErrorCode == 501);
 Console.WriteLine("TOTAL_TEST_FAILURES="+failed);
 return failed==0?0:1;
