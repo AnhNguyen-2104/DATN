@@ -1749,5 +1749,54 @@ var outOfTolResult = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95,
 var outOfTolPose = BeltCoordinates.CreateTrackedPose(1, "CAM1", outOfTolResult, testOpt, fw, fh, BeltDirection.XPlus, 0.0);
 Check("review focus 4: TrackedPose marks IsOpticalMeasured=false when pitch exceeds tolerance", !outOfTolPose.IsOpticalMeasured);
 
+// Review Finding 1: CreateTrackedPose fail-closed on PlateResult.None / empty GluePx
+var nonePose = BeltCoordinates.CreateTrackedPose(2, "CAM1", PlateResult.None("No plate"), testOpt, fw, fh, BeltDirection.XPlus, 0.0);
+Check("review finding 1: CreateTrackedPose handles PlateResult.None safely", !nonePose.IsOpticalMeasured && nonePose.Vertices.Length == 0 && nonePose.MeasuredPitchX_mm == 0.0);
+
+// Review Finding 2: BeltDirection YPlus and XMinus canonical quadrant ordering across rotations
+var vOrderYPlus0 = BeltCoordinates.MapVertices(pts0, 0.0, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.YPlus);
+Check("review finding 2: YPlus theta=0 returns canonical indices 1..4",
+    vOrderYPlus0[0].Index == 1 && vOrderYPlus0[1].Index == 2 && vOrderYPlus0[2].Index == 3 && vOrderYPlus0[3].Index == 4);
+var vOrderXMinus0 = BeltCoordinates.MapVertices(pts0, 0.0, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.XMinus);
+Check("review finding 2: XMinus theta=0 returns canonical indices 1..4",
+    vOrderXMinus0[0].Index == 1 && vOrderXMinus0[1].Index == 2 && vOrderXMinus0[2].Index == 3 && vOrderXMinus0[3].Index == 4);
+var vOrderYPlus15 = BeltCoordinates.MapVertices(pts0, 15.0, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.YPlus);
+Check("review finding 2: YPlus theta=15 returns canonical indices 1..4",
+    vOrderYPlus15[0].Index == 1 && vOrderYPlus15[1].Index == 2 && vOrderYPlus15[2].Index == 3 && vOrderYPlus15[3].Index == 4);
+var vOrderXMinus15 = BeltCoordinates.MapVertices(pts0, 15.0, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.XMinus);
+Check("review finding 2: XMinus theta=15 returns canonical indices 1..4",
+    vOrderXMinus15[0].Index == 1 && vOrderXMinus15[1].Index == 2 && vOrderXMinus15[2].Index == 3 && vOrderXMinus15[3].Index == 4);
+
+// Review Finding 3: Finite validation for thetaDeg, originX/Y, offsetX/Y
+bool caughtNonFiniteTheta = false;
+try { BeltCoordinates.Map(320, 240, double.NaN, fw, fh, mmPerPx, 320, 240, 0, 0, BeltDirection.XPlus); }
+catch (ArgumentException) { caughtNonFiniteTheta = true; }
+Check("review finding 3: Map rejects non-finite theta", caughtNonFiniteTheta);
+
+bool caughtNonFiniteOrigin = false;
+try { BeltCoordinates.Map(320, 240, 0.0, fw, fh, mmPerPx, double.PositiveInfinity, 240, 0, 0, BeltDirection.XPlus); }
+catch (ArgumentException) { caughtNonFiniteOrigin = true; }
+Check("review finding 3: Map rejects non-finite origin", caughtNonFiniteOrigin);
+
+bool caughtNonFiniteOffset = false;
+try { BeltCoordinates.Map(320, 240, 0.0, fw, fh, mmPerPx, 320, 240, double.NaN, 0, BeltDirection.XPlus); }
+catch (ArgumentException) { caughtNonFiniteOffset = true; }
+Check("review finding 3: Map rejects non-finite offset", caughtNonFiniteOffset);
+
+// Review Finding 4: Calibration HolePitchMm used instead of hard-coded 40
+var customPitchOpt = new VisionOptions { PlateSizeMm = 40, HolePitchMm = 30, FixedMmPerPixel = 0.1, OriginPxX = 320, OriginPxY = 240, OffsetXmm = 0, OffsetYmm = 0 };
+var customPitchResult = new PlateResult(true, 320, 240, 0, 0, 0, 0.1, 0.95,
+    new DetectionPoint[] { new(170, 90), new(470, 90), new(470, 390), new(170, 390) }, // 30mm pitch
+    [], [], "OK");
+var customPitchPose = BeltCoordinates.CreateTrackedPose(3, "CAM1", customPitchResult, customPitchOpt, fw, fh, BeltDirection.XPlus, 0.0);
+Check("review finding 4: CreateTrackedPose uses calibration.HolePitchMm", customPitchPose.IsOpticalMeasured && Math.Abs(customPitchPose.MeasuredPitchX_mm - 30.0) < 1e-4);
+
+bool caughtInvalidNominalPitch = false;
+try {
+    var badPitchOpt = new VisionOptions { PlateSizeMm = 50, HolePitchMm = 0, FixedMmPerPixel = 0.1, OriginPxX = 320, OriginPxY = 240, OffsetXmm = 0, OffsetYmm = 0 };
+    BeltCoordinates.CreateTrackedPose(4, "CAM1", customPitchResult, badPitchOpt, fw, fh, BeltDirection.XPlus, 0.0);
+} catch (ArgumentException) { caughtInvalidNominalPitch = true; }
+Check("review finding 4: CreateTrackedPose rejects HolePitchMm <= 0", caughtInvalidNominalPitch);
+
 Console.WriteLine("TOTAL_TEST_FAILURES="+failed);
 return failed==0?0:1;

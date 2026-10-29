@@ -28,11 +28,39 @@ public sealed record TrackedWorkpiecePose(
     bool IsOpticalMeasured);
 public static class BeltCoordinates
 {
+    public static double NormalizeTheta(double thetaDeg)
+    {
+        if (!double.IsFinite(thetaDeg)) throw new ArgumentException("thetaDeg must be finite");
+        while (thetaDeg >= 45.0) thetaDeg -= 90.0;
+        while (thetaDeg < -45.0) thetaDeg += 90.0;
+        return thetaDeg;
+    }
+
+    public static double ToConveyorTheta(double opticalThetaDeg, BeltDirection direction)
+    {
+        if (!double.IsFinite(opticalThetaDeg)) throw new ArgumentException("opticalThetaDeg must be finite");
+        double rawConv = direction switch
+        {
+            BeltDirection.XPlus => opticalThetaDeg,
+            BeltDirection.XMinus => opticalThetaDeg + 180.0,
+            BeltDirection.YPlus => opticalThetaDeg + 90.0,
+            BeltDirection.YMinus => opticalThetaDeg - 90.0,
+            _ => opticalThetaDeg
+        };
+        return NormalizeTheta(rawConv);
+    }
+
     public static BeltCoordinate Map(double px,double py,double thetaDeg,int width,int height,
         double mmPerPixel,double originX,double originY,double offsetX,double offsetY,
         BeltDirection direction)
     {
         if(!double.IsFinite(mmPerPixel)||mmPerPixel<=0)throw new ArgumentException("mmPerPixel > 0 required");
+        if(!double.IsFinite(px)||!double.IsFinite(py))throw new ArgumentException("Pixel coordinates must be finite");
+        if(!double.IsFinite(thetaDeg))throw new ArgumentException("thetaDeg must be finite");
+        if((!double.IsNaN(originX)&&!double.IsFinite(originX))||(!double.IsNaN(originY)&&!double.IsFinite(originY)))
+            throw new ArgumentException("Origin coordinates must be finite or NaN");
+        if(!double.IsFinite(offsetX)||!double.IsFinite(offsetY))throw new ArgumentException("Offset coordinates must be finite");
+
         double ox=double.IsNaN(originX)?width/2.0:originX;
         double oy=double.IsNaN(originY)?height/2.0:originY;
         double u=(px-ox)*mmPerPixel; // image right
@@ -45,11 +73,8 @@ public static class BeltCoordinates
             BeltDirection.YPlus=>(-v,u),
             _=>(u,v)
         };
-        // All mappings are multiples of 90 degrees. For a symmetric square,
-        // edge angle modulo 90 has the same representative in every orientation.
-        while(thetaDeg>=45)thetaDeg-=90;
-        while(thetaDeg< -45)thetaDeg+=90;
-        return new BeltCoordinate(x+offsetX,y+offsetY,thetaDeg);
+        double convTheta = ToConveyorTheta(thetaDeg, direction);
+        return new BeltCoordinate(x+offsetX,y+offsetY,convTheta);
     }
     public static BeltCoordinate FromDetection(PlateResult detection,VisionOptions calibration,
         int frameWidth,int frameHeight,BeltDirection direction) =>
@@ -73,7 +98,13 @@ public static class BeltCoordinates
             throw new ArgumentException("opticalPoints must contain exactly 4 points");
         if (!double.IsFinite(mmPerPixel) || mmPerPixel <= 0)
             throw new ArgumentException("mmPerPixel > 0 required");
-        if (!opticalPoints.All(p => double.IsFinite(p.X) && double.IsFinite(p.Y)))
+        if (!double.IsFinite(thetaDeg))
+            throw new ArgumentException("thetaDeg must be finite");
+        if ((!double.IsNaN(originX) && !double.IsFinite(originX)) || (!double.IsNaN(originY) && !double.IsFinite(originY)))
+            throw new ArgumentException("Origin coordinates must be finite or NaN");
+        if (!double.IsFinite(offsetX) || !double.IsFinite(offsetY))
+            throw new ArgumentException("Offset coordinates must be finite");
+        if (!opticalPoints.All(p => p != null && double.IsFinite(p.X) && double.IsFinite(p.Y)))
             throw new ArgumentException("Optical coordinates must be finite");
 
         var mapped = new (double X, double Y)[4];
@@ -86,7 +117,8 @@ public static class BeltCoordinates
         double cx = mapped.Average(p => p.X);
         double cy = mapped.Average(p => p.Y);
 
-        double rad = thetaDeg * Math.PI / 180.0;
+        double convTheta = ToConveyorTheta(thetaDeg, direction);
+        double rad = convTheta * Math.PI / 180.0;
         double cos = Math.Cos(rad), sin = Math.Sin(rad);
 
         var assigned = new List<ConveyorVertex>();
@@ -94,7 +126,7 @@ public static class BeltCoordinates
         {
             double dx = p.X - cx;
             double dy = p.Y - cy;
-            // Unrotate by -thetaDeg into the workpiece frame
+            // Unrotate by -convTheta into the workpiece frame
             double lx = dx * cos + dy * sin;
             double ly = -dx * sin + dy * cos;
 
@@ -147,6 +179,26 @@ public static class BeltCoordinates
         double encoderAtCrossingMm = 0.0,
         DateTime? utcCrossing = null)
     {
+        if (!double.IsFinite(calibration.HolePitchMm) || calibration.HolePitchMm <= 0)
+            throw new ArgumentException("calibration.HolePitchMm must be finite and > 0");
+
+        if (detection == null || !detection.Found || detection.GluePx == null || detection.GluePx.Length != 4)
+        {
+            return new TrackedWorkpiecePose(
+                productId,
+                $"{source}/{productId}",
+                utcCrossing ?? DateTime.UtcNow,
+                encoderAtCrossingMm,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                detection?.Confidence ?? 0.0,
+                Array.Empty<ConveyorVertex>(),
+                false);
+        }
+
         var centerCoord = FromDetection(detection, calibration, frameWidth, frameHeight, direction);
         var vertices = MapVertices(detection.GluePx, detection.AngleDeg, frameWidth, frameHeight,
             detection.MmPerPixel, calibration.OriginPxX, calibration.OriginPxY,
@@ -158,7 +210,7 @@ public static class BeltCoordinates
         double pitchX = (Dist(vertices[0], vertices[1]) + Dist(vertices[3], vertices[2])) / 2.0;
         double pitchY = (Dist(vertices[1], vertices[2]) + Dist(vertices[0], vertices[3])) / 2.0;
 
-        bool validPitch = Math.Abs(pitchX - 40.0) <= 2.0 && Math.Abs(pitchY - 40.0) <= 2.0;
+        bool validPitch = Math.Abs(pitchX - calibration.HolePitchMm) <= 2.0 && Math.Abs(pitchY - calibration.HolePitchMm) <= 2.0;
         bool isMeasured = detection.Found && validPitch && detection.Confidence >= 0.70;
 
         return new TrackedWorkpiecePose(
