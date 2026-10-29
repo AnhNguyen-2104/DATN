@@ -1880,6 +1880,20 @@ Check("sim measured: V3 RobotY is 66.0mm", Math.Abs(ackAsym.Corners[2].Y - 66.0)
 Check("sim measured: V4 RobotX is -179.0mm", Math.Abs(ackAsym.Corners[3].X - (-179.0)) < 1e-4);
 Check("sim measured: V4 RobotY is 66.0mm", Math.Abs(ackAsym.Corners[3].Y - 66.0) < 1e-4);
 
+// Rotation coupling: non-zero CameraYawDegrees (30 deg) with asymmetric measured vertices
+var simYaw30 = new CameraPipelineSimulator(cameraToWorkStartMm: 200, cameraFineXmm: 0, cameraOffsetYmm: 85, cameraYawDegrees: 30, pitchXmm: 40, pitchYmm: 40);
+var ackYaw30 = simYaw30.Accept("YAW30_TEST/1", 0.0, 0.0, 0.0, 100.0, measuredAsym);
+double yaw30Rad = 30.0 * Math.PI / 180.0;
+double cosYaw30 = Math.Cos(yaw30Rad), sinYaw30 = Math.Sin(yaw30Rad);
+double expYawV1_X = -200.0 + 21.0 * cosYaw30 - 19.0 * sinYaw30; // ~ -191.3135 mm
+double expYawV1_Y = 85.0 + 21.0 * sinYaw30 + 19.0 * cosYaw30;   // ~ 111.9545 mm
+double expYawV2_X = -200.0 - 21.0 * cosYaw30 - 19.0 * sinYaw30; // ~ -227.6865 mm
+double expYawV2_Y = 85.0 - 21.0 * sinYaw30 + 19.0 * cosYaw30;   // ~ 90.9545 mm
+Check("sim yaw coupling: 30 deg V1 RobotX matches rot transform", Math.Abs(ackYaw30.Corners[0].X - expYawV1_X) < 1e-4);
+Check("sim yaw coupling: 30 deg V1 RobotY matches rot transform", Math.Abs(ackYaw30.Corners[0].Y - expYawV1_Y) < 1e-4);
+Check("sim yaw coupling: 30 deg V2 RobotX matches rot transform", Math.Abs(ackYaw30.Corners[1].X - expYawV2_X) < 1e-4);
+Check("sim yaw coupling: 30 deg V2 RobotY matches rot transform", Math.Abs(ackYaw30.Corners[1].Y - expYawV2_Y) < 1e-4);
+
 // Permuted vertex order gets sorted canonically into 1..4
 var permutedMeasured = new ConveyorVertex[] {
     new(4, 21.0, -19.0),
