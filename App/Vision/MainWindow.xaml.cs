@@ -558,6 +558,17 @@ public partial class MainWindow : System.Windows.Window
         _cam2.Model.IpText=S2CamIpBox.Text.Trim();
         UpdateCameraSlotUi(2);
     }
+    private void S1NicTextChanged(object sender,TextChangedEventArgs e)
+    {
+        if(!_cameraUiReady||_closing)return;
+        UpdateCameraSlotUi(1);
+    }
+    private void S2NicTextChanged(object sender,TextChangedEventArgs e)
+    {
+        if(!_cameraUiReady||_closing)return;
+        UpdateCameraSlotUi(2);
+    }
+
 
     private async void S1Scan_Click(object sender,RoutedEventArgs e)=>await ScanSlotAsync(1);
     private async void S2Scan_Click(object sender,RoutedEventArgs e)=>await ScanSlotAsync(2);
@@ -760,9 +771,15 @@ public partial class MainWindow : System.Windows.Window
         SlotScanButton(slot).IsEnabled=!open&&(slot==1?!_scanBusy1:!_scanBusy2);
         SlotDisconnectButton(slot).IsEnabled=open;
 
-        // CONNECT is only offered for a selected device that the policy can actually dispatch.
-        bool canConnect=!open&&model.Selected is not null&&
-            CameraTransportPolicy.CanDispatch(model.Selected,model.Mode,out _);
+        string slotVendor=SlotVendorIsBasler(slot)?"Basler":"Hikrobot";
+        string typedIp=SlotIpBox(slot).Text.Trim();
+        string typedNic=SlotNicBox(slot).Text.Trim();
+        bool manualEligible=CameraTransportPolicy.CanDispatchManualHik(model.Mode,slotVendor,typedIp,typedNic);
+
+        // CONNECT is offered for a selected dispatchable device, OR for fresh manual Hikrobot IP + explicit NIC without scan.
+        bool canConnect=!open&&(
+            (model.Selected is not null&&CameraTransportPolicy.CanDispatch(model.Selected,model.Mode,out _))||
+            (model.Selected is null&&manualEligible));
         SlotConnectButton(slot).IsEnabled=canConnect;
 
         bool showIp=model.Mode==CameraTransportMode.Ip;

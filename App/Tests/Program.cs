@@ -2370,5 +2370,51 @@ if (File.Exists(mwPath))
         Check("slot regression: SaveSlot preserves model.Mode when saving slot settings", preservesModelMode);
     }
 }
+
+// 23. Manual-IP Fresh Connect Workflow & Validation Tests
+Check("manual-ip fresh: CanDispatchManualHik allows valid IP and explicit NIC for Hikrobot",
+    CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Ip, "Hikrobot", "169.254.113.1", "169.254.113.10") &&
+    CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Ip, "Hikvision", "192.168.50.2", "192.168.50.1"));
+
+Check("manual-ip fresh: CanDispatchManualHik rejects Basler (preserves Basler SCAN REQUIRED)",
+    !CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Ip, "Basler", "169.254.113.1", "169.254.113.10"));
+
+Check("manual-ip fresh: CanDispatchManualHik rejects blank or invalid camera IP",
+    !CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Ip, "Hikrobot", "", "169.254.113.10") &&
+    !CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Ip, "Hikrobot", "   ", "169.254.113.10") &&
+    !CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Ip, "Hikrobot", "999.999.999.999", "169.254.113.10") &&
+    !CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Ip, "Hikrobot", "not-an-ip", "169.254.113.10"));
+
+Check("manual-ip fresh: CanDispatchManualHik rejects blank or invalid explicit NIC (fails closed)",
+    !CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Ip, "Hikrobot", "169.254.113.1", "") &&
+    !CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Ip, "Hikrobot", "169.254.113.1", "   ") &&
+    !CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Ip, "Hikrobot", "169.254.113.1", "999.999.999.999") &&
+    !CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Ip, "Hikrobot", "169.254.113.1", "invalid_nic"));
+
+Check("manual-ip fresh: CanDispatchManualHik rejects USB mode",
+    !CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Usb, "Hikrobot", "169.254.113.1", "169.254.113.10"));
+
+if (File.Exists(mwPath))
+{
+    string mwText = File.ReadAllText(mwPath);
+    int updateUiIndex = mwText.IndexOf("void UpdateCameraSlotUi(int slot)");
+    Check("manual-ip fresh: UpdateCameraSlotUi found in MainWindow.xaml.cs", updateUiIndex >= 0);
+    if (updateUiIndex >= 0)
+    {
+        int methodClose = mwText.IndexOf("private void ConnectCameraIp_Click", updateUiIndex);
+        if (methodClose < 0) methodClose = mwText.Length;
+        string updateUiBody = mwText.Substring(updateUiIndex, methodClose - updateUiIndex);
+
+        bool onlyRequiresSelected = updateUiBody.Contains("bool canConnect=!open&&model.Selected is not null&&") ||
+                                    updateUiBody.Contains("bool canConnect = !open && model.Selected is not null &&");
+        bool allowsManualWithoutSelected = updateUiBody.Contains("CanDispatchManualHik") ||
+                                           (updateUiBody.Contains("model.Selected is null") && updateUiBody.Contains("canConnect"));
+
+        Check("manual-ip fresh: UpdateCameraSlotUi does not restrict CONNECT strictly to model.Selected != null",
+            !onlyRequiresSelected);
+        Check("manual-ip fresh: UpdateCameraSlotUi enables CONNECT for manual Hikrobot IP without prior scan",
+            allowsManualWithoutSelected);
+    }
+}
 Console.WriteLine("TOTAL_TEST_FAILURES="+failed);
 return failed==0?0:1;

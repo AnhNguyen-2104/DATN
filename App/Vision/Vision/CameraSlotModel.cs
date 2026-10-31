@@ -511,6 +511,29 @@ public static class CameraTransportPolicy
 
         return true;
     }
+    /// <summary>True when text is a valid IPv4 dotted-quad address.</summary>
+    public static bool IsValidIpv4(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        string value = text.Trim();
+        return IPAddress.TryParse(value, out IPAddress? ip) &&
+               ip.AddressFamily == AddressFamily.InterNetwork;
+    }
+
+    /// <summary>
+    /// Evaluates whether a fresh manual-IP connect is eligible without a prior scan:
+    /// Requires IP transport mode, Hikrobot vendor, valid camera IPv4, and valid explicit local host NIC IPv4.
+    /// Basler, USB mode, blank/invalid camera IP, and blank/invalid NIC are rejected.
+    /// </summary>
+    public static bool CanDispatchManualHik(CameraTransportMode mode, string vendor, string? cameraIp, string? nicText)
+    {
+        if (mode != CameraTransportMode.Ip) return false;
+        if (!IsHikVendor(vendor)) return false;
+        if (!IsValidIpv4(cameraIp)) return false;
+        if (!IsValidIpv4(nicText)) return false;
+        return true;
+    }
+
     /// <summary>
     /// Preferred local IPv4 for GVCP / Hik direct IP:
     /// - Explicit nonblank Host/NIC input must be used exactly if valid IPv4; fails closed (empty string) if invalid with no fallback.
