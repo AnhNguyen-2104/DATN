@@ -8,4 +8,5 @@ public sealed class BaslerCameraDeviceInfo
     public string SerialNumber { get; set; } = "";
     public string ModelName { get; set; } = "";
     public CameraTransportType Transport { get; set; }
+    public string IpAddress { get; set; } = "";
 }

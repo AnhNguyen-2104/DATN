@@ -10,6 +10,11 @@ namespace WpfYolo_DotNet.Devices
     public class HikCameraService : IDisposable
     {
         private MyCamera _cam = new MyCamera();
+        static HikCameraService()
+        {
+            try { MvsNativeLoader.Ensure(); }
+            catch { }
+        }
         private bool _opened, _grabbing;
         private MyCamera.cbOutputExdelegate _callback;
         private readonly object _matLock = new();
@@ -52,6 +57,11 @@ namespace WpfYolo_DotNet.Devices
             LastError = string.Empty;
             try
             {
+                if (!MvsNativeLoader.Ensure())
+                {
+                    LastError = MvsNativeLoader.LastError;
+                    return false;
+                }
                 MyCamera.MV_CC_DEVICE_INFO_LIST list = new MyCamera.MV_CC_DEVICE_INFO_LIST();
                 int ret = MyCamera.MV_CC_EnumDevices_NET(GetHikTransportMask(transport), ref list);
                 if (ret != MyCamera.MV_OK)
@@ -101,6 +111,11 @@ namespace WpfYolo_DotNet.Devices
 
             try
             {
+                if (!MvsNativeLoader.Ensure())
+                {
+                    LastError = MvsNativeLoader.LastError;
+                    return false;
+                }
                 MyCamera.MV_CC_DEVICE_INFO_LIST list = new MyCamera.MV_CC_DEVICE_INFO_LIST();
                 int enumRet = MyCamera.MV_CC_EnumDevices_NET(GetHikTransportMask(camInfo.Transport), ref list);
                 if (enumRet != MyCamera.MV_OK)

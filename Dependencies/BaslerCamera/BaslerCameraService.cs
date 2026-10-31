@@ -78,6 +78,11 @@ public sealed class BaslerCameraService : IDisposable
                 var deviceType = device[CameraInfoKey.DeviceType];
                 var model = device[CameraInfoKey.ModelName];
                 var serial = device[CameraInfoKey.SerialNumber];
+                string ipAddress = "";
+                if (device.ContainsKey(CameraInfoKey.DeviceIpAddress))
+                {
+                    ipAddress = device[CameraInfoKey.DeviceIpAddress] ?? "";
+                }
                 var label = string.IsNullOrWhiteSpace(model) ? $"Basler {_enumeratedDevices.Count}" : model;
                 var display = string.IsNullOrWhiteSpace(serial) ? label : $"{label} - {serial}";
 
@@ -88,7 +93,8 @@ public sealed class BaslerCameraService : IDisposable
                     Name = $"Basler [{transport}]: {display}",
                     ModelName = model,
                     SerialNumber = serial,
-                    Transport = MapTransport(deviceType)
+                    Transport = MapTransport(deviceType),
+                    IpAddress = ipAddress
                 });
             }
 

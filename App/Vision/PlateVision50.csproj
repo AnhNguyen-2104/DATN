@@ -18,5 +18,6 @@
     <Compile Include="..\..\Dependencies\Devices\CameraTransportType.cs" Link="Devices\CameraTransportType.cs" />
     <Compile Include="..\..\Dependencies\Devices\HikCameraService.cs" Link="Devices\HikCameraService.cs" />
     <Compile Include="..\..\Dependencies\Devices\UnifiedCameraService.cs" Link="Devices\UnifiedCameraService.cs" />
+    <Compile Include="..\..\Dependencies\Devices\MvsNativeLoader.cs" Link="Devices\MvsNativeLoader.cs" />
   </ItemGroup>
 </Project>

@@ -9,6 +9,15 @@
 3. `D:\VC\PLC_Q_Session2_Ladder.csv` (Bảng mã lệnh Ladder Instruction List tương đương)
 4. `D:\VC\Session2_Mitsubishi_Q_Guide.md` (Tài liệu hướng dẫn chi tiết này)
 
+
+> ⚠️ **ERRATA / RECONCILIATION NOTICE (2026-10-25):**
+> 1. **Van keo vật lý thực tế là `Y25` (Terminal Y25)** trên module QY40P Slot 1, **KHÔNG PHẢI `Y20`**.
+>    - Các ngõ ra `Y20`, `Y21`, `Y22` được đấu nối vật lý cho **Servo 1..3 Enable** (trục X, Y, Z).
+>    - Ngõ ra `Y23` được đấu nối vật lý cho **Thắng từ (Brake Release)**.
+>    - Tất cả `Y20..Y23` thuộc quyền sở hữu độc quyền của chương trình `MAIN` trong PLC-Q.
+>    - Ngõ ra `Y25` là cuộn duy nhất điều khiển van keo (`Y25 := bValve_Open AND NOT M105;`).
+> 2. **Bit Handshake là `M1000` (Start) và `M1001` (Ack)**, KHÔNG PHẢI `M100/M101` (vốn được dùng cho Homing trong `MAIN`).
+> 3. **BẮT BUỘC:** Trước khi nạp xuống PLC thật, phải thực hiện `Online -> Read/Verify` trong GX Works2 để đối soát với chương trình đang chạy trên CPU Q06UDEH.
 ---
 
 ## 1. TỔNG QUAN PHẦN CỨNG & QUY HOẠCH ĐỊA CHỈ TRẠM Q
@@ -22,7 +31,7 @@ Hệ thống sử dụng Main Base Q35B / Q38B với phân bổ Slot như sau:
   * Base Buffer Memory truy cập qua tiền tố: **`U0\G...`**.
 * **Slot 1**: Module 16 ngõ ra Transistor Sink **QY40P** (điều khiển cơ cấu chấp hành trường).
   * Chiếm dụng 16 điểm Output: **`Y20..Y2F`**.
-  * **Ngõ ra van keo tốc độ cao**: Gán tại **`Y20`** (Transistor phản ứng $<0.1\text{ ms}$).
+  * **Phân bổ thực tế**: `Y20..Y22` (Servo 1..3 Enable), `Y23` (Brake Release), `Y24` (Spare), **`Y25`** (Ngõ ra van keo tốc độ cao, Transistor phản ứng $<0.1\text{ ms}$).
 
 ---
 
@@ -38,7 +47,7 @@ Trong kiến trúc phần cứng Mitsubishi Q-Series, khi QD75D4 cắm tại Slo
 
 **GIẢI PHÁP TIÊU CHUẨN ĐÃ THỰC THI (ĐỒNG THUẬN 100%)**:
 * **`Y0` luôn luôn được giữ ON liên tục trong chương trình PLC** bằng tiếp điểm hệ thống `SM400` (`LD SM400 -> OUT Y0` hoặc `Y0 := SM400;`), tuyệt đối không bị ngắt kể cả khi có lệnh dừng khẩn `M105` hay lỗi. Điều này đảm bảo cờ `X0` (`QD75 READY`) luôn ở trạng thái sẵn sàng, không bị reset bộ nhớ đệm hay mất 100ms chu kỳ khởi tạo lại.
-* Chuyển tín hiệu kích van keo vật lý sang ngõ ra Transistor độc lập **`Y20`** (hoặc ngõ ra DO vật lý riêng theo tủ điện), được điều khiển an toàn qua cuộn nội bộ **`M200`** (`bValveCmd`) và bảo vệ bằng liên khóa.
+* Chuyển tín hiệu kích van keo vật lý sang ngõ ra Transistor độc lập **`Y25`** (Terminal Y25 trên module QY40P Slot 1, không ghi đè lên `Y20..Y23` của Servo/Phanh), được điều khiển an toàn qua cuộn nội bộ **`M200`** (`bValveCmd`) và bảo vệ bằng liên khóa.
 ---
 
 ## 2. BẢNG PHÂN BỔ THANH GHI VÀ VÙNG NHỚ TRUYỀN THÔNG DMA
@@ -58,13 +67,13 @@ Trong kiến trúc phần cứng Mitsubishi Q-Series, khi QD75D4 cắm tại Slo
 | **D116 - D117** | `Target_X_Sync` | DINT (32-bit) | $0.1\ \mu\text{m}$ | Vị trí kết thúc trượt $X$ ($= Target\_X + DeltaX\_Sync$) |
 | **D120** | `Diag_ErrCode` | INT (16-bit) | Mã lỗi | Mã chẩn đoán phần mềm ($501: X,\ 502: Y,\ 503: Z,\ 901: QD75$) |
 | **D200** | `iState` | INT (16-bit) | $0..50$ | Bước hiện tại của Máy trạng thái FSM |
-| **M100** | `Cmd_Start_Vertex`| BIT | Boolean | Cạnh lên kích chạy đỉnh từ TwinCAT 3 (hoặc ép tay) |
-| **M101** | `Ack_Vertex_Done` | BIT | Boolean | Báo hoàn thành đỉnh về Master TwinCAT 3 |
+| **M1000** | `Cmd_Start_Vertex`| BIT | Boolean | Cạnh lên kích chạy đỉnh từ TwinCAT 3 (hoặc ép tay); M100/M101 dành riêng cho Homing |
+| **M1001** | `Ack_Vertex_Done` | BIT | Boolean | Báo hoàn thành đỉnh về Master TwinCAT 3 |
 | **M102** | `Robot_Busy` | BIT | Boolean | Gantry đang trong quá trình chuyển động nội suy |
 | **M103** | `Robot_In_Position`| BIT | Boolean | Cả 3 trục đã đáp vào vị trí đích an toàn |
 | **M104** | `Robot_Alarm` | BIT | Boolean | Báo động lỗi phần cứng QD75 hoặc vi phạm Stroke Limit |
 | **M105** | `Cmd_Cycle_Reset` | BIT | Boolean | Lệnh dừng khẩn cấp / Hủy chu trình / Reset lỗi |
-| **M200 / Y20** | `Valve_Dispense` | BIT | Boolean | Cuộn lệnh (`M200`) và ngõ ra vật lý van keo (`Y20`) |
+| **M200 / Y25** | `Valve_Dispense` | BIT | Boolean | Cuộn lệnh (`M200`) và ngõ ra vật lý van keo (`Y25`); `Y20..Y23` thuộc `MAIN` |
 | **T0 / TC0** | `Dispense_Timer` | High-Speed Timer| $10\text{ ms/count}$ | Bộ định thì tốc độ cao $30\text{ ms}$ (`OUTH T0 K3`) |
 
 ---

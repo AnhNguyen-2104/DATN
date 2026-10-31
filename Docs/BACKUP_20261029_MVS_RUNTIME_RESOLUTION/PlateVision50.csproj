@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>PlateVision50_V2</AssemblyName><PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260214" />
+    <PackageReference Include="OpenCvSharp4.Windows" Version="4.13.0.20260214" />
+    <PackageReference Include="OpenCvSharp4.WpfExtensions" Version="4.13.0.20260214" />
+    <PackageReference Include="Beckhoff.TwinCAT.Ads" Version="6.2.521" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Dependencies\BaslerCamera\NVKProject.DotNet.BaslerCamera.csproj"/>
+    <Compile Include="..\..\Dependencies\Devices\MyCamera.cs" Link="Devices\MyCamera.cs" />
+    <Compile Include="..\..\Dependencies\Devices\CameraVendor.cs" Link="Devices\CameraVendor.cs" />
+    <Compile Include="..\..\Dependencies\Devices\CameraInfo.cs" Link="Devices\CameraInfo.cs" />
+    <Compile Include="..\..\Dependencies\Devices\CameraTransportType.cs" Link="Devices\CameraTransportType.cs" />
+    <Compile Include="..\..\Dependencies\Devices\HikCameraService.cs" Link="Devices\HikCameraService.cs" />
+    <Compile Include="..\..\Dependencies\Devices\UnifiedCameraService.cs" Link="Devices\UnifiedCameraService.cs" />
+  </ItemGroup>
+</Project>

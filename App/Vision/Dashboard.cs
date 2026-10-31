@@ -23,15 +23,25 @@ internal sealed class LineStatus
     public bool ServoReady { get; init; }
     public bool GlobalStop { get; init; }
     public bool PlcQConnected { get; init; }
+    public bool PlcQError { get; init; }
+    public uint PlcQErrorId { get; init; }
     public bool GantryBusy { get; init; }
     public bool GantryDone { get; init; }
     public bool GantryError { get; init; }
     public short GantryVertex { get; init; }
     public short GantryErrorCode { get; init; }
+    public uint GantryCommErrorId { get; init; }
+    public bool StopCommandConfirmed { get; init; }
+    public short AutoDispatchState { get; init; }
     public bool GantryPublisherEnabled { get; init; }
     public bool VisionBridgeVerified { get; init; }
     public short QueueCount { get; init; }
     public uint QueueHead { get; init; }
+    public uint QueueRealCompleted { get; init; }
+    public double QueueHeadX_mm { get; init; }
+    public double QueueHeadY_mm { get; init; }
+    public double GantryTargetX_mm { get; init; }
+    public double GantryTargetY_mm { get; init; }
     public uint Accepted { get; init; }
     public uint Missed { get; init; }
     public double BeltSpeed { get; init; }
@@ -87,15 +97,25 @@ internal static class LineAds
             SystemEStopOk=Optional<bool>(ads,"MAIN.bSystemEStopOK",presence),
             ServoReady=Optional<bool>(ads,"MAIN.bServo_Ready",presence),
             PlcQConnected=Optional<bool>(ads,"MAIN.bPlcQConnected",presence),
+            PlcQError=Optional<bool>(ads,"MAIN.bPlcQError",presence,false),
+            PlcQErrorId=Optional<uint>(ads,"MAIN.nPlcQErrorID",presence,0u),
             GantryBusy=Optional<bool>(ads,"MAIN.bGlueCycleBusy",presence),
             GantryDone=Optional<bool>(ads,"MAIN.bGlueCycleDone",presence),
             GantryError=Optional<bool>(ads,"MAIN.bGlueCycleError",presence),
             GantryVertex=Optional<short>(ads,"MAIN.nGlueCurVertex",presence),
             GantryErrorCode=Optional<short>(ads,"MAIN.nGlueErrorCode",presence),
+            GantryCommErrorId=Optional<uint>(ads,"MAIN.nGlueCommErrorID",presence,0u),
+            StopCommandConfirmed=Optional<bool>(ads,"MAIN.bStopCommandConfirmed",presence,false),
+            AutoDispatchState=Optional<short>(ads,"MAIN.nAutoDispatchState",presence,(short)0),
             GantryPublisherEnabled=Optional<bool>(ads,"MAIN.bLegacyMotionPublisherAllow",presence),
             VisionBridgeVerified=Optional<bool>(ads,"MAIN.bVisionFeedVerified",presence),
             QueueCount=Optional<short>(ads,"MAIN.nQueueCount",presence),
             QueueHead=Optional<uint>(ads,"MAIN.nQueueHeadProductID",presence),
+            QueueRealCompleted=Optional<uint>(ads,"MAIN.nQueueRealCompleted",presence,0u),
+            QueueHeadX_mm=Optional<double>(ads,"MAIN.rQueueHeadX_mm",presence,0.0),
+            QueueHeadY_mm=Optional<double>(ads,"MAIN.rQueueHeadY_mm",presence,0.0),
+            GantryTargetX_mm=Optional<double>(ads,"MAIN.fbPublisher.rTargetX_mm",presence,0.0),
+            GantryTargetY_mm=Optional<double>(ads,"MAIN.fbPublisher.rTargetY_mm",presence,0.0),
             Accepted=Optional<uint>(ads,"MAIN.nQueueAccepted",presence),
             Missed=Optional<uint>(ads,"MAIN.nQueueMissed",presence),
             BeltSpeed=Optional<double>(ads,"MAIN.rConveyorSpeed",presence),
@@ -198,12 +218,13 @@ public partial class MainWindow
             DashBeltMmS.Text=$"{s.BeltSpeed:F2} mm/s";
             DashHzReal.Text=$"{s.HzActualReference:F1} Hz";
             DashAnalog.Text=$"{s.AoVoltsReference:F2} V (raw {s.AoRaw})";
-            DashGantryPlc.Text="Mitsubishi Q: "+(s.PlcQConnected?"TCP ONLINE":"DISCONNECTED");
-            DashGantryState.Text=s.GantryError?"GANTRY: FAULT / NOT READY"
-                :s.GantryBusy?"GANTRY: CYCLE IN PROGRESS"
-                :s.GantryPublisherEnabled?"PUBLISHER ENABLED / NOT COMMISSIONED":"GANTRY: AUTO NOT COMMISSIONED";
-            DashGantryVertex.Text=$"Current vertex: {s.GantryVertex} / 4 | Error: {s.GantryErrorCode}";
-            DashGantryStats.Text=$"FIFO: {s.QueueCount}  |  Accepted: {s.Accepted}  |  Missed: {s.Missed}";
+            DashGantryPlc.Text = s.PlcQError ? $"Mitsubishi Q: MC ERROR ({s.PlcQErrorId})" : ("Mitsubishi Q: " + (s.PlcQConnected ? "TCP ONLINE" : "DISCONNECTED"));
+            DashGantryState.Text = s.GantryError ? $"GANTRY: FAULT (CODE {s.GantryErrorCode})"
+                : s.GantryBusy ? "GANTRY: CYCLE IN PROGRESS"
+                : s.StopCommandConfirmed ? "GANTRY: STOP CONFIRMED"
+                : s.GantryPublisherEnabled ? "PUBLISHER ENABLED / NOT COMMISSIONED" : "GANTRY: AUTO NOT COMMISSIONED";
+            DashGantryVertex.Text = $"Current vertex: {s.GantryVertex} / 4 | State: {s.AutoDispatchState}";
+            DashGantryStats.Text = $"FIFO: {s.QueueCount}  |  Acc: {s.Accepted}  |  Done: {s.QueueRealCompleted}  |  Miss: {s.Missed}";
             DashCamera1.Text=(_cam1.IsOpen?"Camera 1: LIVE":"Camera 1: "+(_video!=null?"VIDEO TEST":"DISCONNECTED"))
                  +(_trackingEnabled?" | DETECT ON":" | DETECT OFF");
             // Camera connection ≠ validated camera-to-PLC calibration.
@@ -324,16 +345,27 @@ public partial class MainWindow
             T("CONVEYOR","GVL_MD200_IO.nAO1_Raw",s.AoRaw.ToString()),
             T("CONVEYOR","GVL_MD200_IO.bRUN_DO",V(s.BeltRun)),
             T("GANTRY","MAIN.bVisionFeedVerified",V(s.VisionBridgeVerified)),
+            T("GANTRY","MAIN.bPlcQConnected",V(s.PlcQConnected)),
+            T("GANTRY","MAIN.bPlcQError",V(s.PlcQError)),
+            T("GANTRY","MAIN.nPlcQErrorID",s.PlcQErrorId.ToString()),
             T("GANTRY","MAIN.nQueueCount",s.QueueCount.ToString()),
             T("GANTRY","MAIN.nQueueHeadProductID",s.QueueHead.ToString()),
             T("GANTRY","MAIN.nQueueAccepted",s.Accepted.ToString()),
             T("GANTRY","MAIN.nQueueMissed",s.Missed.ToString()),
+            T("GANTRY","MAIN.nQueueRealCompleted",s.QueueRealCompleted.ToString()),
+            T("GANTRY","MAIN.rQueueHeadX_mm",$"{s.QueueHeadX_mm:F1} mm"),
+            T("GANTRY","MAIN.rQueueHeadY_mm",$"{s.QueueHeadY_mm:F1} mm"),
+            T("GANTRY","MAIN.fbPublisher.rTargetX_mm",$"{s.GantryTargetX_mm:F1} mm"),
+            T("GANTRY","MAIN.fbPublisher.rTargetY_mm",$"{s.GantryTargetY_mm:F1} mm"),
             T("GANTRY","MAIN.bLegacyMotionPublisherAllow",V(s.GantryPublisherEnabled)),
             T("GANTRY","MAIN.bGlueCycleBusy",V(s.GantryBusy)),
             T("GANTRY","MAIN.bGlueCycleDone",V(s.GantryDone)),
             T("GANTRY","MAIN.bGlueCycleError",V(s.GantryError)),
             T("GANTRY","MAIN.nGlueCurVertex",s.GantryVertex.ToString()),
             T("GANTRY","MAIN.nGlueErrorCode",s.GantryErrorCode.ToString()),
+            T("GANTRY","MAIN.nGlueCommErrorID",s.GantryCommErrorId.ToString()),
+            T("GANTRY","MAIN.bStopCommandConfirmed",V(s.StopCommandConfirmed)),
+            T("GANTRY","MAIN.nAutoDispatchState",s.AutoDispatchState.ToString()),
             new("SCARA","GVL_SCARA.*","--","RESERVED","--","--"),
             new("CAMERA 2","GVL_CAMERA2.*","--","RESERVED","--","--")
         };
@@ -383,16 +415,27 @@ public partial class MainWindow
             T("CONVEYOR", "GVL_MD200_IO.nAO1_Raw", "0"),
             T("CONVEYOR", "GVL_MD200_IO.bRUN_DO", "FALSE"),
             T("GANTRY", "MAIN.bVisionFeedVerified", "FALSE"),
+            T("GANTRY", "MAIN.bPlcQConnected", "FALSE"),
+            T("GANTRY", "MAIN.bPlcQError", "FALSE"),
+            T("GANTRY", "MAIN.nPlcQErrorID", "0"),
             T("GANTRY", "MAIN.nQueueCount", "0"),
             T("GANTRY", "MAIN.nQueueHeadProductID", "0"),
             T("GANTRY", "MAIN.nQueueAccepted", "0"),
             T("GANTRY", "MAIN.nQueueMissed", "0"),
+            T("GANTRY", "MAIN.nQueueRealCompleted", "0"),
+            T("GANTRY", "MAIN.rQueueHeadX_mm", "0.0 mm"),
+            T("GANTRY", "MAIN.rQueueHeadY_mm", "0.0 mm"),
+            T("GANTRY", "MAIN.fbPublisher.rTargetX_mm", "0.0 mm"),
+            T("GANTRY", "MAIN.fbPublisher.rTargetY_mm", "0.0 mm"),
             T("GANTRY", "MAIN.bLegacyMotionPublisherAllow", "FALSE"),
             T("GANTRY", "MAIN.bGlueCycleBusy", "FALSE"),
             T("GANTRY", "MAIN.bGlueCycleDone", "FALSE"),
             T("GANTRY", "MAIN.bGlueCycleError", "FALSE"),
             T("GANTRY", "MAIN.nGlueCurVertex", "0"),
             T("GANTRY", "MAIN.nGlueErrorCode", "0"),
+            T("GANTRY", "MAIN.nGlueCommErrorID", "0"),
+            T("GANTRY", "MAIN.bStopCommandConfirmed", "FALSE"),
+            T("GANTRY", "MAIN.nAutoDispatchState", "0"),
             new("SCARA", "GVL_SCARA.*", "--", "RESERVED", "--", "--"),
             new("CAMERA 2", "GVL_CAMERA2.*", "--", "RESERVED", "--", "--")
         };

@@ -5,6 +5,17 @@ namespace WpfYolo_DotNet.Devices
 {
     public class MyCamera
     {
+        static MyCamera()
+        {
+            try
+            {
+                MvsNativeLoader.Ensure();
+            }
+            catch
+            {
+            }
+        }
+
 
         /// <summary>
         /// Constructor

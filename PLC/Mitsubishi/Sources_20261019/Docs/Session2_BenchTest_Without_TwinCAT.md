@@ -5,6 +5,11 @@
 
 **Đối tượng đọc**: Kỹ sư Session 2 (PLC-Q) khi chạy bench-test, và Session 1 để hiểu dữ liệu giả lập cần khớp định dạng với dữ liệu thật.
 
+> ⚠️ **ERRATA / RECONCILIATION NOTICE (2026-10-25):**
+> Ngõ ra van keo vật lý thực tế trên module QY40P Slot 1 là **`Y25` (Terminal Y25)**, **KHÔNG PHẢI `Y20`**.
+> Các ngõ ra `Y20..Y22` là Servo 1..3 Enable và `Y23` là Thắng từ (Brake Release), thuộc sở hữu độc quyền của `MAIN` ladder.
+> Đoạn code ST đã được chuẩn hóa `Y25 := bValve_Open AND NOT M105;`. Trước khi nạp PLC thực tế, kỹ sư phải thực hiện `Online -> Read/Verify` trong GX Works2.
+
 ---
 
 ## 1. NGUYÊN LÝ
@@ -17,7 +22,7 @@ flowchart LR
     B --> C[FSM State 10<br/>Kiểm tra biên]
     C --> D[Nạp Buffer QD75<br/>Point 1/2/3]
     D --> E[Phát xung Y10<br/>Gantry bay thật]
-    E --> F[X4 ON → Y20 bật<br/>30 ms]
+    E --> F[X4 ON → Y25 bật<br/>30 ms]
     F --> G[X14 ON → M1001 ON]
     G --> H[Ép M1000 = OFF<br/>Về IDLE, đỉnh kế tiếp]
 ```
@@ -75,8 +80,8 @@ Sau khi gõ đủ bảng trên, ép `M1000 = ON`:
 | 1 | `D200 = 0 → 10` | `D116 = 830000` (83.0 mm) tự tính | Gantry nhún nhẹ, servo enable |
 | 2 | `D200 = 10 → 20` | `Y10` nhấp `ON` 1 scan, `X10` phản hồi `ON` | Bắt đầu có tiếng động cơ chạy |
 | 3 | `D200 = 20 → 30` | `M102 = ON` (Robot_Busy) | X chạy về 77 mm, Y về 100 mm, Z hạ xuống 4 mm |
-| 4 | Đang ở Point 2 | **`X4` bật `ON`**, **`Y20` bật `ON`** | Nghe tiếng van keo "tạch" mở, đèn LED Slot 1 sáng |
-| 5 | Sau 30 ms | `Y20` tắt ngay, `X4` tắt | Nghe tiếng van đóng, keo chỉ xả 1 giọt ngắn |
+| 4 | Đang ở Point 2 | **`X4` bật `ON`**, **`Y25` bật `ON`** | Nghe tiếng van keo "tạch" mở, đèn LED Y25 sáng |
+| 5 | Sau 30 ms | `Y25` tắt ngay, `X4` tắt | Nghe tiếng van đóng, keo chỉ xả 1 giọt ngắn |
 | 6 | Đang ở Point 3 | Trục Z đọc về 0 mm | Z rút lên nhanh (~30 ms) |
 | 7 | Kết thúc | **`X14 = ON`** → `D200 = 40 → 50`, **`M1001 = ON`**, `M103 = ON` | Gantry đứng yên ở vị trí cuối, chờ lệnh |
 | 8 | Ép `M1000 = OFF` | `M1001 = OFF`, `M103 = OFF`, `D200 = 0` | Về IDLE, sẵn sàng đỉnh tiếp theo |
@@ -124,7 +129,7 @@ Nạp `D104 = 10000` (1 mm, cao độ chấm) và `D112 = 50000` (5 mm, cao đ�
 Nếu muốn kiểm tra **riêng** mạch van mà không chạy gantry (ví dụ đã tháo đầu kim, đấu đồng hồ đo), có thể dùng một trong các cách:
 
 1. **Chạy đúng test 1** ở chế độ Point 2 (như mục 3). Van mở đúng khi `X4` bật.
-2. **Kiểm tra thời gian thực bằng PLC**: đặt đồng hồ đo ở `Y20` (hoặc module QY40P chân tương ứng). Đo độ rộng xung — phải **đúng 30 ms ±1 ms** (3 × 10 ms của timer tốc độ cao).
+2. **Kiểm tra thời gian thực bằng PLC**: đặt đồng hồ đo ở `Y25` (Terminal Y25 trên module QY40P). Đo độ rộng xung — phải **đúng 30 ms ±1 ms** (3 × 10 ms của timer tốc độ cao).
 3. **Kiểm tra khi Timer chưa ngắt kịp**: nếu xung rộng hơn 30 ms, kiểm tra `TIMER_H_M` được khai báo đúng và `T0` không bị ghi đè bởi chương trình khác.
 
 ---
@@ -138,7 +143,7 @@ Nếu muốn kiểm tra **riêng** mạch van mà không chạy gantry (ví dụ
 | `D200 = 10 → 30` nhưng trục đứng im | `Speed_Approach` hoặc `Target_Z_Down` đang là 0 | Nạp lại đúng bảng mục 2 |
 | Chạy xong mà `M1001` không ON | Mất `X14` hoặc còn 1 trục bận (`XC/XD/XE`) | Đọc `U0\G800..G1000` (`Md.20`) xem trục nào chưa tới; đọc `U0\G806` (`Md.23`) xem có lỗi QD75 |
 | `M104 = ON` ngay từ đầu | Có lỗi QD75 từ trước (`X8..XA`) | Đọc `D121..D123`, reset bằng `M105` hoặc `Cd.5` |
-| `Y20` mở kéo dài hơn 30 ms | Timer bị reset bởi scan hoặc code khác ghi đè `TC0` | Kiểm tra chỉ có **1 chỗ duy nhất** gọi `TIMER_H_M(M200, TC0, 3)` |
+| `Y25` mở kéo dài hơn 30 ms | Timer bị reset bởi scan hoặc code khác ghi đè `TC0` | Kiểm tra chỉ có **1 chỗ duy nhất** gọi `TIMER_H_M(M200, TC0, 3)` |
 
 **An toàn bắt buộc trước khi chạy**:
 * Đặt tay lên E-Stop cứng trong suốt quá trình bench-test.

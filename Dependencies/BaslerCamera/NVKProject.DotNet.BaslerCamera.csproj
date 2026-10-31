@@ -8,9 +8,13 @@
     <RootNamespace>NVKProject.DotNet.BaslerCamera</RootNamespace>
     <AssemblyName>NVKProject.DotNet.BaslerCamera</AssemblyName>
     <ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
-    <PylonRoot Condition="'$(PylonRoot)' == ''">C:\Program Files\Basler\pylon 8</PylonRoot>
-    <PylonManagedDll>$(PylonRoot)\Development\Assemblies\Basler.Pylon\x64\Basler.Pylon.dll</PylonManagedDll>
-    <PylonRuntimeDir>$(PylonRoot)\Runtime\x64</PylonRuntimeDir>
+    <PylonRoot Condition="'$(PylonRoot)' == '' and '$(PYLON_ROOT)' != ''">$(PYLON_ROOT)</PylonRoot>
+    <PylonRoot Condition="'$(PylonRoot)' == '' and Exists('C:\Program Files\Basler\pylon')">C:\Program Files\Basler\pylon</PylonRoot>
+    <PylonRoot Condition="'$(PylonRoot)' == '' and Exists('C:\Program Files\Basler\pylon 8')">C:\Program Files\Basler\pylon 8</PylonRoot>
+    <PylonRoot Condition="'$(PylonRoot)' == ''">C:\Program Files\Basler\pylon</PylonRoot>
+    <PylonManagedDll Condition="'$(PylonManagedDll)' == '' and Exists('$(PylonRoot)\Development\Assemblies\Basler.Pylon\net8.0\x64\Basler.Pylon.dll')">$(PylonRoot)\Development\Assemblies\Basler.Pylon\net8.0\x64\Basler.Pylon.dll</PylonManagedDll>
+    <PylonManagedDll Condition="'$(PylonManagedDll)' == '' and Exists('$(PylonRoot)\Development\Assemblies\Basler.Pylon\x64\Basler.Pylon.dll')">$(PylonRoot)\Development\Assemblies\Basler.Pylon\x64\Basler.Pylon.dll</PylonManagedDll>
+    <PylonRuntimeDir Condition="'$(PylonRuntimeDir)' == ''">$(PylonRoot)\Runtime\x64</PylonRuntimeDir>
   </PropertyGroup>
 
   <ItemGroup>

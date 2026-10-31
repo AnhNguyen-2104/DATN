@@ -1,8 +1,10 @@
 (***************************************************************************************************)
 (* PROGRAM : Tracking (ST) - Q06UDEH + QD75D4                                                      *)
-(* VERSION : 4.0 - TAT CA LENH 32-BIT DUNG DMOV(TRUE, Nguon, Dich)                                 *)
+(* VERSION : 4.1 - REASSIGNED PHYSICAL GLUE PUMP TO Y25 (TERMINAL Y25)                              *)
 (* KIEU    : TwinCAT ghi D -> DMOV D->VAR -> tinh toan tren VAR -> DMOV VAR->D -> DTO nap QD75    *)
-(* QUY TAC : Single-Writer | Y0 thuoc MAIN | Y10 owner MAIN qua M110 | 0 Double-Coil               *)
+(* QUY TAC : Single-Writer | Y0 thuoc MAIN | Y10 owner MAIN qua M110 | Y20..Y23 thuoc MAIN         *)
+(* SAFETY  : Y20..Y22 (Servo 1..3 Enables) & Y23 (Brake Release) OWNED EXCLUSIVELY BY MAIN LADDER   *)
+(* NOTICE  : OFFLINE ARTIFACT ONLY. LIVE PLC-Q STILL REQUIRES ONLINE READ/VERIFY & AUTHORIZED DOWNLOAD*)
 (* TAG     : Local Label KHONG gan Device (Device de trong), chi khai Class + Data Type            *)
 (***************************************************************************************************)
 
@@ -197,7 +199,11 @@ Y6 := M105;                                 (* Axis 3 Stop *)
 
 M110 := bReq_Start_Y10 AND NOT M105;        (* Yeu cau Start -> MAIN xuat Y10 *)
 
-Y20 := bValve_Open AND NOT M105;            (* Van keo vat ly (Slot 1 QY40P) *)
+(* SAFETY FIX 2026-10-25: Reassigned from Y20 to Y25 to match confirmed physical wiring            *)
+(* Y20..Y22 are Servo 1..3 Enables; Y23 is Brake Release (all owned by MAIN ladder).                *)
+(* Y25 is the physical Glue Pump Trigger output on Slot 1 QY40P.                                     *)
+(* WARNING: Live PLC-Q still requires online Read/Verify in GX Works2 prior to authorized download.  *)
+Y25 := bValve_Open AND NOT M105;            (* Van keo vat ly (Slot 1 QY40P - Terminal Y25) *)
 
 (***************************************************************************************************)
 (* 8. LUU LICH SU TIN HIEU DE BAT CANH LEN                                                         *)

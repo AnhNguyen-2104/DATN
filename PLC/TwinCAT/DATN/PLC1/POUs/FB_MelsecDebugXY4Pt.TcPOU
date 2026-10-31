@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
   <POU Name="FB_MelsecDebugXY4Pt" Id="{d87b6f2e-7da6-42c2-a98b-51142259b86c}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_MelsecDebugXY4Pt
@@ -404,6 +404,10 @@ fbRead(
     </Implementation>
     <LineIds Name="FB_MelsecDebugXY4Pt">
       <LineId Id="9" Count="0" />
+      <LineId Id="4" Count="4" />
+      <LineId Id="331" Count="0" />
+      <LineId Id="10" Count="320" />
+      <LineId Id="2" Count="0" />
     </LineIds>
   </POU>
 </TcPlcObject>

@@ -28,6 +28,14 @@ public sealed class UnifiedCameraService : IDisposable
     {
         try
         {
+            MvsNativeLoader.Ensure();
+        }
+        catch
+        {
+        }
+
+        try
+        {
             PylonNativeLoader.Ensure();
         }
         catch (Exception ex)

@@ -138,7 +138,17 @@ public static class LineMailboxProtocol
         "MAIN.rMD200_SetSpeed_mm_s",
         "MAIN.rMD200_AppliedSpeed_mm_s",
         "MAIN.nMD200_SpeedInputState",
-        "MAIN.rBeltPreviewUnverified_Hz"
+        "MAIN.rBeltPreviewUnverified_Hz",
+        "MAIN.bPlcQError",
+        "MAIN.nPlcQErrorID",
+        "MAIN.nGlueCommErrorID",
+        "MAIN.bStopCommandConfirmed",
+        "MAIN.nAutoDispatchState",
+        "MAIN.nQueueRealCompleted",
+        "MAIN.rQueueHeadX_mm",
+        "MAIN.rQueueHeadY_mm",
+        "MAIN.fbPublisher.rTargetX_mm",
+        "MAIN.fbPublisher.rTargetY_mm"
     };
 
     public static string ClassifyQuality(string tag, bool isAvailableOnRuntime)

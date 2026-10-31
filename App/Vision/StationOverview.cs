@@ -44,6 +44,8 @@ public partial class MainWindow
         Edge("PLC-Q TCP",old.PlcQConnected,now.PlcQConnected);
         Edge("Gantry Busy",old.GantryBusy,now.GantryBusy);
         Edge("Gantry Alarm",old.GantryError,now.GantryError);
+        Edge("PLC-Q MC Error",old.PlcQError,now.PlcQError);
+        Edge("Gantry Stop Confirmed",old.StopCommandConfirmed,now.StopCommandConfirmed);
         Edge("MD200 RUN DO",old.BeltRun,now.BeltRun);
         bool wasServo = old.SymbolPresence.TryGetValue("MAIN.bServo_Ready",out var oldOk) && oldOk;
         bool isServo = now.SymbolPresence.TryGetValue("MAIN.bServo_Ready",out var newOk) && newOk;
@@ -157,10 +159,11 @@ public partial class MainWindow
         OverviewSensors.Text =
             $"E-STOP AUX DI0: {BoolState(status.EstopOk)}  |  TwinCAT STOP REQUEST: {BoolState(status.GlobalStop)}  |  " +
             $"SERVO READY: {servo}  |  MD200 RUN DO: {BoolState(status.BeltRun)}  |  ENCODER: {status.BeltSpeed:F2} mm/s";
+        string plcQDesc = status.PlcQError ? $"MC ERROR ({status.PlcQErrorId})" : (status.PlcQConnected ? "CONNECTED" : "DISCONNECTED");
         OverviewGantrySensors.Text =
-            $"PLC-Q TCP: {(status.PlcQConnected ? "CONNECTED" : "DISCONNECTED")}  |  " +
+            $"PLC-Q TCP: {plcQDesc}  |  " +
             $"VISION BRIDGE: {BoolState(status.VisionBridgeVerified)}  |  GANTRY BUSY: {BoolState(status.GantryBusy)}" +
-            $"  |  ALARM: {BoolState(status.GantryError)}";
+            $"  |  ALARM: {BoolState(status.GantryError)}  |  STOP ACK: {BoolState(status.StopCommandConfirmed)}";
         OverviewGlobalAuthority.Text = status.EstopOk && !status.GlobalStop
             ? "ADS LIVE · GLOBAL START/STOP NOT COMMISSIONED; PHYSICAL E-STOP REQUIRED"
             : "PLC STOP REQUESTED / E-STOP AUX NOT OK · DO NOT START EQUIPMENT";

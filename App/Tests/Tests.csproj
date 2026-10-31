@@ -24,5 +24,6 @@
     <Compile Include="..\Vision\TwinCAT\CameraPipelineSimulator.cs" Link="CameraPipelineSimulator.cs" />
     <Compile Include="..\Vision\Vision\CameraSlotModel.cs" Link="CameraSlotModel.cs" />
     <Compile Include="..\Vision\Vision\GvcpDiscovery.cs" Link="GvcpDiscovery.cs" />
+    <Compile Include="..\..\Dependencies\Devices\MvsNativeLoader.cs" Link="MvsNativeLoader.cs" />
   </ItemGroup>
 </Project>

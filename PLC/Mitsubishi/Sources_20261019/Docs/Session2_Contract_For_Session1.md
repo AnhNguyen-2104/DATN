@@ -3,6 +3,9 @@
 
 **Mục đích:** Session 1 chỉ tính Vision/Encoder/đón đầu, ghi dữ liệu vào PLC và thực hiện handshake. Session 2 chỉ kiểm tra biên, nạp Point 1–3 vào QD75D4, phát chuyển động và xả keo.
 
+
+> **ERRATA / RECONCILIATION NOTICE (2026-10-25):**
+> Đấu dây vật lý thực tế trên tủ điện (Module QY40P Slot 1): **`Y25` là ngõ ra kích van keo**. Các ngõ ra `Y20..Y22` là Servo 1..3 Enable và `Y23` là Thắng từ (Brake Release), thuộc quyền điều khiển độc quyền của chương trình `MAIN`. Tài liệu lịch sử từng ghi nhầm van keo là `Y20`, nay đã được chuẩn hóa thành `Y25`. Trước khi nạp chương trình vào PLC thực tế, bắt buộc phải thực hiện `Online -> Read/Verify` trong GX Works2.
 ## 1. Quyền sở hữu — bắt buộc không ghi chéo
 
 | Thành phần | Owner | Quy tắc |
@@ -12,7 +15,7 @@
 | QD75 Buffer Memory `U0\G...`, FSM `D200`, D116, D120, M1001 | Session 2 / PLC-Q | Session 1 chỉ đọc trạng thái; không ghi. |
 | `Y0` | `MAIN` Ladder | Luôn ON liên tục: `SM400 -> Y0`. Không dùng làm van keo. |
 | `Y10` | `MAIN` Ladder | Chỉ có **một coil Y10** trong MAIN; Tracking ST yêu cầu phát xung qua `M110`. |
-| `Y20` | Session 2 / PLC-Q | Ngõ ra van keo vật lý; Session 1 không ghi. |
+| `Y25` | Session 2 / PLC-Q | Ngõ ra van keo vật lý (Terminal Y25); Session 1 không ghi. (Lưu ý: `Y20..Y22` là Servo Enable, `Y23` là Brake Release, do `MAIN` quản lý). |
 | `M100`, `M101` | `MAIN` Homing hiện có | **Cấm dùng cho Tracking** vì MAIN đang dùng `PLS M100` và `PLS M101`. |
 
 ## 2. Cấu hình Ethernet MC Protocol
@@ -124,7 +127,7 @@ Không tạo xung Start ngắn. `M1000` phải duy trì ON đến khi PLC đặt
 | Pha QD75 | Identifier | X | Y | Z | Tốc độ | Hành vi |
 |---|---:|---|---|---|---|---|
 | Point 1 | `1503H` | `Target_X` | `Target_Y` | `Target_Z_Down` | `Speed_Approach` | Bay nội suy ABS3 đến đỉnh. |
-| Point 2 | `1503H` | `Target_X + DeltaX_Sync` | `Target_Y` | `Target_Z_Down` | `Speed_Sync` | Trượt đồng tốc; QD75 phát M-code `X4`, PLC mở `Y20` trong 30 ms. |
+| Point 2 | `1503H` | `Target_X + DeltaX_Sync` | `Target_Y` | `Target_Z_Down` | `Speed_Sync` | Trượt đồng tốc; QD75 phát M-code `X4`, PLC mở `Y25` trong 30 ms. |
 | Point 3 | `1500H` | `Target_X + DeltaX_Sync` | `Target_Y` | `Target_Z_Safe` | `Speed_Approach` | Rút Z, dừng chuỗi; sau X14 đặt Ack. |
 
 ## 7. Kiểm tra biên PLC trước khi chạy
@@ -142,7 +145,7 @@ Session 1 phải kiểm tra trước các điều kiện này để tránh mất
 
 ## 8. Điều kiện Session 1 không được vi phạm
 
-1. Không viết `Y0`, `Y10`, `Y20`, `Y4..Y6`, `U0\G...`, `D116`, `D120`, `D200`.
+1. Không viết `Y0`, `Y10`, `Y20..Y25`, `Y4..Y6`, `U0\G...`, `D116`, `D120`, `D200`.
 2. Không dùng port TCP `5000..5009`; dùng `5010`.
 3. Không dùng `M100/M101` cho giao tiếp Tracking.
 4. Không cập nhật bất kỳ word nào trong `D100..D114` sau khi `M1000 = ON` và trước khi `M1001 = ON`.

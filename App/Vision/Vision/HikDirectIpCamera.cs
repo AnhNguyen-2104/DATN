@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenCvSharp;
+using WpfYolo_DotNet.Devices;
 
 namespace PlateVision50.Vision;
 
@@ -17,6 +18,10 @@ public sealed class HikDirectIpCamera : IDisposable
 {
     private static class Native
     {
+        static Native()
+        {
+            MvsNativeLoader.Ensure();
+        }
         private const string Dll = "MvCameraControl.dll";
         [DllImport(Dll, EntryPoint="MV_CC_Initialize")]
         internal static extern int Initialize();
@@ -34,6 +39,10 @@ public sealed class HikDirectIpCamera : IDisposable
         internal static extern int CloseDevice(IntPtr handle);
         [DllImport(Dll, EntryPoint="MV_CC_DestroyHandle")]
         internal static extern int DestroyHandle(IntPtr handle);
+    }
+    static HikDirectIpCamera()
+    {
+        MvsNativeLoader.Ensure();
     }
     private IntPtr _handle = IntPtr.Zero;
     private CancellationTokenSource? _cancel;
@@ -64,6 +73,11 @@ public sealed class HikDirectIpCamera : IDisposable
     public void Open()
     {
         if(IsOpen)return;
+        if(!MvsNativeLoader.Ensure())
+        {
+            LastError=MvsNativeLoader.LastError;
+            throw new DllNotFoundException(MvsNativeLoader.LastError);
+        }
         int ret=Native.Initialize();
         if(ret!=0)throw new InvalidOperationException($"MVS Initialize 0x{ret:X8}");
         // The directly inspected installed MVS Python SDK's sizeof(MV_CC_DEVICE_INFO)

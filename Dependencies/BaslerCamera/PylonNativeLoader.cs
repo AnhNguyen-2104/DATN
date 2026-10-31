@@ -28,17 +28,18 @@ public static class PylonNativeLoader
             return false;
 
         var runtime = Path.Combine(root, "Runtime", "x64");
-        var managed = Path.Combine(root, "Development", "Assemblies", "Basler.Pylon", "x64", "Basler.Pylon.dll");
+        var managed = ResolveManagedDll(root);
         if (!Directory.Exists(runtime))
             return false;
 
         RuntimeDirectory = runtime;
-        if (File.Exists(managed))
+        if (managed != null)
+        {
             ManagedDllPath = managed;
+            TryStageManagedDll(managed);
+        }
 
         PrependPath(runtime);
-        TryStageManagedDll(managed);
-
         return true;
     }
 
@@ -90,7 +91,12 @@ public static class PylonNativeLoader
 
         var root = Environment.GetEnvironmentVariable("PYLON_ROOT") ?? DiscoverPylonRoot();
         if (!string.IsNullOrWhiteSpace(root))
-            yield return Path.Combine(root, "Development", "Assemblies", "Basler.Pylon", "x64", "Basler.Pylon.dll");
+        {
+            var net8 = Path.Combine(root, "Development", "Assemblies", "Basler.Pylon", "net8.0", "x64", "Basler.Pylon.dll");
+            var legacy = Path.Combine(root, "Development", "Assemblies", "Basler.Pylon", "x64", "Basler.Pylon.dll");
+            yield return net8;
+            yield return legacy;
+        }
     }
 
     private static void PrependPath(string directory)
@@ -108,8 +114,22 @@ public static class PylonNativeLoader
         var baslerDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Basler");
         if (!Directory.Exists(baslerDir)) return null;
 
+        var standard = Path.Combine(baslerDir, "pylon");
+        if (Directory.Exists(standard)) return standard;
+
         return Directory.GetDirectories(baslerDir, "pylon*")
             .OrderByDescending(static d => d, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
+            .FirstOrDefault(d => Directory.Exists(Path.Combine(d, "Runtime", "x64")));
+    }
+
+    private static string? ResolveManagedDll(string root)
+    {
+        var net8 = Path.Combine(root, "Development", "Assemblies", "Basler.Pylon", "net8.0", "x64", "Basler.Pylon.dll");
+        if (File.Exists(net8)) return net8;
+
+        var legacy = Path.Combine(root, "Development", "Assemblies", "Basler.Pylon", "x64", "Basler.Pylon.dll");
+        if (File.Exists(legacy)) return legacy;
+
+        return null;
     }
 }
