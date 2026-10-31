@@ -138,7 +138,7 @@ public sealed class StationCameraController : IDisposable
                     string.IsNullOrWhiteSpace(info.SerialNumber)
                         ? "BASLER#" + info.DeviceListIndex.ToString(CultureInfo.InvariantCulture)
                         : info.SerialNumber,
-                    string.Empty,
+                    info.IpAddress ?? string.Empty,
                     info.DeviceListIndex));
             }
         }
@@ -243,65 +243,9 @@ public sealed class StationCameraController : IDisposable
         result.Add(device);
     }
 
-    /// <summary>Preferred local IPv4 for GVCP: typed NIC, camera subnet, then Ethernet 2 (169.254.113.x).</summary>
-    public static string ResolveCameraNic(string? cameraIp, string? nicText)
-    {
-        if (!string.IsNullOrWhiteSpace(nicText) &&
-            IPAddress.TryParse(nicText.Trim(), out IPAddress? nic) &&
-            nic.AddressFamily == AddressFamily.InterNetwork)
-        {
-            return nic.ToString();
-        }
-
-        if (!string.IsNullOrWhiteSpace(cameraIp) &&
-            IPAddress.TryParse(cameraIp.Trim(), out IPAddress? camera) &&
-            camera.AddressFamily == AddressFamily.InterNetwork)
-        {
-            string local = FindLocalIp(camera);
-            if (local.Length > 0) return local;
-        }
-
-        return FindPreferredCameraIp();
-    }
-
-    private static string FindPreferredCameraIp()
-    {
-        string fallback = string.Empty;
-
-        try
-        {
-            foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
-            {
-                if (nic.OperationalStatus != OperationalStatus.Up) continue;
-                if (IsPlcOrVirtualInterface(nic)) continue;
-
-                foreach (UnicastIPAddressInformation address in nic.GetIPProperties().UnicastAddresses)
-                {
-                    if (address.Address.AddressFamily != AddressFamily.InterNetwork) continue;
-                    byte[] bytes = address.Address.GetAddressBytes();
-
-                    if (bytes[0] == 169 && bytes[1] == 254)
-                    {
-                        string value = address.Address.ToString();
-                        if (value == "169.254.113.10") return value;
-                        if (bytes[2] == 113 && fallback.Length == 0) fallback = value;
-                        if (fallback.Length == 0) fallback = value;
-                    }
-                }
-            }
-        }
-        catch { }
-
-        return fallback;
-    }
-
-    private static bool IsPlcOrVirtualInterface(NetworkInterface nic)
-    {
-        string name = ((nic.Name ?? string.Empty) + " " + (nic.Description ?? string.Empty)).ToUpperInvariant();
-        return name.Contains("TWINCAT") || name.Contains("ETHERCAT") || name.Contains("PLC") ||
-               name.Contains("TAILSCALE") || name.Contains("LOOPBACK") || name.Contains("WSL") ||
-               name.Contains("HYPER-V") || name.Contains("VMWARE") || name.Contains("VIRTUALBOX");
-    }
+    /// <summary>Preferred local IPv4 for GVCP / Hik direct IP; forwards to CameraTransportPolicy.</summary>
+    public static string ResolveCameraNic(string? cameraIp, string? nicText) =>
+        CameraTransportPolicy.ResolveCameraNic(cameraIp, nicText);
 
     private static string ShortName(string name)
     {
@@ -494,33 +438,8 @@ public sealed class StationCameraController : IDisposable
     }
 
     /// <summary>Finds a local IPv4 address on the camera's /24 subnet (GigE point-to-point adapter).</summary>
-    public static string FindLocalIp(IPAddress cameraAddress)
-    {
-        byte[] camera = cameraAddress.GetAddressBytes();
-        string fallback = string.Empty;
-        try
-        {
-            foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
-            {
-                if (nic.OperationalStatus != OperationalStatus.Up) continue;
-                if (IsPlcOrVirtualInterface(nic)) continue;
-
-                foreach (UnicastIPAddressInformation address in nic.GetIPProperties().UnicastAddresses)
-                {
-                    if (address.Address.AddressFamily != AddressFamily.InterNetwork) continue;
-                    byte[] local = address.Address.GetAddressBytes();
-                    if (local[0] != camera[0] || local[1] != camera[1] || local[2] != camera[2]) continue;
-                    if (local.SequenceEqual(camera)) continue;
-
-                    string value = address.Address.ToString();
-                    if (value == "169.254.113.10") return value;
-                    if (fallback.Length == 0) fallback = value;
-                }
-            }
-        }
-        catch { }
-        return fallback;
-    }
+    public static string FindLocalIp(IPAddress cameraAddress) =>
+        CameraTransportPolicy.FindLocalIp(cameraAddress);
 
     public void Dispose()
     {
@@ -531,40 +450,72 @@ public sealed class StationCameraController : IDisposable
 /// <summary>Per-station transport/device/IP preference, stored without credentials.</summary>
 public static class CameraSlotSettingsStore
 {
-    private sealed record SlotSetting(string Mode, string Ip, string Nic, string DeviceKey);
+    private sealed record SlotSetting(string Mode, string Ip, string Nic, string DeviceKey, string? Vendor = null);
 
     private static readonly string FilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "PlateVision50_V2", "camera_slots.json");
 
-    public static (CameraTransportMode Mode, string Ip, string Nic, string DeviceKey) Load(int slot)
+    public static (CameraTransportMode Mode, string Ip, string Nic, string DeviceKey, string Vendor) Load(int slot)
     {
         CameraTransportMode defaultMode = CameraSlotDefaults.DefaultMode(slot);
+        string defaultVendor = CameraSlotDefaults.DefaultVendor(slot);
 
         try
         {
-            if (!File.Exists(FilePath)) return (defaultMode, "", "", "");
+            if (!File.Exists(FilePath)) return (defaultMode, "", "", "", defaultVendor);
             var all = JsonSerializer.Deserialize<Dictionary<string, SlotSetting>>(File.ReadAllText(FilePath));
-            if (all is null || !all.TryGetValue(slot.ToString(CultureInfo.InvariantCulture), out var value) || value is null)
-                return (defaultMode, "", "", "");
+            if (all is null) return (defaultMode, "", "", "", defaultVendor);
 
-            return (CameraSlotDefaults.MigrateMode(value.Mode, slot), value.Ip ?? "", value.Nic ?? "", value.DeviceKey ?? "");
+            var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var claimedIps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var normalizedAll = new Dictionary<string, (CameraTransportMode Mode, string Ip, string Nic, string DeviceKey, string Vendor)>();
+            var orderedKeys = all.Keys.OrderBy(k => int.TryParse(k, out int n) ? n : 99).ToList();
+
+            foreach (var key in orderedKeys)
+            {
+                int s = int.TryParse(key, out int n) ? n : 1;
+                var setting = all[key];
+                normalizedAll[key] = CameraSlotDefaults.NormalizeSlot(
+                    s, setting.Mode, setting.Ip, setting.Nic, setting.DeviceKey, setting.Vendor, claimed, claimedIps);
+            }
+
+            string slotKey = slot.ToString(CultureInfo.InvariantCulture);
+            if (!normalizedAll.TryGetValue(slotKey, out var normalized))
+                return (defaultMode, "", "", "", defaultVendor);
+
+            return normalized;
         }
         catch
         {
-            return (defaultMode, "", "", "");
+            return (defaultMode, "", "", "", defaultVendor);
         }
     }
 
-    public static void Save(int slot, CameraTransportMode mode, string ip, string nic, string deviceKey)
+    public static void Save(int slot, CameraTransportMode mode, string ip, string nic, string deviceKey, string vendor = "")
     {
         try
         {
             Dictionary<string, SlotSetting> all = File.Exists(FilePath)
                 ? JsonSerializer.Deserialize<Dictionary<string, SlotSetting>>(File.ReadAllText(FilePath)) ?? new()
                 : new();
+
+            var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var claimedIps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in all)
+            {
+                if (kv.Key != slot.ToString(CultureInfo.InvariantCulture))
+                {
+                    if (!string.IsNullOrWhiteSpace(kv.Value.DeviceKey))
+                        claimed.Add(kv.Value.DeviceKey.Trim().ToUpperInvariant());
+                    if (!string.IsNullOrWhiteSpace(kv.Value.Ip))
+                        claimedIps.Add(kv.Value.Ip.Trim());
+                }
+            }
+
+            var norm = CameraSlotDefaults.NormalizeSlot(slot, mode.ToString(), ip, nic, deviceKey, vendor, claimed, claimedIps);
             all[slot.ToString(CultureInfo.InvariantCulture)] =
-                new SlotSetting(mode.ToString(), ip ?? "", nic ?? "", deviceKey ?? "");
+                new SlotSetting(norm.Mode.ToString(), norm.Ip, norm.Nic, norm.DeviceKey, norm.Vendor);
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
             File.WriteAllText(FilePath, JsonSerializer.Serialize(all));
         }

@@ -129,7 +129,8 @@ public partial class MainWindow
         S1Bool(s1, "Gantry cycle busy", "MOTION", "MAIN.bGlueCycleBusy", status?.GantryBusy ?? false, "BUSY", "IDLE");
         S1Bool(s1, "Gantry cycle done", "MOTION", "MAIN.bGlueCycleDone", status?.GantryDone ?? false, "DONE", "NOT DONE");
         S1Bool(s1, "Gantry alarm", "MOTION", "MAIN.bGlueCycleError", status?.GantryError ?? false, "FAULT", "CLEAR");
-        S1Bool(s1, "Servo drive ready", "MOTION", "MAIN.bServo_Ready", status?.ServoReady ?? false, "READY", "NOT READY");
+        S1Bool(s1, "Gantry stop confirmed", "SAFETY", "MAIN.bStopCommandConfirmed", status?.StopCommandConfirmed ?? false, "CONFIRMED", "UNCONFIRMED");
+        S1Bool(s1, "EziServo rotary ready", "MOTION", "MAIN.bServo_Ready", status?.ServoReady ?? false, "READY", "NOT READY");
         S1Bool(s1, "Motion publisher enabled", "MOTION", "MAIN.bLegacyMotionPublisherAllow",
             status?.GantryPublisherEnabled ?? false, "ENABLED", "DISABLED");
         // Vision / handshake
@@ -137,6 +138,8 @@ public partial class MainWindow
             status?.VisionBridgeVerified ?? false, "VERIFIED", "NOT VERIFIED");
         S1Bool(s1, "Robot controller link", "VISION", "MAIN.bPlcQConnected", status?.PlcQConnected ?? false,
             "CONNECTED", "DISCONNECTED");
+        S1Bool(s1, "Robot MC error", "VISION", "MAIN.bPlcQError", status?.PlcQError ?? false,
+            "ERROR", "OK");
         s1.Add(status is null
             ? new StationSignalRow { Label = "track FIFO depth", Group = "VISION", State = StateNoData, StateBrush = StateBrushFor(StateNoData) }
             : Signal("Track FIFO depth", "VISION", status.QueueCount > 0, $"occupied ({status.QueueCount})", "empty"));
@@ -343,12 +346,12 @@ public partial class MainWindow
             S1Badge.Text = "ADS LIVE";
             S1BadgeHost.Background = DashBrush("#103028");
             S1Badge.Foreground = DashBrush("#39C7A2");
-            S1Link.Text = status.PlcQConnected ? "CONNECTED" : "DISCONNECTED";
-            S1Ready.Text = Pres(status, "MAIN.bServo_Ready") ? (status.ServoReady ? "READY" : "NOT READY") : "NO DATA";
-            S1Servo.Text = Pres(status, "MAIN.bServo_Ready") ? (status.ServoReady ? "ENABLED" : "DISABLED") : "NO DATA";
-            S1Mode.Text = status.GantryPublisherEnabled ? "MONITOR" : "AUTO";
+            S1Link.Text = status.PlcQError ? $"MC ERROR ({status.PlcQErrorId})" : (status.PlcQConnected ? "CONNECTED" : "DISCONNECTED");
+            S1Ready.Text = "UNMAPPED (QD75)"; // Actual QD75 Ready is X0 internal to PLC-Q, unmapped in TwinCAT
+            S1Servo.Text = Pres(status, "MAIN.bServo_Ready") ? (status.ServoReady ? "ROTARY OK" : "ROTARY OFF") : "NO DATA";
+            S1Mode.Text = status.GantryPublisherEnabled ? "MONITOR" : "PUBLISHER LOCKED";
             S1Busy.Text = status.GantryError ? "FAULT" : status.GantryBusy ? "BUSY" : status.GantryDone ? "DONE" : "IDLE";
-            S1Homed.Text = "NO DATA"; // no homed/reference symbol exists
+            S1Homed.Text = "UNMAPPED"; // no homed symbol mapped from PLC-Q
             S1X.Text = S1Y.Text = S1Z.Text = S1Rz.Text = "--";
             S1QueueDepth.Text = Pres(status, "MAIN.nQueueCount") ? $"{status.QueueCount} / 8" : "NO DATA";
             S1CycleStatus.Text = status.GantryError ? "FAULT" : status.GantryBusy ? "BUSY" : status.GantryDone ? "DONE" : "IDLE";
@@ -371,12 +374,13 @@ public partial class MainWindow
         S2Detect.Text = "NO DATA";
         S2Confidence.Text = "--";
         S2Pose.Text = "X --  Y --  θ --";
-        S2FrameQuality.Text = _cam2.IsOpen ? "CAM 2 · ACQUISITION ONLY" : "CAM 2 OFFLINE";
+        bool s2Live = _cam2.Model.IsLive(DateTime.UtcNow, TimeSpan.FromSeconds(3));
+        S2FrameQuality.Text = s2Live ? "CAM 2 · ACQUISITION ONLY" : (_cam2.IsOpen ? "CAM 2 · NO FRAME" : "CAM 2 OFFLINE");
         S2QueueDepth.Text = "UNMAPPED";
         S2CycleStatus.Text = "NOT COMM.";
         S2Vertex.Text = "--";
         S2AlarmStrip.Text = "SCARA not commissioned; no robot/tray signal.";
-        S2CfgCamera.Text = _cam2.IsOpen ? "CAM 2 CONNECTED" : "CAM 2 OFFLINE";
+        S2CfgCamera.Text = s2Live ? "CAM 2 LIVE" : (_cam2.IsOpen ? "CAM 2 CONNECTED · NO FRAME" : "CAM 2 OFFLINE");
 
         // Conveyor page receives the same honest snapshot.
         OvUpdated.Text = status is null
@@ -411,12 +415,12 @@ public partial class MainWindow
         Ov1Badge.Text = status is null ? "ADS OFFLINE" : "ADS LIVE";
         Ov1BadgeHost.Background = DashBrush(status is null ? "#33181C" : "#103028");
         Ov1Badge.Foreground = DashBrush(status is null ? "#FF6E70" : "#39C7A2");
-        Ov1Link.Text = status is null ? "NO DATA" : status.PlcQConnected ? "CONNECTED" : "DISCONNECTED";
-        Ov1Ready.Text = status is null ? "NO DATA" : Pres(status, "MAIN.bServo_Ready") ? (status.ServoReady ? "READY" : "NOT READY") : "NO DATA";
-        Ov1Servo.Text = status is null ? "NO DATA" : Pres(status, "MAIN.bServo_Ready") ? (status.ServoReady ? "ENABLED" : "DISABLED") : "NO DATA";
-        Ov1Mode.Text = status is null ? "NO DATA" : status.GantryPublisherEnabled ? "MONITOR" : "AUTO";
+        Ov1Link.Text = status is null ? "NO DATA" : status.PlcQError ? $"MC ERROR ({status.PlcQErrorId})" : status.PlcQConnected ? "CONNECTED" : "DISCONNECTED";
+        Ov1Ready.Text = "UNMAPPED";
+        Ov1Servo.Text = status is null ? "NO DATA" : Pres(status, "MAIN.bServo_Ready") ? (status.ServoReady ? "ROTARY OK" : "ROTARY OFF") : "NO DATA";
+        Ov1Mode.Text = status is null ? "NO DATA" : status.GantryPublisherEnabled ? "MONITOR" : "PUBLISHER LOCKED";
         Ov1Busy.Text = status is null ? "NO DATA" : status.GantryError ? "FAULT" : status.GantryBusy ? "BUSY" : "IDLE";
-        Ov1Homed.Text = "NO DATA";
+        Ov1Homed.Text = "UNMAPPED";
         Ov1X.Text = Ov1Y.Text = Ov1Z.Text = Ov1Rz.Text = "--";
         Ov1Track.Text = validPose ? track : "--";
         Ov1Pose.Text = validPose

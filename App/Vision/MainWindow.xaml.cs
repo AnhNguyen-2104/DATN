@@ -596,7 +596,7 @@ public partial class MainWindow : System.Windows.Window
 
             if(model.Selected is null&&model.FilteredDevices.Count>0)
             {
-                var chosen=model.AutoSelectForSlot(slot);
+                var chosen=model.AutoSelectForSlot(slot, SlotVendorIsBasler(slot) ? "Basler" : "Hikrobot");
                 if(chosen is not null)
                 {
                     if(mode==CameraTransportMode.Ip&&!string.IsNullOrWhiteSpace(chosen.Address))
@@ -642,8 +642,10 @@ public partial class MainWindow : System.Windows.Window
         var model=controller.Model;
         model.IpText=SlotIpBox(slot).Text.Trim();
 
-        if(model.Mode==CameraTransportMode.Ip&&model.Selected is null&&
-           CameraTransportPolicy.IsValidAddress(model.IpText))
+        if(model.Mode==CameraTransportMode.Ip&&CameraTransportPolicy.IsValidAddress(model.IpText)&&
+           (model.Selected is null ||
+            (!SlotVendorIsBasler(slot) && CameraTransportPolicy.IsBaslerVendor(model.Selected.Vendor)) ||
+            (model.Selected.BackendIndex < 0 && model.Selected.Address != model.IpText)))
         {
             if(SlotVendorIsBasler(slot))
             {
@@ -700,6 +702,7 @@ public partial class MainWindow : System.Windows.Window
         if(slot==1)
         {
             _lastCam1Frame=0;
+            _stationLastFrameUtc=DateTime.MinValue;
             Preview.Source=null;
             if(_video==null)FrameInfo.Text="No source";
         }

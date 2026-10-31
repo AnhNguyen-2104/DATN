@@ -122,27 +122,25 @@ public static class GvcpDiscovery
         try
         {
             using var client = new UdpClient(new IPEndPoint(host, 0));
-            client.EnableBroadcast = true;
+            IPAddress? target = null;
+            bool hasTarget = !string.IsNullOrWhiteSpace(targetIp) &&
+                IPAddress.TryParse(targetIp.Trim(), out target) &&
+                target?.AddressFamily == AddressFamily.InterNetwork;
 
             // GVCP DISCOVERY_CMD 0x0002, request ID 1. No camera settings change.
             byte[] frame = { 0x42, 0x11, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01 };
 
-            // 1. Broadcast discovery on camera subnet
-            await client.SendAsync(frame, frame.Length, new IPEndPoint(IPAddress.Broadcast, 3956));
-
-            // 2. Unicast discovery to typed target IP if provided
-            if (!string.IsNullOrWhiteSpace(targetIp) &&
-                IPAddress.TryParse(targetIp.Trim(), out IPAddress? target) &&
-                target.AddressFamily == AddressFamily.InterNetwork)
+            if (hasTarget)
             {
-                try
-                {
-                    await client.SendAsync(frame, frame.Length, new IPEndPoint(target, 3956));
-                }
-                catch
-                {
-                    // Unicast send failure is non-fatal; broadcast already went out
-                }
+                // Manual camera IP must be probed only at that target IP (no broadcast)
+                client.EnableBroadcast = false;
+                await client.SendAsync(frame, frame.Length, new IPEndPoint(target!, 3956));
+            }
+            else
+            {
+                // Subnet broadcast only when no specific target IP was supplied
+                client.EnableBroadcast = true;
+                await client.SendAsync(frame, frame.Length, new IPEndPoint(IPAddress.Broadcast, 3956));
             }
 
             using var stop = new CancellationTokenSource(timeoutMs);
@@ -153,6 +151,11 @@ public static class GvcpDiscovery
                 try
                 {
                     var response = await client.ReceiveAsync(stop.Token);
+                    if (hasTarget && !response.RemoteEndPoint.Address.Equals(target!))
+                    {
+                        continue;
+                    }
+
                     var info = ParseDiscoveryAck(response.Buffer, response.RemoteEndPoint.Address);
                     if (info is not null)
                     {

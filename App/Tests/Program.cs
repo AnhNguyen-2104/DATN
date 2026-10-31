@@ -458,8 +458,8 @@ Check("interlock: mock off restores production NotReady on failed check",
     Check("camera mode: station 1 and station 2 both default to IP",
         CameraSlotDefaults.DefaultMode(1)==CameraTransportMode.Ip&&
         CameraSlotDefaults.DefaultMode(2)==CameraTransportMode.Ip);
-    Check("camera vendor: station 1 defaults to Basler and station 2 to Hikrobot",
-        CameraSlotDefaults.DefaultVendor(1)=="Basler"&&
+    Check("camera vendor: station 1 and station 2 both default to Hikrobot",
+        CameraSlotDefaults.DefaultVendor(1)=="Hikrobot"&&
         CameraSlotDefaults.DefaultVendor(2)=="Hikrobot");
     Check("camera mode: slot models start in their station default with no scan issues",
         new CameraSlotModel(1,"Station 01").Mode==CameraTransportMode.Ip&&
@@ -478,8 +478,8 @@ Check("interlock: mock off restores production NotReady on failed check",
         CameraSlotDefaults.MigrateMode("IP",2)==CameraTransportMode.Ip&&
         CameraSlotDefaults.MigrateMode("ip",1)==CameraTransportMode.Ip);
     Check("camera vendor: legacy, null and invalid values migrate to the station default",
-        CameraSlotDefaults.MigrateVendor(null,1)=="Basler"&&
-        CameraSlotDefaults.MigrateVendor("Auto",1)=="Basler"&&
+        CameraSlotDefaults.MigrateVendor(null,1)=="Hikrobot"&&
+        CameraSlotDefaults.MigrateVendor("Auto",1)=="Hikrobot"&&
         CameraSlotDefaults.MigrateVendor("",2)=="Hikrobot"&&
         CameraSlotDefaults.MigrateVendor("Hikvision",1)=="Hikrobot"&&
         CameraSlotDefaults.MigrateVendor("Basler",2)=="Basler");
@@ -882,16 +882,19 @@ Check("interlock: mock off restores production NotReady on failed check",
         camUsbCount==2&&camIpCount==1&&camUsbCount+camIpCount==camSlot.Devices.Count);
     camSlot.Mode=CameraTransportMode.Ip;
     Check("camera slots: GigE device selects in IP mode",camSlot.SelectDevice(camHikGigE.Key));
-    // AutoSelectForSlot station remap: Slot 1 prefers/requires Basler, Slot 2 prefers/requires Hikrobot
+    // AutoSelectForSlot station remap: Slot 1 and Slot 2 default to Hikrobot; explicit Basler preference preserved
     var s1Slot = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Usb };
     s1Slot.SetDevices(new[] { camBaslerUsb, Cam("Hikvision", "USB", "HK-U", "MV-USB") });
     var s1Chosen = s1Slot.AutoSelectForSlot(1);
-    Check("station remap: slot 1 AutoSelectForSlot selects Basler when both vendors present",
-        s1Chosen is not null && CameraTransportPolicy.IsBaslerVendor(s1Chosen.Vendor));
+    Check("station remap: slot 1 AutoSelectForSlot defaults to Hikrobot when both vendors present",
+        s1Chosen is not null && CameraTransportPolicy.IsHikVendor(s1Chosen.Vendor));
+    var s1ChosenBasler = s1Slot.AutoSelectForSlot(1, "Basler");
+    Check("station remap: slot 1 AutoSelectForSlot selects Basler when Basler is explicitly preferred",
+        s1ChosenBasler is not null && CameraTransportPolicy.IsBaslerVendor(s1ChosenBasler.Vendor));
     var s1HikOnlySlot = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Usb };
     s1HikOnlySlot.SetDevices(new[] { Cam("Hikvision", "USB", "HK-U", "MV-USB") });
-    var s1HikReject = s1HikOnlySlot.AutoSelectForSlot(1);
-    Check("station remap: slot 1 AutoSelectForSlot rejects Hikrobot when no Basler present",
+    var s1HikReject = s1HikOnlySlot.AutoSelectForSlot(1, "Basler");
+    Check("station remap: slot 1 AutoSelectForSlot rejects Hikrobot when Basler is preferred but not present",
         s1HikReject is null && s1HikOnlySlot.Selected is null);
     var s2Slot = new CameraSlotModel(2, "Station 02") { Mode = CameraTransportMode.Ip };
     s2Slot.SetDevices(new[] { camBaslerUsb, camHikGigE });
@@ -903,14 +906,21 @@ Check("interlock: mock off restores production NotReady on failed check",
     var s2BaslerReject = s2BaslerOnlySlot.AutoSelectForSlot(2);
     Check("station remap: slot 2 AutoSelectForSlot rejects Basler when no Hikrobot present",
         s2BaslerReject is null && s2BaslerOnlySlot.Selected is null);
+    var s2BaslerAccept = s2BaslerOnlySlot.AutoSelectForSlot(2, "Basler");
+    Check("station remap: slot 2 AutoSelectForSlot accepts Basler when Basler is explicitly preferred",
+        s2BaslerAccept is not null && CameraTransportPolicy.IsBaslerVendor(s2BaslerAccept.Vendor));
     var s1MixedGigE = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip };
     s1MixedGigE.SetDevices(new[] { dHikrobotGigE, dBaslerGigE });
-    Check("station remap: slot 1 AutoSelectForSlot selects Basler GigE over Hikrobot GigE in IP mode",
-        s1MixedGigE.AutoSelectForSlot(1)?.Key == dBaslerGigE.Key);
+    Check("station remap: slot 1 AutoSelectForSlot defaults to Hikrobot GigE in IP mode",
+        s1MixedGigE.AutoSelectForSlot(1)?.Key == dHikrobotGigE.Key);
+    Check("station remap: slot 1 AutoSelectForSlot selects Basler GigE over Hikrobot GigE when Basler preferred",
+        s1MixedGigE.AutoSelectForSlot(1, "Basler")?.Key == dBaslerGigE.Key);
     var s1HikGigEOnly = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip };
     s1HikGigEOnly.SetDevices(new[] { dHikrobotGigE });
-    Check("station remap: slot 1 AutoSelectForSlot rejects Hikrobot GigE in IP mode",
-        s1HikGigEOnly.AutoSelectForSlot(1) is null && s1HikGigEOnly.Selected is null);
+    Check("station remap: slot 1 AutoSelectForSlot selects Hikrobot GigE in IP mode",
+        s1HikGigEOnly.AutoSelectForSlot(1)?.Key == dHikrobotGigE.Key);
+    Check("station remap: slot 1 AutoSelectForSlot rejects Hikrobot GigE when Basler preferred",
+        s1HikGigEOnly.AutoSelectForSlot(1, "Basler") is null && s1HikGigEOnly.Selected is null);
     var s2HikvisionSlot = new CameraSlotModel(2, "Station 02") { Mode = CameraTransportMode.Usb };
     s2HikvisionSlot.SetDevices(new[] { dBaslerUsb, dHikvisionUsb });
     Check("station remap: slot 2 AutoSelectForSlot accepts Hikvision vendor in USB mode",
@@ -919,6 +929,8 @@ Check("interlock: mock off restores production NotReady on failed check",
     s2BaslerGigEOnly.SetDevices(new[] { dBaslerGigE });
     Check("station remap: slot 2 AutoSelectForSlot rejects Basler GigE in IP mode",
         s2BaslerGigEOnly.AutoSelectForSlot(2) is null && s2BaslerGigEOnly.Selected is null);
+    Check("station remap: slot 2 AutoSelectForSlot selects Basler GigE when Basler preferred",
+        s2BaslerGigEOnly.AutoSelectForSlot(2, "Basler")?.Key == dBaslerGigE.Key);
 
     var slotManualTest = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip };
     slotManualTest.SetDevices(new[] { manHikrobotDirect, manBaslerDirect, dBaslerGigE });
@@ -1134,6 +1146,129 @@ Check("interlock: mock off restores production NotReady on failed check",
     var evalCamBoth=interlock.Evaluate(ReadyInputs());
     Check("camera interlock: cameras connecting changes no interlock state",
         evalCamBoth.State==InterlockState.Ready&&evalCamBoth.CanStart);
+    // 22. Dual-Camera Hikrobot Contract & Isolation Tests (TDD Focused Suite)
+    // (a) Both slot defaults/migrations are Hikrobot
+    Check("dual-hik (a): slot 1 and slot 2 default vendor is Hikrobot",
+        CameraSlotDefaults.DefaultVendor(1) == "Hikrobot" &&
+        CameraSlotDefaults.DefaultVendor(2) == "Hikrobot");
+
+    Check("dual-hik (a): slot 1 null, blank, and invalid migrate to Hikrobot default",
+        CameraSlotDefaults.MigrateVendor(null, 1) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("", 1) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("   ", 1) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("invalid", 1) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("Auto", 1) == "Hikrobot");
+
+    Check("dual-hik (a): slot 2 null, blank, and invalid migrate to Hikrobot default",
+        CameraSlotDefaults.MigrateVendor(null, 2) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("", 2) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("   ", 2) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("invalid", 2) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("Auto", 2) == "Hikrobot");
+
+    Check("dual-hik (a): explicit Hikrobot/Hikvision values migrate to Hikrobot on both slots",
+        CameraSlotDefaults.MigrateVendor("Hikrobot", 1) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("Hikvision", 1) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("hikrobot", 2) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("hikvision", 2) == "Hikrobot");
+
+    var s1SlotHikAuto = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip };
+    s1SlotHikAuto.SetDevices(new[] { camHikGigE, dBaslerGigE });
+    var s1ChosenHikAuto = s1SlotHikAuto.AutoSelectForSlot(1);
+    Check("dual-hik (a): slot 1 AutoSelectForSlot defaults to Hikrobot when both present",
+        s1ChosenHikAuto is not null && CameraTransportPolicy.IsHikVendor(s1ChosenHikAuto.Vendor));
+
+    // (b) Valid Hikrobot slot-1 persistence is preserved
+    var claimedS1HikTdd = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var normHikS1Tdd = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.1", "169.254.113.10", "HIKROBOT|DA7403922", "Hikrobot", claimedS1HikTdd);
+    Check("dual-hik (b): slot 1 preserves valid Hikrobot persistence",
+        normHikS1Tdd.Mode == CameraTransportMode.Ip &&
+        normHikS1Tdd.Vendor == "Hikrobot" &&
+        normHikS1Tdd.Ip == "169.254.113.1" &&
+        normHikS1Tdd.Nic == "169.254.113.10" &&
+        normHikS1Tdd.DeviceKey == "HIKROBOT|DA7403922");
+
+    var normHikS1NullVendor = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.1", "169.254.113.10", "HIKROBOT|DA7403922", null);
+    Check("dual-hik (b): slot 1 with null/default vendor preserves valid Hikrobot persistence",
+        normHikS1NullVendor.Mode == CameraTransportMode.Ip &&
+        normHikS1NullVendor.Vendor == "Hikrobot" &&
+        normHikS1NullVendor.Ip == "169.254.113.1" &&
+        normHikS1NullVendor.Nic == "169.254.113.10" &&
+        normHikS1NullVendor.DeviceKey == "HIKROBOT|DA7403922");
+
+    // (c) Two distinct slot camera IP/host NIC pairs remain isolated
+    var claimedKeysDualTdd = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var claimedIpsDualTdd = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var s1DualTdd = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.1", "169.254.113.10", "HIKROBOT|DA7403922", "Hikrobot", claimedKeysDualTdd, claimedIpsDualTdd);
+    var s2DualTdd = CameraSlotDefaults.NormalizeSlot(2, "Ip", "192.168.50.2", "192.168.50.1", "HIKROBOT|J95682667", "Hikrobot", claimedKeysDualTdd, claimedIpsDualTdd);
+
+    Check("dual-hik (c): two distinct slot camera IP/host NIC pairs remain isolated",
+        s1DualTdd.Ip == "169.254.113.1" && s1DualTdd.Nic == "169.254.113.10" && s1DualTdd.DeviceKey == "HIKROBOT|DA7403922" &&
+        s2DualTdd.Ip == "192.168.50.2" && s2DualTdd.Nic == "192.168.50.1" && s2DualTdd.DeviceKey == "HIKROBOT|J95682667" &&
+        s1DualTdd.DeviceKey != s2DualTdd.DeviceKey && s1DualTdd.Ip != s2DualTdd.Ip && s1DualTdd.Nic != s2DualTdd.Nic);
+
+    var regDualTdd = new CameraOwnershipRegistry();
+    Check("dual-hik (c): registry claims both slot camera keys without collision",
+        regDualTdd.TryClaim(s1DualTdd.DeviceKey, 1, out string errClaim1Tdd) && string.IsNullOrEmpty(errClaim1Tdd) &&
+        regDualTdd.TryClaim(s2DualTdd.DeviceKey, 2, out string errClaim2Tdd) && string.IsNullOrEmpty(errClaim2Tdd) &&
+        regDualTdd.OwnerOf(s1DualTdd.DeviceKey) == 1 &&
+        regDualTdd.OwnerOf(s2DualTdd.DeviceKey) == 2);
+
+    regDualTdd.Release(2);
+    Check("dual-hik (c): releasing slot 2 preserves slot 1 claim",
+        regDualTdd.OwnerOf(s1DualTdd.DeviceKey) == 1 &&
+        regDualTdd.OwnerOf(s2DualTdd.DeviceKey) == null);
+
+    // (d) Blank/invalid manual camera IP or explicit host NIC fails closed
+    Check("dual-hik (d): ResolveCameraNic fails closed when explicit host NIC is invalid (no fallback)",
+        CameraTransportPolicy.ResolveCameraNic("169.254.113.1", "not-an-ip") == "" &&
+        CameraTransportPolicy.ResolveCameraNic("169.254.113.1", "999.999.999.999") == "" &&
+        CameraTransportPolicy.ResolveCameraNic("192.168.50.2", "invalid_nic") == "");
+
+    Check("dual-hik (d): ResolveCameraNic fails closed on blank camera IP and blank NIC (no fallback to preferred NIC)",
+        CameraTransportPolicy.ResolveCameraNic("", "") == "" &&
+        CameraTransportPolicy.ResolveCameraNic(null, null) == "" &&
+        CameraTransportPolicy.ResolveCameraNic("   ", "   ") == "");
+
+    Check("dual-hik (d): ResolveCameraNic uses explicit valid host NIC exactly without fallback",
+        CameraTransportPolicy.ResolveCameraNic("192.168.50.2", "192.168.50.1") == "192.168.50.1" &&
+        CameraTransportPolicy.ResolveCameraNic("169.254.113.1", "169.254.113.10") == "169.254.113.10");
+
+    var slotManualBlankIp = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip, IpText = "" };
+    slotManualBlankIp.SetDevices(new[] { manHikrobotDirect });
+    slotManualBlankIp.SelectDevice(manHikrobotDirect.Key);
+    Check("dual-hik (d): manual connect with blank camera IP fails closed before connect",
+        !slotManualBlankIp.ValidateBeforeConnect(new CameraOwnershipRegistry()).ok);
+
+    var slotManualBadIp = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip, IpText = "999.999.999.999" };
+    slotManualBadIp.SetDevices(new[] { manHikrobotDirect });
+    slotManualBadIp.SelectDevice(manHikrobotDirect.Key);
+    Check("dual-hik (d): manual connect with invalid camera IP fails closed before connect",
+        !slotManualBadIp.ValidateBeforeConnect(new CameraOwnershipRegistry()).ok);
+
+    // (e) Explicit Basler compatibility remains if already supported
+    Check("dual-hik (e): explicit Basler vendor is preserved across migration on slot 1 and slot 2",
+        CameraSlotDefaults.MigrateVendor("Basler", 1) == "Basler" &&
+        CameraSlotDefaults.MigrateVendor("Basler", 2) == "Basler" &&
+        CameraSlotDefaults.MigrateVendor("  basler  ", 1) == "Basler" &&
+        CameraSlotDefaults.MigrateVendor("  BASLER  ", 2) == "Basler");
+
+    var claimedBaslerPreserve = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var normBaslerSlot1 = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.5", "", "BASLER|40098765", "Basler", claimedBaslerPreserve);
+    Check("dual-hik (e): slot 1 with explicit Basler preserves Basler identity and IP",
+        normBaslerSlot1.Vendor == "Basler" &&
+        normBaslerSlot1.Ip == "169.254.113.5" &&
+        normBaslerSlot1.DeviceKey == "BASLER|40098765");
+
+    var normBaslerSlot2 = CameraSlotDefaults.NormalizeSlot(2, "Ip", "169.254.113.6", "", "BASLER|40098766", "Basler", claimedBaslerPreserve);
+    Check("dual-hik (e): slot 2 with explicit Basler preserves Basler identity and IP",
+        normBaslerSlot2.Vendor == "Basler" &&
+        normBaslerSlot2.Ip == "169.254.113.6" &&
+        normBaslerSlot2.DeviceKey == "BASLER|40098766");
+
+    Check("dual-hik (e): Basler USB and GigE dispatch compatibility is retained",
+        CameraTransportPolicy.CanDispatch(camBaslerUsb, CameraTransportMode.Usb, out _) &&
+        CameraTransportPolicy.CanDispatch(dBaslerGigE, CameraTransportMode.Ip, out _));
 }
 LineMailboxProtocol.ProductionCommandSourceApproved = false;
 Check("mailbox: source commands are disarmed until hardware commissioning",

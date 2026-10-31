@@ -617,7 +617,7 @@
                       <TextBlock Text="NIC" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="8,0,4,0"/>
                       <TextBox x:Name="S1HostIpBox" Width="112" MinHeight="22" Padding="4,0" FontSize="10" ToolTip="Local NIC IPv4 for GVCP discovery and Hikrobot direct-IP connect; auto-detected when the camera subnet is local."/>
                       <TextBlock Text="VENDOR" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                      <ComboBox x:Name="S1VendorBox" Width="88" MinHeight="22" FontSize="9.5" SelectedIndex="0" ToolTip="Typed-IP manual connect is supported for HIKROBOT only. BASLER devices need SCAN.">
+                      <ComboBox x:Name="S1VendorBox" Width="88" MinHeight="22" FontSize="9.5" SelectedIndex="0" SelectionChanged="S1VendorChanged" ToolTip="Typed-IP manual connect is supported for HIKROBOT only. BASLER devices need SCAN.">
                         <ComboBoxItem Content="HIKROBOT"/><ComboBoxItem Content="BASLER"/>
                       </ComboBox>
                     </WrapPanel>
@@ -894,7 +894,7 @@
                         <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
                       </Grid.ColumnDefinitions>
                       <TextBlock x:Name="S2CamBadge" Text="CAM 2" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
-                      <ComboBox x:Name="S2ModeBox" Grid.Column="2" Width="62" MinHeight="22" FontSize="9.5" SelectedIndex="1" SelectionChanged="S2ModeChanged" ToolTip="IP enumerates Hikrobot/Basler GigE plus read-only GVCP; USB enumerates USB3 Vision. Auto is removed.">
+                      <ComboBox x:Name="S2ModeBox" Grid.Column="2" Width="62" MinHeight="22" FontSize="9.5" SelectedIndex="0" SelectionChanged="S2ModeChanged" ToolTip="IP enumerates Hikrobot/Basler GigE plus read-only GVCP; USB enumerates USB3 Vision. Auto is removed.">
                         <ComboBoxItem Content="IP"/><ComboBoxItem Content="USB"/>
                       </ComboBox>
                       <ComboBox x:Name="S2DeviceBox" Grid.Column="4" MinWidth="130" MinHeight="22" FontSize="9.5" DisplayMemberPath="Display" SelectionChanged="S2DeviceChanged" ToolTip="Scanned Hikrobot/Basler device: model · serial · vendor · transport."/>
@@ -909,7 +909,7 @@
                       <TextBlock Text="NIC" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="8,0,4,0"/>
                       <TextBox x:Name="S2HostIpBox" Width="112" MinHeight="22" Padding="4,0" FontSize="10" ToolTip="Local NIC IPv4 for GVCP discovery and Hikrobot direct-IP connect; auto-detected when the camera subnet is local."/>
                       <TextBlock Text="VENDOR" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                      <ComboBox x:Name="S2VendorBox" Width="88" MinHeight="22" FontSize="9.5" SelectedIndex="0" ToolTip="Typed-IP manual connect is supported for HIKROBOT only. BASLER devices need SCAN.">
+                      <ComboBox x:Name="S2VendorBox" Width="88" MinHeight="22" FontSize="9.5" SelectedIndex="0" SelectionChanged="S2VendorChanged" ToolTip="Typed-IP manual connect is supported for HIKROBOT only. BASLER devices need SCAN.">
                         <ComboBoxItem Content="HIKROBOT"/><ComboBoxItem Content="BASLER"/>
                       </ComboBox>
                     </WrapPanel>

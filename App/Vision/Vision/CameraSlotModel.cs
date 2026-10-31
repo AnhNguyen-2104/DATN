@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 
 namespace PlateVision50.Vision;
 
@@ -16,9 +20,13 @@ public enum CameraTransportMode
 /// <summary>Station defaults and legacy persistence migration; Auto no longer exists.</summary>
 public static class CameraSlotDefaults
 {
-    /// <summary>Convenience default only: station 1 starts in IP, station 2 in USB; either can switch.</summary>
+    /// <summary>Both Station 1 (Basler) and Station 2 (Hikrobot) default to IP.</summary>
     public static CameraTransportMode DefaultMode(int slot) =>
-        slot == 1 ? CameraTransportMode.Ip : CameraTransportMode.Usb;
+        CameraTransportMode.Ip;
+
+    /// <summary>Both Station 1 and Station 2 default to Hikrobot.</summary>
+    public static string DefaultVendor(int slot) =>
+        "Hikrobot";
 
     /// <summary>Saved USB/IP survive; legacy "Auto", null, blank and invalid values become the station default.</summary>
     public static CameraTransportMode MigrateMode(string? saved, int slot)
@@ -29,6 +37,95 @@ public static class CameraSlotDefaults
         if (value.Equals("Ip", StringComparison.OrdinalIgnoreCase)) return CameraTransportMode.Ip;
 
         return DefaultMode(slot);
+    }
+
+    /// <summary>Saved Basler/Hikrobot survive; legacy, null, blank and invalid values become the station default.</summary>
+    public static string MigrateVendor(string? saved, int slot)
+    {
+        string value = (saved ?? string.Empty).Trim();
+
+        if (value.Equals("Basler", StringComparison.OrdinalIgnoreCase)) return "Basler";
+        if (value.Equals("Hikrobot", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("Hikvision", StringComparison.OrdinalIgnoreCase)) return "Hikrobot";
+
+        return DefaultVendor(slot);
+    }
+
+    /// <summary>Checks whether a device key matches the vendor (Basler vs Hikrobot/Hikvision).</summary>
+    public static bool IsKeyCompatibleWithVendor(string? deviceKey, string vendor)
+    {
+        if (string.IsNullOrWhiteSpace(deviceKey)) return false;
+        string key = deviceKey.Trim();
+        bool isBasler = CameraTransportPolicy.IsBaslerVendor(vendor);
+        if (isBasler)
+        {
+            if (key.StartsWith("HIK", StringComparison.OrdinalIgnoreCase)) return false;
+            return true;
+        }
+        else
+        {
+            if (key.StartsWith("BASLER", StringComparison.OrdinalIgnoreCase)) return false;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Normalizes persisted slot configuration safely across slots:
+    /// - Preserves IP only if it has an actual compatible key and valid address; clears mismatched/duplicate DeviceKey and duplicate IP.
+    /// - Clears duplicate keys and duplicate IP addresses across full dictionary.
+    /// </summary>
+    public static (CameraTransportMode Mode, string Ip, string Nic, string DeviceKey, string Vendor) NormalizeSlot(
+        int slot,
+        string? savedMode,
+        string? savedIp,
+        string? savedNic,
+        string? savedDeviceKey,
+        string? savedVendor,
+        HashSet<string>? claimedKeys = null,
+        HashSet<string>? claimedIps = null)
+    {
+        string vendor = MigrateVendor(savedVendor, slot);
+        string key = (savedDeviceKey ?? string.Empty).Trim();
+        string nic = (savedNic ?? string.Empty).Trim();
+        string rawIp = (savedIp ?? string.Empty).Trim();
+        CameraTransportMode mode = MigrateMode(savedMode, slot);
+        string ip;
+
+        if (IsKeyCompatibleWithVendor(key, vendor) && CameraTransportPolicy.IsValidAddress(rawIp))
+        {
+            ip = rawIp;
+        }
+        else
+        {
+            ip = string.Empty;
+        }
+
+        if (!IsKeyCompatibleWithVendor(key, vendor))
+        {
+            key = string.Empty;
+            ip = string.Empty;
+        }
+
+        // Clear duplicate keys across slots
+        if (key.Length > 0 && claimedKeys != null)
+        {
+            if (!claimedKeys.Add(key.ToUpperInvariant()))
+            {
+                key = string.Empty;
+                ip = string.Empty;
+            }
+        }
+
+        // Clear duplicate IP addresses across slots
+        if (ip.Length > 0 && claimedIps != null)
+        {
+            if (!claimedIps.Add(ip))
+            {
+                ip = string.Empty;
+            }
+        }
+
+        return (mode, ip, nic, key, vendor);
     }
 }
 
@@ -335,6 +432,10 @@ public static class CameraTransportPolicy
                value.Equals("Hikrobot", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>Basler camera products share the pylon backend.</summary>
+    public static bool IsBaslerVendor(string? vendor) =>
+        string.Equals((vendor ?? string.Empty).Trim(), "Basler", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>
     /// A device with no SDK backend (BackendIndex below zero) is only reachable through the
     /// Hikrobot direct-IP path. Basler direct IP is not implemented and needs a real scan.
@@ -409,6 +510,68 @@ public static class CameraTransportPolicy
         }
 
         return true;
+    }
+    /// <summary>
+    /// Preferred local IPv4 for GVCP / Hik direct IP:
+    /// - Explicit nonblank Host/NIC input must be used exactly if valid IPv4; fails closed (empty string) if invalid with no fallback.
+    /// - Blank Host/NIC resolves only if cameraIp matches a local NIC /24 subnet.
+    /// - Never falls back to arbitrary NIC or cross-slot default.
+    /// </summary>
+    public static string ResolveCameraNic(string? cameraIp, string? nicText)
+    {
+        if (!string.IsNullOrWhiteSpace(nicText))
+        {
+            if (IPAddress.TryParse(nicText.Trim(), out IPAddress? nic) &&
+                nic.AddressFamily == AddressFamily.InterNetwork)
+            {
+                return nic.ToString();
+            }
+
+            return string.Empty;
+        }
+
+        if (!string.IsNullOrWhiteSpace(cameraIp) &&
+            IPAddress.TryParse(cameraIp.Trim(), out IPAddress? camera) &&
+            camera.AddressFamily == AddressFamily.InterNetwork)
+        {
+            string local = FindLocalIp(camera);
+            if (local.Length > 0) return local;
+        }
+
+        return string.Empty;
+    }
+
+    public static string FindLocalIp(IPAddress cameraAddress)
+    {
+        byte[] camera = cameraAddress.GetAddressBytes();
+        try
+        {
+            foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (nic.OperationalStatus != OperationalStatus.Up) continue;
+                if (IsPlcOrVirtualInterface(nic)) continue;
+
+                foreach (UnicastIPAddressInformation address in nic.GetIPProperties().UnicastAddresses)
+                {
+                    if (address.Address.AddressFamily != AddressFamily.InterNetwork) continue;
+                    byte[] local = address.Address.GetAddressBytes();
+                    if (local[0] != camera[0] || local[1] != camera[1] || local[2] != camera[2]) continue;
+                    if (local.SequenceEqual(camera)) continue;
+
+                    return address.Address.ToString();
+                }
+            }
+        }
+        catch { }
+        return string.Empty;
+    }
+
+    private static bool IsPlcOrVirtualInterface(NetworkInterface nic)
+    {
+        string name = ((nic.Name ?? string.Empty) + " " + (nic.Description ?? string.Empty)).ToUpperInvariant();
+        return name.Contains("TWINCAT") || name.Contains("ETHERCAT") || name.Contains("PLC") ||
+               name.Contains("TAILSCALE") || name.Contains("LOOPBACK") || name.Contains("WSL") ||
+               name.Contains("HYPER-V") || name.Contains("VMWARE") || name.Contains("VIRTUALBOX");
     }
 }
 
@@ -594,6 +757,35 @@ public sealed class CameraSlotModel
         _selected = match;
         LastError = string.Empty;
         return true;
+    }
+
+    /// <summary>
+    /// Auto-selects for a given station slot:
+    /// Defaults to Hikrobot on both stations; preserves Basler when preferredVendor is explicitly Basler.
+    /// Returns the selected device, or null if unassigned.
+    /// </summary>
+    public CameraDevice? AutoSelectForSlot(int slot, string? preferredVendor = null)
+    {
+        string targetVendor = !string.IsNullOrWhiteSpace(preferredVendor)
+            ? CameraSlotDefaults.MigrateVendor(preferredVendor, slot)
+            : CameraSlotDefaults.DefaultVendor(slot);
+
+        if (CameraTransportPolicy.IsBaslerVendor(targetVendor))
+        {
+            var basler = _filtered.FirstOrDefault(d => CameraTransportPolicy.IsBaslerVendor(d.Vendor));
+            if (basler is not null && SelectDevice(basler.Key))
+                return basler;
+            _selected = null;
+            return null;
+        }
+        else
+        {
+            var hik = _filtered.FirstOrDefault(d => CameraTransportPolicy.IsHikVendor(d.Vendor));
+            if (hik is not null && SelectDevice(hik.Key))
+                return hik;
+            _selected = null;
+            return null;
+        }
     }
 
     /// <summary>Validates mode, support, IP text (IP mode only) and ownership before any SDK open.</summary>
