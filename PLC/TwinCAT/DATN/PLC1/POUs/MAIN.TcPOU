@@ -118,26 +118,6 @@ VAR
     fbHmiBeltStopRise         : R_TRIG;
 
     // ================================================================
-    // 4. EZI-SERVO: TRỤC QUAY ĐƠN VỊ DEGREE
-    // ================================================================
-    Axis1               : AXIS_REF;
-
-    fbServo             : FB_EziServoControl;
-
-    bServo_Enable       : BOOL := FALSE;     // TRUE = Servo ON / giữ cốt
-    bServo_Reset        : BOOL := FALSE;    // TRUE một chu kỳ = Reset Alarm
-    bServo_JogFwd       : BOOL := FALSE;    // TRUE = chạy thuận
-    bServo_JogBwd       : BOOL := FALSE;    // TRUE = chạy nghịch
-
-    rServo_Speed        : LREAL := 100.0;   // Degree/s
-    rServo_Acc          : LREAL := 400.0;   // Degree/s2
-    rServo_Dec          : LREAL := 400.0;   // Degree/s2
-
-    bServo_Ready        : BOOL;             // TRUE = Servo ON
-    rServo_ActPos_Deg   : LREAL;            // Góc thực tế, Degree
-    rServo_ActVel_Deg_s : LREAL;            // Vận tốc thực tế, Degree/s
-
-    // ================================================================
     // 5. TRACKING 4 ĐIỂM: CAMERA + ENCODER
     // ================================================================
     fbTracking4Pt       : FB_ConveyorTracking4Pt;
@@ -356,6 +336,38 @@ VAR
     nEchoBitErrorID     : UDINT;
     bEchoBitBefore      : BOOL;
     bEchoBitAfter       : BOOL;
+
+    // ================================================================
+    // GANTRY SERVO MASTER ENABLE (M10) MAILBOX — SOURCE ONLY.
+    // Writes only M10. Reads M10, M0..M3, Y20..Y22. Never writes M1..M3.
+    // Command ON maps to M10=FALSE; command OFF maps to M10=TRUE.
+    // No automatic ON/OFF on boot, reconnect, or heartbeat loss.
+    // Live path remains hard-closed by cServoMasterCommissioned and
+    // cServoIdleMotionVerified below. No ADS/WPF proof tag exists.
+    // ================================================================
+    fbServoMaster        : FB_ServoMasterEnable;
+    bHmiServoMasterReq   : BOOL := FALSE;   // WPF rising-edge command request
+    bHmiServoMasterOn    : BOOL := FALSE;   // TRUE=ON request, FALSE=OFF request
+    udiHmiServoCmdSeq    : UDINT := 0;      // WPF-owned, nonzero, changed per command
+    bHmiServoRefreshReq  : BOOL := FALSE;   // WPF rising-edge read-only refresh
+    bServoBusy           : BOOL;
+    bServoDone           : BOOL;
+    bServoError          : BOOL;
+    nServoCommandResult  : UINT := 0;
+    udiServoLastAckSeq   : UDINT := 0;
+    bServoCmdM10Echo     : BOOL;
+    bServoMasterOnEcho   : BOOL;
+    bServoAxisOverrideEcho : ARRAY[1..3] OF BOOL;
+    bServoOutputEcho     : ARRAY[1..3] OF BOOL;
+    bServoAllOutputsOff  : BOOL;
+    bServoMasterOffOverride : BOOL;
+    bServoReadbackMismatch : BOOL;
+    nServoState          : UINT := 0;
+    udiServoSnapshotSeq  : UDINT := 0;
+    bServoSnapshotValid  : BOOL := FALSE;
+    bServoPermit         : BOOL;
+    bServoIdleVerified   : BOOL;
+    nServoCommErrorID    : UDINT;
 END_VAR
 VAR CONSTANT
     cQueueMotionCommissioned : BOOL := FALSE;
@@ -367,6 +379,12 @@ VAR CONSTANT
     // and measured ratio agreement have all been independently verified.
     cBeltFixedMmPerHz     : LREAL := 6.666666666666667;
     cBeltMaxKDriftRatio   : LREAL := 0.05; // require measured K within 5% of configured K
+    // Gantry servo M10 mailbox. Both gates are source-only constants:
+    // ADS/WPF cannot write or force them. Commissioning must review the
+    // running CPU MAIN, boot/retentive M10 state, QD75 XC..XE idle mapping,
+    // and hardwired E-Stop before either constant is changed to TRUE.
+    cServoMasterCommissioned : BOOL := FALSE;
+    cServoIdleMotionVerified : BOOL := FALSE;
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[// ================================================================
@@ -622,10 +640,6 @@ ELSE
 END_IF;
 IF bSystemStopRequested THEN
     bMD200_Start := FALSE;
-    bServo_Enable := FALSE;
-    bServo_JogFwd := FALSE;
-    bServo_JogBwd := FALSE;
-    bServo_Reset := FALSE;
     bStartGlueCycle := FALSE;
     bAutoDispatchEnable := FALSE;
     bAutoDispatchArm := FALSE;
@@ -643,6 +657,8 @@ IF bSystemStopRequested THEN
     bEchoRequestWord := FALSE;
     bEchoRequestBit := FALSE;
     bQueueSimMode := FALSE;
+    bHmiServoMasterReq := FALSE;
+    bHmiServoRefreshReq := FALSE;
     // A software E-Stop feedback cannot certify a stopped robot.
     // Ownership is kept latched until a supervised recovery/reset.
 END_IF;
@@ -734,29 +750,6 @@ END_IF;
 GVL_MD200_IO.bRUN_DO := bMD200_DO_RunVirtual;
 
 // ================================================================
-// 3. EZI-SERVO: ENABLE, RESET, JOG VÀ GIÁM SÁT
-// ================================================================
-fbServo(
-    Axis            := Axis1,
-    bEnable         := bServo_Enable AND bSystemEStopOK,
-    bResetFault     := bServo_Reset AND bSystemEStopOK,
-    bJogFwd         := bServo_JogFwd AND bSystemEStopOK,
-    bJogBwd         := bServo_JogBwd AND bSystemEStopOK,
-    rTargetVelocity := rServo_Speed,
-    rAcc            := rServo_Acc,
-    rDec            := rServo_Dec,
-
-    bReady          => bServo_Ready,
-    rActPos_Deg     => rServo_ActPos_Deg,
-    rActVel_Deg     => rServo_ActVel_Deg_s
-);
-
-IF bServo_Reset THEN
-    bServo_Reset := FALSE;
-END_IF;
-
-
-// ================================================================
 // 4. TRACKING 4 ĐIỂM: CAMERA + ENCODER
 // ================================================================
 fbTracking4Pt(
@@ -816,7 +809,7 @@ ELSIF (rConveyorSpeed <= 0.0) OR (rConveyorSpeed > 1000.0) THEN
 ELSIF NOT bPlcQConnected OR stMelsec.bBusy THEN
     nAutoDispatchState := 3;
 ELSIF bGlueCycleBusy OR bStartGlueCycle OR bEnableManualWrite
-    OR bEchoWordBusy OR bEchoBitBusy THEN
+    OR bEchoWordBusy OR bEchoBitBusy OR bServoBusy THEN
     nAutoDispatchState := 4;
 ELSE
     nQueueActiveProductID := nQueueHeadProductID;
@@ -844,7 +837,7 @@ END_IF;
 // ================================================================
 fbPublisher(
     stSession           := stMelsec,
-    bStartCycle         := (bStartGlueCycle OR bAutoStartPulse) AND bSystemEStopOK AND bLegacyMotionPublisherAllow AND NOT bQueueSimMode AND NOT bEchoPermit AND NOT bEchoWordBusy AND NOT bEchoBitBusy AND NOT bDebugXYPermit AND NOT bDebugXYBusy AND NOT bXYManualPermit AND NOT bXYManualBusy,
+    bStartCycle         := (bStartGlueCycle OR bAutoStartPulse) AND bSystemEStopOK AND bLegacyMotionPublisherAllow AND NOT bQueueSimMode AND NOT bEchoPermit AND NOT bEchoWordBusy AND NOT bEchoBitBusy AND NOT bDebugXYPermit AND NOT bDebugXYBusy AND NOT bXYManualPermit AND NOT bXYManualBusy AND NOT bServoBusy,
     // Best-effort TCP cancellation only; cannot replace independent QD75
     // hardwired EStop. Avoid sending M105 when publisher is idle.
     bAbortCycle         := bAbortGlueCycle OR
@@ -868,11 +861,11 @@ fbPublisher(
     rZSafe_mm           := 0.0,
 
     // Chế độ test thủ công (chỉ có tác dụng khi bStartGlueCycle = FALSE)
-    bManualWriteD100    := bTest_WriteD100 AND bSystemEStopOK AND bLegacyMotionPublisherAllow AND NOT bQueueSimMode AND NOT bDebugXYPermit AND NOT bXYManualPermit,
+    bManualWriteD100    := bTest_WriteD100 AND bSystemEStopOK AND bLegacyMotionPublisherAllow AND NOT bQueueSimMode AND NOT bDebugXYPermit AND NOT bXYManualPermit AND NOT bServoBusy,
     nD100_ManualVal     := nTest_D100_Val,
-    bManualWriteM1000   := bTest_WriteM1000 AND bSystemEStopOK AND bLegacyMotionPublisherAllow AND NOT bQueueSimMode AND NOT bDebugXYPermit AND NOT bXYManualPermit,
+    bManualWriteM1000   := bTest_WriteM1000 AND bSystemEStopOK AND bLegacyMotionPublisherAllow AND NOT bQueueSimMode AND NOT bDebugXYPermit AND NOT bXYManualPermit AND NOT bServoBusy,
     bM1000_ManualVal    := bTest_M1000_Val,
-    bManualReadM1001    := bTest_ReadM1001 AND bSystemEStopOK AND NOT bDebugXYPermit AND NOT bXYManualPermit,
+    bManualReadM1001    := bTest_ReadM1001 AND bSystemEStopOK AND NOT bDebugXYPermit AND NOT bXYManualPermit AND NOT bServoBusy,
 
     // Giám sát
     bBusy               => bGlueCycleBusy,
@@ -927,7 +920,7 @@ fbEchoWord(
     stSession := stMelsec,
     bExecute := bEchoRequestWord AND bSystemEStopOK AND NOT bEchoRequestBit,
     bEnable := bEchoPermit AND bSystemEStopOK AND NOT bGlueCycleBusy AND NOT bStartGlueCycle
-               AND NOT bEnableManualWrite AND NOT bEchoBitBusy AND NOT bDebugXYPermit AND NOT bXYManualPermit,
+               AND NOT bEnableManualWrite AND NOT bEchoBitBusy AND NOT bDebugXYPermit AND NOT bXYManualPermit AND NOT bServoBusy,
     bAddressVerifiedUnused := bEchoAddressChecked,
     bMachineSafe := bEchoMachineSafe,
     bBitDevice := FALSE,
@@ -948,7 +941,7 @@ fbEchoBit(
     stSession := stMelsec,
     bExecute := bEchoRequestBit AND bSystemEStopOK AND NOT bEchoRequestWord,
     bEnable := bEchoPermit AND bSystemEStopOK AND NOT bGlueCycleBusy AND NOT bStartGlueCycle
-               AND NOT bEnableManualWrite AND NOT bEchoWordBusy AND NOT bDebugXYPermit AND NOT bXYManualPermit,
+               AND NOT bEnableManualWrite AND NOT bEchoWordBusy AND NOT bDebugXYPermit AND NOT bXYManualPermit AND NOT bServoBusy,
     bAddressVerifiedUnused := bEchoAddressChecked,
     bMachineSafe := bEchoMachineSafe,
     bBitDevice := TRUE,
@@ -966,14 +959,64 @@ fbEchoBit(
 );
 
 // ================================================================
+// 6B. GANTRY SERVO MASTER ENABLE (M10) MAILBOX
+// ================================================================
+bServoPermit := cServoMasterCommissioned;
+bServoIdleVerified := (ABS(rConveyorSpeed) < 0.5)
+    AND NOT bGlueCycleBusy AND NOT bStartGlueCycle
+    AND (fbPublisher.nCurrentVertex = 0)
+    AND cServoIdleMotionVerified;
+
+fbServoMaster(
+    bCommandReq          := bHmiServoMasterReq,
+    bRequestedOn         := bHmiServoMasterOn,
+    udiCmdSeq            := udiHmiServoCmdSeq,
+    bRefreshReq          := bHmiServoRefreshReq,
+    bPermit              := bServoPermit,
+    bHeartbeatFresh      := bHmiLinkFresh,
+    bEStopOK             := bSystemEStopOK,
+    bSystemStop          := bSystemStopRequested,
+    bPlcQConnected       := bPlcQConnected,
+    bMachineStoppedVerified := bServoIdleVerified,
+    bOtherMotionOwnerActive := bGlueCycleBusy OR bStartGlueCycle
+                               OR (fbPublisher.nState <> 0)
+                               OR bTest_WriteM1000 OR bTest_WriteD100
+                               OR bEchoWordBusy OR bEchoBitBusy
+                               OR bDebugXYBusy OR bXYManualBusy
+                               OR bQueueMotionActive,
+    stSession            := stMelsec,
+    bBusy                => bServoBusy,
+    bDone                => bServoDone,
+    bError               => bServoError,
+    nCommandResult       => nServoCommandResult,
+    udiLastAckSeq        => udiServoLastAckSeq,
+    bMasterOnEcho        => bServoMasterOnEcho,
+    aAxisOverrideEcho    => bServoAxisOverrideEcho,
+    aServoOutputEcho     => bServoOutputEcho,
+    bM10Echo             => bServoCmdM10Echo,
+    bAllOutputsOff       => bServoAllOutputsOff,
+    bMasterOffOverride   => bServoMasterOffOverride,
+    bReadbackMismatch    => bServoReadbackMismatch,
+    nServoState          => nServoState,
+    udiSnapshotSeq       => udiServoSnapshotSeq,
+    bSnapshotValid       => bServoSnapshotValid,
+    nCommError           => nServoCommErrorID
+);
+
+IF (udiHmiServoCmdSeq <> 0) AND (udiServoLastAckSeq = udiHmiServoCmdSeq) THEN
+    bHmiServoMasterReq := FALSE;
+END_IF;
+IF bServoDone THEN
+    bHmiServoRefreshReq := FALSE;
+END_IF;
+
+// ================================================================
 // 7. DATA-ONLY DIAGNOSTIC: REAL TwinCAT -> MC TCP -> Mitsubishi.
-// Operator must stop servo/conveyor, and provide two rising-edge
+// Operator must stop conveyor, and provide two rising-edge
 // flags (Permit=TRUE, Execute pulse). No Z, speed, M1000 or Y writes.
 // ================================================================
 bDebugXYMachineStopped :=
-    NOT bServo_JogFwd AND NOT bServo_JogBwd
-    AND (ABS(rServo_ActVel_Deg_s) < 0.2)
-    AND (ABS(rConveyorSpeed) < 0.5)
+    (ABS(rConveyorSpeed) < 0.5)
     AND NOT bGlueCycleBusy AND NOT bStartGlueCycle
     AND NOT bAbortGlueCycle AND NOT bGlueCycleError;
 
@@ -982,7 +1025,7 @@ fbDebugXY(
     bExecute := bDebugXYExecute AND bSystemEStopOK,
     bPermit := bDebugXYPermit AND bSystemEStopOK AND NOT bXYManualPermit AND NOT bEchoPermit
                AND NOT bEnableManualWrite AND NOT bAutoDispatchEnable
-               AND NOT bAutoDispatchArm,
+               AND NOT bAutoDispatchArm AND NOT bServoBusy,
     bMachineStopped := bDebugXYMachineStopped,
     bPublisherIdle := (fbPublisher.nState = 0)
                       AND NOT bEchoWordBusy AND NOT bEchoBitBusy
@@ -1145,7 +1188,8 @@ bXYManualSafe := bSystemEStopOK AND NOT bDebugXYPermit
     AND NOT bAutoDispatchEnable AND NOT bAutoDispatchArm
     AND NOT bTest_WriteM1000 AND NOT bTest_WriteD100
     AND (fbPublisher.nState = 0)
-    AND bPlcQConnected;
+    AND bPlcQConnected
+    AND NOT bServoBusy;
 
 fbXYManualAck(
     stSession := stMelsec,

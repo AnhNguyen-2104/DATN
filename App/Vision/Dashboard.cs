@@ -20,7 +20,6 @@ internal sealed class LineStatus
     public IReadOnlyDictionary<string,bool> SymbolPresence { get; init; } = new Dictionary<string,bool>();
     public bool EstopOk { get; init; }
     public bool SystemEStopOk { get; init; }
-    public bool ServoReady { get; init; }
     public bool GlobalStop { get; init; }
     public bool PlcQConnected { get; init; }
     public bool PlcQError { get; init; }
@@ -95,7 +94,6 @@ internal static class LineAds
             EstopOk=Optional<bool>(ads,"GVL_MD200_IO.bEStopFeedback",presence,false),
             GlobalStop=Optional<bool>(ads,"MAIN.bSystemStopRequested",presence,true),
             SystemEStopOk=Optional<bool>(ads,"MAIN.bSystemEStopOK",presence),
-            ServoReady=Optional<bool>(ads,"MAIN.bServo_Ready",presence),
             PlcQConnected=Optional<bool>(ads,"MAIN.bPlcQConnected",presence),
             PlcQError=Optional<bool>(ads,"MAIN.bPlcQError",presence,false),
             PlcQErrorId=Optional<uint>(ads,"MAIN.nPlcQErrorID",presence,0u),
@@ -171,10 +169,23 @@ public partial class MainWindow
         DashControlArm.IsEnabled=true;
         DashControlNote.Text="MANUAL CONVEYOR COMMANDS FAIL-CLOSED. Central mm/s preset; commands await PLC/HMI commissioning.";
         PopulateOfflineTagMatrix();
-        _dashTimer.Tick+=DashTimer_Tick;
-        _dashTimer.Start();
-        _heartbeatTimer.Tick+=HeartbeatTimer_Tick;
-        _heartbeatTimer.Start();
+        if (AppHardwareCapabilities.AllowAdsPolling)
+        {
+            _dashTimer.Tick+=DashTimer_Tick;
+            _dashTimer.Start();
+            _heartbeatTimer.Tick+=HeartbeatTimer_Tick;
+            _heartbeatTimer.Start();
+        }
+        else
+        {
+            LineMailboxGateway.Instance.DisconnectTransport();
+            DashPlc.Text="OFFLINE (NO HARDWARE)";
+            DashPlc.Foreground=DashBrush("#92AABE");
+            DashEStop.Text="DISARMED";
+            DashEStop.Foreground=DashBrush("#92AABE");
+            DashUpdated.Text="OFFLINE CALIBRATION / ZERO ADS";
+            DashControlNote.Text="OFFLINE CALIBRATION MODE: ADS polling, transport and heartbeats strictly inhibited.";
+        }
         Closed+=(_,_)=>{
             _dashTimer.Stop();
             _heartbeatTimer.Stop();
@@ -183,7 +194,7 @@ public partial class MainWindow
     }
     private void HeartbeatTimer_Tick(object? sender,EventArgs e)
     {
-        if(_closing)return;
+        if(_closing || !AppHardwareCapabilities.AllowAdsWrites)return;
         bool adsOnline = _dashStatus is not null && LineMailboxProtocol.IsTelemetryFresh(_dashStatus.ReceivedUtc, DateTime.UtcNow, TimeSpan.FromSeconds(3));
         LineMailboxGateway.Instance.TickHeartbeat(false, adsOnline);
     }
@@ -191,7 +202,7 @@ public partial class MainWindow
 
     private async Task RefreshDashboardAsync()
     {
-        if(_dashPolling || _closing)return;
+        if(_dashPolling || _closing || !AppHardwareCapabilities.AllowAdsPolling)return;
         _dashPolling=true;
         try {
             var s=await Task.Run(LineAds.Poll);
@@ -234,28 +245,89 @@ public partial class MainWindow
                 DashMachineMessage.Text="AUX E-STOP DI OK · MITSUBISHI PLC-Q DISCONNECTED · GANTRY BLOCKED";
             else
                 DashMachineMessage.Text="AUX E-STOP DI OK · TWINCAT RUN · GANTRY AUTO NOT COMMISSIONED";
-            // Manual conveyor panel: arming toggle is operator-controlled; buttons follow arm state
-            DashControlArm.IsEnabled=true;
-            DashStartButton.IsEnabled=_dashControlArmed;
-            DashStopButton.IsEnabled=_dashControlArmed;
-            string reason = LineMailboxProtocol.BlockReason(
-                LineMailboxProtocol.IsTelemetryFresh(s.ReceivedUtc,DateTime.UtcNow,TimeSpan.FromSeconds(3)),
-                s.MailboxSymbolsAvailable,s.EstopOk,s.GlobalStop,
-                s.BeltSpeedMapReady,s.HmiLinkFresh);
-            string extra = "";
-            if (s.LineNormalStopLatched) extra += " | NORMAL STOP LATCHED";
-            if (!s.BeltSpeedMapReady) extra += " | BELT NOT COMMISSIONED";
-            if (!LineMailboxProtocol.ProductionCommandSourceApproved)
+            bool isRunning = s.BeltRun;
+            if (!_conveyorCalibrationMode)
             {
-                bool writeConnected = LineMailboxGateway.Instance.Transport.IsConnected;
-                extra += writeConnected ? " | WRITE TRANSPORT: CONNECTED · DISARMED" : " | WRITE TRANSPORT: DISCONNECTED · DISARMED";
+                DashControlArm.IsEnabled = false;
+                DashControlArm.IsChecked = false;
+                _dashControlArmed = false;
+                DashStartButton.IsEnabled = false;
+                DashStopButton.IsEnabled = isRunning; // CRIT-03: keep STOP enabled while running!
+                if (ConveyorManualControlPanel != null)
+                    ConveyorManualControlPanel.IsEnabled = false;
+                if (ConveyorManualModeNote != null)
+                    ConveyorManualModeNote.Text = "CALIBRATION DISARMED: Switch to 'CONVEYOR SUBSYSTEM CALIBRATION' on LINE OVERVIEW to enable calibration controls.";
+
+                if (isRunning)
+                {
+                    DashControlNote.Text = $"CONVEYOR RUNNING at {s.BeltSpeed:F1} mm/s · MANUAL RUN ACTIVE · NOT PRODUCTION AUTO. In danger use PHYSICAL E-STOP.";
+                }
+                else
+                {
+                    string reason = LineMailboxProtocol.BlockReason(
+                        LineMailboxProtocol.IsTelemetryFresh(s.ReceivedUtc,DateTime.UtcNow,TimeSpan.FromSeconds(3)),
+                        s.MailboxSymbolsAvailable,s.EstopOk,s.GlobalStop,
+                        s.BeltSpeedMapReady,s.HmiLinkFresh);
+                    string extra = "";
+                    if (s.LineNormalStopLatched) extra += " | NORMAL STOP LATCHED";
+                    if (!s.BeltSpeedMapReady) extra += " | BELT NOT COMMISSIONED";
+                    if (!LineMailboxProtocol.ProductionCommandSourceApproved)
+                    {
+                        bool writeConnected = LineMailboxGateway.Instance.Transport.IsConnected;
+                        extra += writeConnected ? " | WRITE TRANSPORT: CONNECTED · DISARMED" : " | WRITE TRANSPORT: DISCONNECTED · DISARMED";
+                    }
+                    else
+                    {
+                        bool writeConnected = LineMailboxGateway.Instance.Transport.IsConnected;
+                        extra += writeConnected ? " | WRITE TRANSPORT: LIVE · COMMISSIONED" : " | WRITE TRANSPORT: RECONNECTING";
+                    }
+                    DashControlNote.Text = "CONVEYOR CONTROLS INACTIVE: Select 'CONVEYOR SUBSYSTEM CALIBRATION' on LINE OVERVIEW to enable conveyor running. " + reason + extra;
+                }
             }
             else
             {
-                bool writeConnected = LineMailboxGateway.Instance.Transport.IsConnected;
-                extra += writeConnected ? " | WRITE TRANSPORT: LIVE · COMMISSIONED" : " | WRITE TRANSPORT: RECONNECTING";
+                if (ConveyorManualControlPanel != null)
+                    ConveyorManualControlPanel.IsEnabled = true;
+                if (ConveyorManualModeNote != null)
+                    ConveyorManualModeNote.Text = "CONVEYOR SUBSYSTEM ISOLATION: Station 01 Gantry and Station 02 SCARA are disarmed during conveyor calibration. Camera 1 is not required. Production AUTO line requires verified camera and separate commissioning on Overview.";
+
+                DashControlArm.IsEnabled = true;
+                bool adsFresh = LineMailboxProtocol.IsTelemetryFresh(s.ReceivedUtc, DateTime.UtcNow, TimeSpan.FromSeconds(3));
+                bool speedOk = !double.IsNaN(_presetSpeedMmS) && _presetSpeedMmS >= LineSpeedPreset.MinMmS && _presetSpeedMmS <= LineSpeedPreset.MaxMmS;
+                bool canStart = _dashControlArmed && adsFresh && s.MailboxSymbolsAvailable && LineMailboxProtocol.ProductionCommandSourceApproved
+                    && s.EstopOk && !s.GlobalStop && s.HmiLinkFresh && !s.LineNormalStopLatched && s.BeltSpeedMapReady && speedOk && !isRunning;
+
+                DashStartButton.IsEnabled = canStart;
+                DashStopButton.IsEnabled = _dashControlArmed || isRunning;
+                string? blockedReason = null;
+                if (!adsFresh)
+                    blockedReason = "CONVEYOR CALIBRATION BLOCKED: ADS 851 offline or stale telemetry.";
+                else if (!s.MailboxSymbolsAvailable)
+                    blockedReason = "CONVEYOR CALIBRATION BLOCKED: HMI PLC mailbox symbols missing on runtime.";
+                else if (!LineMailboxProtocol.ProductionCommandSourceApproved)
+                    blockedReason = "CONVEYOR CALIBRATION BLOCKED: Production command source is not approved.";
+                else if (!s.EstopOk)
+                    blockedReason = "CONVEYOR CALIBRATION BLOCKED: Emergency stop auxiliary contact (ST-1228 DI0) not healthy. In danger use PHYSICAL E-STOP.";
+                else if (s.GlobalStop && !s.LineNormalStopLatched)
+                    blockedReason = "CONVEYOR CALIBRATION BLOCKED: Global stop active in PLC. In danger use PHYSICAL E-STOP.";
+                else if (!s.HmiLinkFresh)
+                    blockedReason = "CONVEYOR CALIBRATION BLOCKED: HMI watchdog heartbeat stale in PLC.";
+                else if (s.LineNormalStopLatched)
+                    blockedReason = "CONVEYOR CALIBRATION BLOCKED: Normal stop latched in PLC; reset required.";
+                else if (!s.BeltSpeedMapReady)
+                    blockedReason = "CONVEYOR CALIBRATION BLOCKED: Belt speed map not ready in PLC.";
+                else if (!speedOk)
+                    blockedReason = $"CONVEYOR CALIBRATION BLOCKED: Speed {_presetSpeedMmS:F1} mm/s outside [1.0..150.0].";
+
+                if (isRunning)
+                    DashControlNote.Text = $"CONVEYOR CALIBRATION RUNNING at {s.BeltSpeed:F1} mm/s · ISOLATED BELT RUN (NO ROBOT/GLUE) · In danger use PHYSICAL E-STOP.";
+                else if (blockedReason != null)
+                    DashControlNote.Text = blockedReason;
+                else if (_dashControlArmed)
+                    DashControlNote.Text = $"CONVEYOR CALIBRATION ARMED at {_presetSpeedMmS:F1} mm/s · Ready to command conveyor · ISOLATED BELT RUN (NO ROBOT/GLUE).";
+                else
+                    DashControlNote.Text = "CONVEYOR CALIBRATION READY (DISARMED): Check arm checkbox to enable start · ISOLATED BELT RUN (NO ROBOT/GLUE) · In danger use PHYSICAL E-STOP.";
             }
-            DashControlNote.Text = reason + extra;
         } catch(Exception ex) {
             _dashStatus=null;
             LineMailboxGateway.Instance.DisconnectTransport();
@@ -285,6 +357,8 @@ public partial class MainWindow
             DashMachineMessage.Text="TWINCAT DATA LOST: "+ex.Message;
             DashStartButton.IsEnabled=false;
             DashStopButton.IsEnabled=false;
+            RefreshInterlockUi();
+            UpdateControlSafetyBanner();
         } finally {_dashPolling=false;}
     }
 
@@ -311,7 +385,6 @@ public partial class MainWindow
             T("GLOBAL","GVL_MD200_IO.bEStopFeedback",V(s.EstopOk)),
             T("GLOBAL","MAIN.bSystemStopRequested",V(s.GlobalStop)),
             T("GLOBAL","MAIN.bSystemEStopOK",V(s.SystemEStopOk)),
-            T("GLOBAL","MAIN.bServo_Ready",V(s.ServoReady)),
             T("GLOBAL","MAIN.bPlcQConnected",V(s.PlcQConnected)),
             T("CONVEYOR","MAIN.rConveyorSpeed",$"{s.BeltSpeed:F2} mm/s"),
             T("CONVEYOR","MAIN.rConveyorDist",$"{s.BeltDistance:F2} mm"),
@@ -382,7 +455,6 @@ public partial class MainWindow
             T("GLOBAL", "GVL_MD200_IO.bEStopFeedback", "FALSE (unverified)"),
             T("GLOBAL", "MAIN.bSystemStopRequested", "TRUE (fail-closed)"),
             T("GLOBAL", "MAIN.bSystemEStopOK", "FALSE (unverified)"),
-            T("GLOBAL", "MAIN.bServo_Ready", "FALSE"),
             T("GLOBAL", "MAIN.bPlcQConnected", "FALSE"),
             T("CONVEYOR", "MAIN.rConveyorSpeed", "0.00 mm/s"),
             T("CONVEYOR", "MAIN.rConveyorDist", "0.00 mm"),
@@ -450,52 +522,149 @@ public partial class MainWindow
     private void DashArmChanged(object sender,RoutedEventArgs e)
     {
         if(!IsLoaded)return;
-        _dashControlArmed=DashControlArm.IsChecked==true;
-        DashStartButton.IsEnabled=_dashControlArmed;
-        DashStopButton.IsEnabled=_dashControlArmed;
-        DashControlNote.Text=_dashControlArmed
-            ? (LineMailboxProtocol.ProductionCommandSourceApproved ? "MANUAL ARMED: Ready to command conveyor (1..150 mm/s)." : "MANUAL ARMED: Physical writes disarmed pending commissioning.")
-            : "MANUAL DISARMED: Operator confirmation required to arm buttons.";
+        if (!_conveyorCalibrationMode)
+        {
+            _dashControlArmed = false;
+            DashControlArm.IsChecked = false;
+            if (OvCalibrationArm != null) OvCalibrationArm.IsChecked = false;
+            DashStartButton.IsEnabled = false;
+            DashStopButton.IsEnabled = _dashStatus?.BeltRun == true; // keep STOP enabled if belt is running
+            DashControlNote.Text = "CONVEYOR CONTROLS INACTIVE: Select 'CONVEYOR SUBSYSTEM CALIBRATION' on LINE OVERVIEW to enable conveyor running.";
+            return;
+        }
+
+        _dashControlArmed = DashControlArm.IsChecked == true;
+        if (OvCalibrationArm != null && OvCalibrationArm.IsChecked != _dashControlArmed)
+            OvCalibrationArm.IsChecked = _dashControlArmed;
+
+        bool isRunning = _dashStatus?.BeltRun == true;
+        DashStartButton.IsEnabled = _dashControlArmed && !isRunning;
+        DashStopButton.IsEnabled = _dashControlArmed || isRunning; // CRIT-03
+        UpdateControlSafetyBanner();
+
+        if (isRunning)
+        {
+            DashControlNote.Text = $"CONVEYOR CALIBRATION RUNNING at {_dashStatus!.BeltSpeed:F1} mm/s · ISOLATED BELT RUN (NO ROBOT/GLUE) · In danger use PHYSICAL E-STOP.";
+        }
+        else if (_dashControlArmed)
+        {
+            DashControlNote.Text = "CONVEYOR CALIBRATION ARMED: Ready to command conveyor (1..150 mm/s) · ISOLATED BELT RUN (NO ROBOT/GLUE).";
+        }
+        else
+        {
+            DashControlNote.Text = "CONVEYOR CALIBRATION DISARMED: Operator confirmation required to arm buttons.";
+        }
+        RefreshInterlockUi();
     }
 
     private async void DashStart_Click(object sender,RoutedEventArgs e)
     {
-        bool adsOnline = _dashStatus is not null && LineMailboxProtocol.IsTelemetryFresh(_dashStatus.ReceivedUtc, DateTime.UtcNow, TimeSpan.FromSeconds(3));
+        if (!_conveyorCalibrationMode)
+        {
+            string blocked = "START BLOCKED: Conveyor start is permitted ONLY in 'CONVEYOR SUBSYSTEM CALIBRATION' mode. Select mode on Overview.";
+            DashControlNote.Text = blocked;
+            StatusText.Text = blocked;
+            if (OvStartReason != null) OvStartReason.Text = blocked;
+            return;
+        }
+
+        bool adsFresh = _dashStatus is not null && LineMailboxProtocol.IsTelemetryFresh(_dashStatus.ReceivedUtc, DateTime.UtcNow, TimeSpan.FromSeconds(3));
         bool mapReady = _dashStatus?.BeltSpeedMapReady == true;
+        bool symbolsPresent = _dashStatus?.MailboxSymbolsAvailable == true;
+        bool sourceApproved = LineMailboxProtocol.ProductionCommandSourceApproved;
+        bool auxEstopOk = _dashStatus?.EstopOk == true;
+        bool globalStop = _dashStatus?.GlobalStop == true;
+        bool heartbeatFresh = _dashStatus?.HmiLinkFresh == true;
+        bool stopLatched = _dashStatus?.LineNormalStopLatched == true;
+        bool speedOk = !double.IsNaN(_presetSpeedMmS) && _presetSpeedMmS >= LineSpeedPreset.MinMmS && _presetSpeedMmS <= LineSpeedPreset.MaxMmS;
+
+        string? failReason = null;
+        if (!adsFresh) failReason = "CONVEYOR CALIBRATION BLOCKED: ADS 851 offline or stale telemetry.";
+        else if (!symbolsPresent) failReason = "CONVEYOR CALIBRATION BLOCKED: HMI PLC mailbox symbols missing on runtime.";
+        else if (!sourceApproved) failReason = "CONVEYOR CALIBRATION BLOCKED: Production command source is not approved.";
+        else if (!auxEstopOk) failReason = "CONVEYOR CALIBRATION BLOCKED: Emergency stop auxiliary contact (ST-1228 DI0) not healthy. In danger use PHYSICAL E-STOP.";
+        else if (globalStop && !stopLatched) failReason = "CONVEYOR CALIBRATION BLOCKED: Global stop active in PLC. In danger use PHYSICAL E-STOP.";
+        else if (!heartbeatFresh) failReason = "CONVEYOR CALIBRATION BLOCKED: HMI watchdog heartbeat stale in PLC.";
+        else if (stopLatched) failReason = "CONVEYOR CALIBRATION BLOCKED: Normal stop latched in PLC; reset required.";
+        else if (globalStop) failReason = "CONVEYOR CALIBRATION BLOCKED: Global stop active in PLC. In danger use PHYSICAL E-STOP.";
+        else if (!mapReady) failReason = "CONVEYOR CALIBRATION BLOCKED: Belt speed map not ready in PLC.";
+        else if (!speedOk) failReason = $"CONVEYOR CALIBRATION BLOCKED: Speed {_presetSpeedMmS:F1} mm/s outside [1.0..150.0].";
+        else if (!_dashControlArmed) failReason = "CONVEYOR CALIBRATION BLOCKED: Arm checkbox required to enable start.";
+
+        if (failReason != null)
+        {
+            DashControlNote.Text = failReason;
+            StatusText.Text = failReason;
+            if (OvStartReason != null)
+            {
+                OvStartReason.Text = failReason;
+                OvStartReason.Foreground = DashBrush("#FF6E70");
+            }
+            RefreshInterlockUi();
+            return;
+        }
+
+        // DEF-03: prevent Overview calibration START/STOP async re-entrancy; disable both buttons during dispatch
         DashStartButton.IsEnabled = false;
+        if (SysStartButton != null) SysStartButton.IsEnabled = false;
+        if (OvStartReason != null) OvStartReason.Text = "CONVEYOR CALIBRATION START DISPATCHING: Asserting start request to PLC...";
+
         try {
             if (!LineMailboxGateway.Instance.PriorBeltSetAccepted || Math.Abs(LineMailboxGateway.Instance.LastAcceptedBeltSetMmS - _presetSpeedMmS) > 0.05)
             {
-                var setResult = await LineMailboxGateway.Instance.RequestManualBeltSetAsync(false, adsOnline, _presetSpeedMmS);
+                var setResult = await LineMailboxGateway.Instance.RequestManualBeltSetAsync(false, adsFresh, _presetSpeedMmS);
                 if (!setResult.Success)
                 {
-                    DashControlNote.Text = setResult.Message;
-                    StatusText.Text = setResult.Message;
+                    string setMsg = $"START BLOCKED: Speed SET failed: {setResult.Message}";
+                    DashControlNote.Text = setMsg;
+                    StatusText.Text = setMsg;
+                    if (OvStartReason != null)
+                    {
+                        OvStartReason.Text = setMsg;
+                        OvStartReason.Foreground = DashBrush("#FF6E70");
+                    }
+                    if (CvPresetStatus != null) CvPresetStatus.Text = $"SET FAILED: {setResult.Message}";
+                    if (OvPresetError != null) OvPresetError.Text = setResult.Message;
                     return;
                 }
             }
-            var result = await LineMailboxGateway.Instance.RequestManualBeltStartAsync(false, adsOnline, mapReady, _presetSpeedMmS);
+            var result = await LineMailboxGateway.Instance.RequestManualBeltStartAsync(false, adsFresh, mapReady, _presetSpeedMmS);
             DashControlNote.Text = result.Message;
             StatusText.Text = result.Message;
-            SensorHistory("MANUAL BELT START: " + result.Message);
+            if (OvStartReason != null)
+            {
+                OvStartReason.Text = result.Message;
+                OvStartReason.Foreground = DashBrush(result.Success ? "#39C7A2" : "#FF6E70");
+            }
+            SensorHistory("CONVEYOR SUBSYSTEM CALIBRATION START: " + result.Message);
             await RefreshDashboardAsync();
         } finally {
-            DashStartButton.IsEnabled = _dashControlArmed;
+            RefreshInterlockUi();
         }
     }
 
     private async void DashStop_Click(object sender,RoutedEventArgs e)
     {
-        bool adsOnline = _dashStatus is not null && LineMailboxProtocol.IsTelemetryFresh(_dashStatus.ReceivedUtc, DateTime.UtcNow, TimeSpan.FromSeconds(3));
+        bool adsFresh = _dashStatus is not null && LineMailboxProtocol.IsTelemetryFresh(_dashStatus.ReceivedUtc, DateTime.UtcNow, TimeSpan.FromSeconds(3));
+
+        // DEF-03: prevent Overview calibration START/STOP async re-entrancy; disable both buttons during dispatch
         DashStopButton.IsEnabled = false;
+        if (SysStopButton != null) SysStopButton.IsEnabled = false;
+        if (OvStartReason != null) OvStartReason.Text = "CONVEYOR CALIBRATION STOP DISPATCHING: Asserting stop request to PLC...";
+
         try {
-            var result = await LineMailboxGateway.Instance.RequestManualBeltStopAsync(false, adsOnline);
+            var result = await LineMailboxGateway.Instance.RequestManualBeltStopAsync(false, adsFresh);
             DashControlNote.Text = result.Message;
             StatusText.Text = result.Message;
-            SensorHistory("MANUAL BELT STOP: " + result.Message);
+            if (OvStartReason != null)
+            {
+                OvStartReason.Text = result.Message;
+                OvStartReason.Foreground = DashBrush(result.Success ? "#39C7A2" : "#FF6E70");
+            }
+            SensorHistory("CONVEYOR SUBSYSTEM CALIBRATION STOP: " + result.Message);
             await RefreshDashboardAsync();
         } finally {
-            DashStopButton.IsEnabled = _dashControlArmed;
+            RefreshInterlockUi();
         }
     }
     private InterlockInputs BuildInterlockInputs()
@@ -522,7 +691,154 @@ public partial class MainWindow
     private void RefreshInterlockUi()
     {
         if (_closing) return;
-        var evaluation = _lineInterlock.Evaluate(BuildInterlockInputs());
+        var inputs = BuildInterlockInputs();
+        var evaluation = _lineInterlock.Evaluate(inputs);
+
+        if (_conveyorCalibrationMode)
+        {
+            var st = _dashStatus;
+            bool adsFresh = st is not null && LineMailboxProtocol.IsTelemetryFresh(st.ReceivedUtc, DateTime.UtcNow, TimeSpan.FromSeconds(3));
+            bool symbolsPresent = st?.MailboxSymbolsAvailable == true;
+            bool sourceApproved = LineMailboxProtocol.ProductionCommandSourceApproved;
+            bool auxEstopOk = st?.EstopOk == true;
+            bool globalStop = st?.GlobalStop == true;
+            bool heartbeatFresh = st?.HmiLinkFresh == true;
+            bool stopLatched = st?.LineNormalStopLatched == true;
+            bool mapReady = st?.BeltSpeedMapReady == true;
+            bool speedOk = !double.IsNaN(inputs.PresetSpeedMmS) && inputs.PresetSpeedMmS >= LineSpeedPreset.MinMmS && inputs.PresetSpeedMmS <= LineSpeedPreset.MaxMmS;
+            bool isRunning = st?.BeltRun == true;
+
+            OvIlAds.Text = (adsFresh ? "● " : "○ ") + "ADS 851";
+            OvIlAds.Foreground = DashBrush(adsFresh ? "#39C7A2" : "#FF6E70");
+            OvIlAds.ToolTip = adsFresh ? "TwinCAT ADS router connected (port 851)" : "ADS 851 OFFLINE / STALE";
+
+            OvIlEstop.Text = (auxEstopOk ? "● " : "○ ") + "E-STOP AUX";
+            OvIlEstop.Foreground = DashBrush(auxEstopOk ? "#39C7A2" : "#FF6E70");
+            OvIlEstop.ToolTip = auxEstopOk ? "E-stop auxiliary contact healthy (ST-1228 DI0)" : "Emergency stop active or auxiliary feedback not healthy";
+
+            OvIlSpeed.Text = (speedOk ? "● " : "○ ") + "SPEED PRESET";
+            OvIlSpeed.Foreground = DashBrush(speedOk ? "#39C7A2" : "#FF6E70");
+            OvIlSpeed.ToolTip = $"Calibration speed {inputs.PresetSpeedMmS:F1} mm/s";
+
+            // Camera is not required for independent conveyor subsystem calibration
+            OvIlCamera.Text = "● CAM (NOT REQUIRED)";
+            OvIlCamera.Foreground = DashBrush("#27C9EC");
+            OvIlCamera.ToolTip = "CONVEYOR SUBSYSTEM CALIBRATION: Independent belt drive tuning does not require camera acquisition.";
+
+            // Robot / PLC-Q / Gantry / SCARA / AUTO are inhibited
+            OvIlPlcQ.Text = "● PLC-Q (INHIBITED)";
+            OvIlPlcQ.Foreground = DashBrush("#27C9EC");
+            OvIlPlcQ.ToolTip = "CONVEYOR SUBSYSTEM CALIBRATION: Robot MC bridge and tracking queue are disarmed.";
+
+            OvIlGantry.Text = "● GANTRY (INHIBITED)";
+            OvIlGantry.Foreground = DashBrush("#27C9EC");
+            OvIlGantry.ToolTip = "CONVEYOR SUBSYSTEM CALIBRATION: Gantry motion and glue dispense are inhibited.";
+
+            OvIlMaster.Text = "● AUTO INHIBITED";
+            OvIlMaster.Foreground = DashBrush("#27C9EC");
+            OvIlMaster.ToolTip = "CONVEYOR SUBSYSTEM CALIBRATION: Production AUTO coordinator is disarmed. Production gates are NOT bypassed; line auto contract remains separate and uncommissioned.";
+
+            OvIlScara.Text = "● SCARA (INHIBITED)";
+            OvIlScara.Foreground = DashBrush("#27C9EC");
+            OvIlScara.ToolTip = "CONVEYOR SUBSYSTEM CALIBRATION: SCARA Station 02 is disarmed.";
+
+            bool canStartCalibration = _dashControlArmed && adsFresh && symbolsPresent && sourceApproved && auxEstopOk && !globalStop && heartbeatFresh && !stopLatched && mapReady && speedOk && !isRunning;
+
+            SysStartButton.IsEnabled = canStartCalibration;
+            SysStopButton.IsEnabled = _dashControlArmed || isRunning;
+
+            var calibResetInputs = new ConveyorCalibrationResetInputs(
+                AdsFresh: adsFresh,
+                AuxEstopOk: auxEstopOk,
+                GlobalStop: globalStop,
+                NormalStopLatched: stopLatched,
+                BeltRunning: isRunning || st?.BeltRequest == true || LineMailboxGateway.Instance.ManualBeltActive,
+                GlueActive: st?.GantryBusy == true || st?.GantryError == true,
+                AutoActive: st?.LineAutoAccepted == true || LineMailboxGateway.Instance.AutoLineActive);
+            var calibResetEval = ConveyorCalibrationInterlock.EvaluateReset(calibResetInputs);
+            bool canResetCalibration = calibResetEval.CanReset;
+            SysResetButton.IsEnabled = canResetCalibration;
+
+            if (OvCommandCommissionStatus != null)
+            {
+                if (!sourceApproved || !symbolsPresent)
+                {
+                    OvCommandCommissionStatus.Text = "CALIBRATION MAILBOX · NOT COMMISSIONED";
+                    OvCommandCommissionStatus.Foreground = DashBrush("#FF6E70");
+                }
+                else
+                {
+                    OvCommandCommissionStatus.Text = "CALIBRATION MAILBOX LIVE · ISOLATED (NO ROBOT/GLUE)";
+                    OvCommandCommissionStatus.Foreground = DashBrush("#27C9EC");
+                }
+            }
+
+            // Prioritize actual running state (MIN-02)
+            OvCvCommand.Text = isRunning ? "CALIB / RUNNING" : (_dashControlArmed ? "CALIB / ARMED" : "CALIB / DISARMED");
+
+            // Complete fail-closed reason hierarchy (IMP-01/02)
+            if (!adsFresh)
+            {
+                OvStartReason.Text = "CONVEYOR CALIBRATION BLOCKED: ADS 851 offline or stale telemetry.";
+                OvStartReason.Foreground = DashBrush("#FF6E70");
+            }
+            else if (!symbolsPresent)
+            {
+                OvStartReason.Text = "CONVEYOR CALIBRATION BLOCKED: HMI PLC mailbox symbols missing on runtime.";
+                OvStartReason.Foreground = DashBrush("#FF6E70");
+            }
+            else if (!sourceApproved)
+            {
+                OvStartReason.Text = "CONVEYOR CALIBRATION BLOCKED: Production command source is not approved.";
+                OvStartReason.Foreground = DashBrush("#FF6E70");
+            }
+            else if (!auxEstopOk)
+            {
+                OvStartReason.Text = "CONVEYOR CALIBRATION BLOCKED: Emergency stop auxiliary contact (ST-1228 DI0) not healthy. In danger use PHYSICAL E-STOP.";
+                OvStartReason.Foreground = DashBrush("#FF6E70");
+            }
+            else if (globalStop && !stopLatched)
+            {
+                OvStartReason.Text = "CONVEYOR CALIBRATION BLOCKED: Global stop active in PLC. In danger use PHYSICAL E-STOP.";
+                OvStartReason.Foreground = DashBrush("#FF6E70");
+            }
+            else if (!heartbeatFresh)
+            {
+                OvStartReason.Text = "CONVEYOR CALIBRATION BLOCKED: HMI watchdog heartbeat stale in PLC.";
+                OvStartReason.Foreground = DashBrush("#F4BB45");
+            }
+            else if (stopLatched)
+            {
+                OvStartReason.Text = "CONVEYOR CALIBRATION BLOCKED: Normal stop latched in PLC; reset required.";
+                OvStartReason.Foreground = DashBrush("#F4BB45");
+            }
+            else if (!mapReady)
+            {
+                OvStartReason.Text = "CONVEYOR CALIBRATION BLOCKED: Belt speed map not ready in PLC.";
+                OvStartReason.Foreground = DashBrush("#F4BB45");
+            }
+            else if (!speedOk)
+            {
+                OvStartReason.Text = $"CONVEYOR CALIBRATION BLOCKED: Speed {inputs.PresetSpeedMmS:F1} mm/s outside [1.0..150.0].";
+                OvStartReason.Foreground = DashBrush("#F4BB45");
+            }
+            else if (isRunning)
+            {
+                OvStartReason.Text = $"CONVEYOR CALIBRATION RUNNING at {st!.BeltSpeed:F1} mm/s · ISOLATED BELT RUN (NO ROBOT/GLUE) · In danger use PHYSICAL E-STOP.";
+                OvStartReason.Foreground = DashBrush("#39C7A2");
+            }
+            else if (_dashControlArmed)
+            {
+                OvStartReason.Text = $"CONVEYOR CALIBRATION ARMED at {_presetSpeedMmS:F1} mm/s · Ready to start · ISOLATED BELT RUN (NO ROBOT/GLUE)";
+                OvStartReason.Foreground = DashBrush("#39C7A2");
+            }
+            else
+            {
+                OvStartReason.Text = "CONVEYOR CALIBRATION READY (DISARMED): Check 'Arm Subsystem Calibration' to enable start · ISOLATED BELT RUN (NO ROBOT/GLUE)";
+                OvStartReason.Foreground = DashBrush("#F4BB45");
+            }
+            return;
+        }
 
         void Mark(System.Windows.Controls.TextBlock block, InterlockCheckId id)
         {
@@ -547,7 +863,7 @@ public partial class MainWindow
         SysResetButton.IsEnabled = evaluation.CanReset;
         OvCvCommand.Text = LineStateText(evaluation.State);
         OvStartReason.Text = evaluation.PrimaryReason;
-        if(_dashStatus is { } blockedStatus)
+        if (_dashStatus is { } blockedStatus)
         {
             var notes = new List<string>();
             if(!blockedStatus.MailboxSymbolsAvailable)
@@ -558,8 +874,6 @@ public partial class MainWindow
                 notes.Add("HMI HEARTBEAT STALE");
             if(blockedStatus.LineNormalStopLatched)
                 notes.Add("NORMAL STOP LATCHED");
-            if(!blockedStatus.ServoReady)
-                notes.Add("AUTO/GANTRY: SERVO NOT READY (Manual belt independent)");
             if(!LineMailboxProtocol.ProductionCommandSourceApproved)
             {
                 bool writeConnected = LineMailboxGateway.Instance.Transport.IsConnected;
@@ -575,6 +889,12 @@ public partial class MainWindow
         }
         OvStartReason.Foreground = DashBrush(evaluation.CanStart ? "#39C7A2"
             : evaluation.State == InterlockState.Offline ? "#FF6E70" : "#F4BB45");
+
+        if (OvCommandCommissionStatus != null)
+        {
+            OvCommandCommissionStatus.Text = "PRODUCTION AUTO · COMMISSIONING PENDING";
+            OvCommandCommissionStatus.Foreground = DashBrush("#F4BB45");
+        }
     }
 
     private static string LineStateText(InterlockState state) => state switch
@@ -606,7 +926,16 @@ public partial class MainWindow
         OvPresetHz.Text = hz; // Estimated only, never sent to the MD200.
         bool adsOnline = _dashStatus is not null && LineMailboxProtocol.IsTelemetryFresh(_dashStatus.ReceivedUtc, DateTime.UtcNow, TimeSpan.FromSeconds(3));
         var setResult = await LineMailboxGateway.Instance.RequestManualBeltSetAsync(false, adsOnline, mmS);
-        CvPresetStatus.Text = $"PRESET APPLIED: {normalized} mm/s · {hz} ({setResult.Message})";
+        if (setResult.Success)
+        {
+            CvPresetStatus.Text = $"SET ACCEPTED: {normalized} mm/s · {hz}";
+            OvPresetError.Text = "";
+        }
+        else
+        {
+            CvPresetStatus.Text = $"SET FAILED: {setResult.Message}";
+            OvPresetError.Text = setResult.Message;
+        }
         RefreshInterlockUi();
         await RefreshDashboardAsync();
     }
@@ -619,6 +948,11 @@ public partial class MainWindow
 
     private async void SysLineStart_Click(object sender, RoutedEventArgs e)
     {
+        if (_conveyorCalibrationMode)
+        {
+            DashStart_Click(sender, e);
+            return;
+        }
         var (interlockOk, interlockMsg) = _lineInterlock.RequestStart(BuildInterlockInputs());
         if (!interlockOk)
         {
@@ -661,6 +995,11 @@ public partial class MainWindow
 
     private async void SysLineStop_Click(object sender, RoutedEventArgs e)
     {
+        if (_conveyorCalibrationMode)
+        {
+            DashStop_Click(sender, e);
+            return;
+        }
         var (interlockOk, interlockMsg) = _lineInterlock.RequestStop(BuildInterlockInputs());
         if (!interlockOk)
         {
@@ -689,6 +1028,53 @@ public partial class MainWindow
 
     private async void SysLineReset_Click(object sender, RoutedEventArgs e)
     {
+        if (_conveyorCalibrationMode)
+        {
+            var st = _dashStatus;
+            bool calibAdsOnline = st is not null && LineMailboxProtocol.IsTelemetryFresh(st.ReceivedUtc, DateTime.UtcNow, TimeSpan.FromSeconds(3));
+            bool isRunning = st?.BeltRun == true || LineMailboxGateway.Instance.ManualBeltActive;
+            bool stopLatched = st?.LineNormalStopLatched == true;
+
+            var resetInputs = new ConveyorCalibrationResetInputs(
+                AdsFresh: calibAdsOnline,
+                AuxEstopOk: st?.EstopOk == true,
+                GlobalStop: st?.GlobalStop == true,
+                NormalStopLatched: stopLatched,
+                BeltRunning: isRunning || st?.BeltRequest == true,
+                GlueActive: st?.GantryBusy == true || st?.GantryError == true,
+                AutoActive: st?.LineAutoAccepted == true || LineMailboxGateway.Instance.AutoLineActive);
+
+            var resetEval = ConveyorCalibrationInterlock.EvaluateReset(resetInputs);
+            if (!resetEval.CanReset)
+            {
+                string msg = resetEval.Reason;
+                if (OvStartReason != null) { OvStartReason.Text = msg; OvStartReason.Foreground = DashBrush(stopLatched ? "#F4BB45" : "#FF6E70"); }
+                StatusText.Text = msg;
+                RefreshInterlockUi();
+                return;
+            }
+
+            SysResetButton.IsEnabled = false;
+            try
+            {
+                var result = await LineMailboxGateway.Instance.RequestLineResetAsync(false, calibAdsOnline);
+                string resultMsg = (result.Success ? "CALIBRATION RESET: " : "CALIBRATION RESET BLOCKED: ") + result.Message;
+                if (OvStartReason != null)
+                {
+                    OvStartReason.Text = resultMsg;
+                    OvStartReason.Foreground = DashBrush(result.Success ? "#39C7A2" : "#FF6E70");
+                }
+                StatusText.Text = resultMsg;
+                SensorHistory("CONVEYOR CALIBRATION RESET: " + result.Message);
+                await RefreshDashboardAsync();
+            }
+            finally
+            {
+                RefreshInterlockUi();
+            }
+            return;
+        }
+
         var (interlockOk, interlockMsg) = _lineInterlock.RequestReset(BuildInterlockInputs());
         if (!interlockOk)
         {
@@ -697,7 +1083,6 @@ public partial class MainWindow
             RefreshInterlockUi();
             return;
         }
-
         bool adsOnline = _dashStatus is not null && LineMailboxProtocol.IsTelemetryFresh(_dashStatus.ReceivedUtc, DateTime.UtcNow, TimeSpan.FromSeconds(3));
         SysResetButton.IsEnabled = false;
         try

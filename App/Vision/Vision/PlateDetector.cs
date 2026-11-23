@@ -42,6 +42,7 @@ public static class PlateDetector
         using var blur=new Mat();
         Cv2.GaussianBlur(gray,blur,new Size(5,5),0);
         using var kernel=Cv2.GetStructuringElement(MorphShapes.Rect,new Size(7,7));
+        using var smallKernel=Cv2.GetStructuringElement(MorphShapes.Rect,new Size(5,5));
         var modes=o.ThresholdMode==1?new[]{true}:o.ThresholdMode==2?new[]{false}:new[]{true,false};
         var candidates=new List<Candidate>();
         foreach(var inverted in modes)
@@ -65,7 +66,9 @@ public static class PlateDetector
                 Point2f[] corners=rr.Points();
                 if(corners.Any(p=>p.X<3||p.Y<3||p.X>=image.Width-3||p.Y>=image.Height-3))continue;
                 double score=area*(1-Math.Abs(1-aspect)*1.8)*Math.Min(fill,1.0);
-                candidates.Add(new(rr,corners,score,aspect,fill));
+                var coarse=new Candidate(rr,corners,score,aspect,fill);
+                var candidate=RefineCandidate(coarse,blur,inverted,o,image.Width,image.Height,smallKernel);
+                if(candidate!=null)candidates.Add(candidate);
             }
         }
         var unique=new List<Candidate>();
@@ -108,6 +111,145 @@ public static class PlateDetector
         double quality=Math.Clamp((1-Math.Abs(c.Aspect-1))*c.Fill,0,1);
         return new PlateResult(true,cx,cy,(cx-ox)*scale+o.OffsetXmm,(oy-cy)*scale+o.OffsetYmm,
             theta,scale,quality,gluePx.ToArray(),glueMm.ToArray(),c.Corners,"OK");
+    }
+
+    private static Candidate? RefineCandidate(Candidate c,Mat blur,bool inverted,VisionOptions o,int imageWidth,int imageHeight,Mat smallKernel)
+    {
+        // Only refine if coarse candidate shows evidence of elongation from an attached halo/reflection
+        if(c.Aspect<=1.06)return c;
+
+        Point2f[] pts=c.Corners;
+        float minX=pts.Min(p=>p.X);
+        float maxX=pts.Max(p=>p.X);
+        float minY=pts.Min(p=>p.Y);
+        float maxY=pts.Max(p=>p.Y);
+        int pad=8;
+        int rx=Math.Max(0,(int)Math.Floor(minX-pad));
+        int ry=Math.Max(0,(int)Math.Floor(minY-pad));
+        int rw=Math.Min(imageWidth-rx,(int)Math.Ceiling(maxX+pad)-rx);
+        int rh=Math.Min(imageHeight-ry,(int)Math.Ceiling(maxY+pad)-ry);
+        if(rw<20||rh<20)return c;
+        Rect roiRect=new Rect(rx,ry,rw,rh);
+
+        using var roiBlur=new Mat(blur,roiRect);
+        using var roiCandidateMask=new Mat(new Size(rw,rh),MatType.CV_8UC1,new Scalar(0));
+        Point[] roiPts=Array.ConvertAll(c.Corners,p=>new Point((int)Math.Round(p.X-rx),(int)Math.Round(p.Y-ry)));
+        Cv2.FillConvexPoly(roiCandidateMask,roiPts,new Scalar(255));
+
+        using var histMat=new Mat();
+        Cv2.CalcHist(new[]{roiBlur},new[]{0},roiCandidateMask,histMat,1,new[]{256},new[]{new Rangef(0,256)});
+        float[] hist=new float[256];
+        for(int i=0;i<256;i++)hist[i]=histMat.Get<float>(i);
+        if(hist.Sum()<100)return c;
+
+        double t1=ComputeOtsu(hist,0,255);
+        double tRefined;
+        ThresholdTypes threshType;
+
+        if(!inverted)
+        {
+            int minV=Math.Clamp((int)Math.Ceiling(t1),0,255);
+            tRefined=ComputeOtsu(hist,minV,255);
+            threshType=ThresholdTypes.Binary;
+        }
+        else
+        {
+            int maxV=Math.Clamp((int)Math.Floor(t1),0,255);
+            tRefined=ComputeOtsu(hist,0,maxV);
+            threshType=ThresholdTypes.BinaryInv;
+        }
+
+        using var refinedMask=new Mat();
+        Cv2.Threshold(roiBlur,refinedMask,tRefined,255,threshType);
+        Cv2.BitwiseAnd(refinedMask,roiCandidateMask,refinedMask);
+
+        using var refinedClean=new Mat();
+        Cv2.MorphologyEx(refinedMask,refinedClean,MorphTypes.Close,smallKernel);
+
+        Cv2.FindContours(refinedClean,out Point[][] refinedContours,out _,RetrievalModes.External,ContourApproximationModes.ApproxSimple);
+        if(refinedContours.Length==0)return c;
+
+        var bestContour=refinedContours.OrderByDescending(x=>Cv2.ContourArea(x)).First();
+        double area=Math.Abs(Cv2.ContourArea(bestContour));
+
+        // Enforce same configured min area contract: if the true core is below min area,
+        // it must not be accepted as a tiny refined workpiece (reject ambiguous undersized target)
+        double minArea=imageWidth*imageHeight*o.MinObjectAreaFraction;
+        if(area<minArea)return null;
+
+        RotatedRect rrLocal=Cv2.MinAreaRect(bestContour);
+        RotatedRect rr=new RotatedRect(
+            new Point2f(rrLocal.Center.X+rx,rrLocal.Center.Y+ry),
+            rrLocal.Size,
+            rrLocal.Angle
+        );
+
+        double w=Math.Max(rr.Size.Width,rr.Size.Height);
+        double h=Math.Min(rr.Size.Width,rr.Size.Height);
+        if(h<20||w/imageWidth>.96||h/imageHeight>.96)return c;
+
+        double aspect=w/h;
+        if(aspect>1.30)return c;
+        double fill=area/(w*h);
+        if(fill<.64||fill>1.12)return c;
+
+        Point2f[] corners=rr.Points();
+        if(corners.Any(p=>p.X<3||p.Y<3||p.X>=imageWidth-3||p.Y>=imageHeight-3))return c;
+
+        // Credible body support: workpiece must retain the primary body, not collapse into an inner highlight
+        double coarseMaxSide=Math.Max(c.Rect.Size.Width,c.Rect.Size.Height);
+        double coarseMinSide=Math.Min(c.Rect.Size.Width,c.Rect.Size.Height);
+        double coarseArea=coarseMaxSide*coarseMinSide*Math.Min(c.Fill,1.0);
+        if(area<coarseArea*0.50||w<coarseMaxSide*0.60||h<coarseMinSide*0.60)return c;
+
+        double centerShift=Math.Sqrt(Math.Pow(rr.Center.X-c.Rect.Center.X,2)+Math.Pow(rr.Center.Y-c.Rect.Center.Y,2));
+        if(centerShift>w*0.35)return c;
+
+        double coarseAspectDiff=Math.Abs(c.Aspect-1.0);
+        double refinedAspectDiff=Math.Abs(aspect-1.0);
+
+        if(refinedAspectDiff<coarseAspectDiff)
+        {
+            double score=area*(1-Math.Abs(1-aspect)*1.8)*Math.Min(fill,1.0);
+            return new Candidate(rr,corners,score,aspect,fill);
+        }
+
+        return c;
+    }
+
+    private static double ComputeOtsu(float[] hist,int minVal,int maxVal)
+    {
+        float total=0;
+        for(int i=minVal;i<=maxVal;i++)total+=hist[i];
+        if(total<=0)return(minVal+maxVal)/2.0;
+
+        double sum=0;
+        for(int i=minVal;i<=maxVal;i++)sum+=(double)i*hist[i];
+
+        double sumB=0;
+        float wB=0;
+        double maxVar=-1;
+        double threshold=(minVal+maxVal)/2.0;
+
+        for(int t=minVal;t<=maxVal;t++)
+        {
+            wB+=hist[t];
+            if(wB<=0)continue;
+            float wF=total-wB;
+            if(wF<=0)break;
+
+            sumB+=(double)t*hist[t];
+            double mB=sumB/wB;
+            double mF=(sum-sumB)/wF;
+
+            double varBetween=(double)wB*wF*(mB-mF)*(mB-mF);
+            if(varBetween>maxVar)
+            {
+                maxVar=varBetween;
+                threshold=t;
+            }
+        }
+        return threshold;
     }
 
     public static Mat Draw(Mat image,PlateResult result,VisionOptions o)

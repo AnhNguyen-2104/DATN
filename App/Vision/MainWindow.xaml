@@ -326,7 +326,7 @@
         </StackPanel>
         <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
           <Ellipse x:Name="ShellAdsDot" Width="6" Height="6" Fill="{StaticResource ScadaAmber}" Margin="0,0,6,0" VerticalAlignment="Center" />
-          <TextBlock x:Name="ControlSafetyBanner" Text="ADS READ-ONLY · NO MOTION" Foreground="{StaticResource ScadaTextSecondary}" FontSize="10" VerticalAlignment="Center"/>
+          <TextBlock x:Name="ControlSafetyBanner" Text="PRODUCTION AUTO: DISARMED · COMMISSIONING PENDING" Foreground="{StaticResource ScadaTextSecondary}" FontSize="10" VerticalAlignment="Center"/>
           <CheckBox x:Name="DarkModeBox" Content="Theme" IsChecked="True" Visibility="Collapsed" Checked="DarkModeChanged" Unchecked="DarkModeChanged" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
         </StackPanel>
       </Grid>
@@ -334,7 +334,7 @@
 
     <!-- Horizontal tab navigation replaces the old 170px sidebar to reclaim page width. -->
     <Border Grid.Row="1" Background="{StaticResource ScadaNavBg}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="0,0,0,0" Padding="5,0,0,0">
-      <TabControl x:Name="MainNavigation" TabStripPlacement="Top" Background="Transparent" BorderThickness="0" Margin="0" Padding="0" SelectedIndex="0">
+      <TabControl x:Name="MainNavigation" TabStripPlacement="Top" Background="Transparent" BorderThickness="0" Margin="0" Padding="0" SelectedIndex="0" SelectionChanged="MainNavigation_SelectionChanged">
         <TabControl.Resources>
           <Style TargetType="TabItem">
             <Setter Property="MinHeight" Value="34" />
@@ -411,7 +411,7 @@
                   <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="7,4"><StackPanel><TextBlock Text="TRACK ID" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="Ov1Track" Text="--" FontSize="12" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{StaticResource ScadaTextPrimary}" TextTrimming="CharacterEllipsis"/></StackPanel></Border>
                   <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="7,4"><StackPanel><TextBlock Text="GANTRY / PLC-Q" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="Ov1Link" Text="NO DATA" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" TextTrimming="CharacterEllipsis"/></StackPanel></Border>
                   <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="7,4"><StackPanel><TextBlock Text="PRODUCT X / Y" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="Ov1Pose" Text="-- / -- mm" FontSize="12" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{StaticResource ScadaTextPrimary}" TextTrimming="CharacterEllipsis"/></StackPanel></Border>
-                  <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="7,4"><StackPanel><TextBlock Text="SERVO / MODE" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="Ov1Servo" Text="NO DATA" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" TextTrimming="CharacterEllipsis"/></StackPanel></Border>
+                  <Border BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1,0,0,0" Padding="7,4"><StackPanel><TextBlock Text="GANTRY MODE" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/><TextBlock x:Name="Ov1Mode" Text="NO DATA" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" TextTrimming="CharacterEllipsis"/></StackPanel></Border>
                 </UniformGrid>
               </Grid>
             </Border>
@@ -461,11 +461,25 @@
               </Grid.RowDefinitions>
               <Border Background="{StaticResource ScadaPanelHead}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="0,0,0,1" Padding="8,0">
                 <Grid>
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                  <TextBlock Text="CONVEYOR + COMMANDS" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <TextBlock Text="CONVEYOR + COMMANDS" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
+                    <Button x:Name="OpenCalibrationWorkspaceBtn" Content="CALIBRATION WORKSPACE" Click="OpenCalibrationWorkspace_Click" MinHeight="22" Padding="8,1" FontSize="9.5" Background="#162C42" Foreground="{StaticResource ScadaCyan}" BorderBrush="{StaticResource ScadaCyan}" BorderThickness="1" Margin="8,0,0,0" ToolTip="Opens the integrated Calibration Workspace (Video OpenCV overlay &amp; Gantry 4-corner preview)."/>
+                  </StackPanel>
                   <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="CONVEYOR SUBSYSTEM MODE (LIVE MD200):" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                    <ComboBox x:Name="LineModeSelector" SelectionChanged="LineMode_Changed" Width="260" MinHeight="22" FontSize="9.5" VerticalAlignment="Center">
+                      <ComboBoxItem Content="PRODUCTION AUTO (LINE) · COMMISSIONING PENDING" IsSelected="True"/>
+                      <ComboBoxItem Content="CONVEYOR SUBSYSTEM CALIBRATION · ISOLATED"/>
+                    </ComboBox>
+                    <Border x:Name="CalibrationBadge" Visibility="Collapsed" Background="#162C42" BorderBrush="#27C9EC" BorderThickness="1" CornerRadius="3" Padding="6,1" VerticalAlignment="Center" Margin="8,0,0,0">
+                      <TextBlock Text="CONVEYOR SUBSYSTEM CALIBRATION · ISOLATED BELT RUN (NO ROBOT/GLUE)" FontSize="8.5" FontWeight="Bold" Foreground="#27C9EC"/>
+                    </Border>
+                    <CheckBox x:Name="OvCalibrationArm" Content="Arm Subsystem Calibration" Visibility="Collapsed" Checked="CalibrationArm_Changed" Unchecked="CalibrationArm_Changed" Foreground="#F4BB45" FontSize="9.5" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="OvUpdated" Text="Reading PLC..." FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <TextBlock Text="CONTRACT PENDING" FontSize="9" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="OvContractStatus" Text="CONTRACT PENDING" FontSize="9" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center"/>
                   </StackPanel>
                 </Grid>
               </Border>
@@ -480,8 +494,8 @@
               <StackPanel Grid.Row="2" Margin="8,5,8,4">
                 <WrapPanel VerticalAlignment="Center">
                   <TextBlock Text="SPEED (mm/s)" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                  <TextBox x:Name="OvPresetSpeedBox" Text="100" Width="64" MinHeight="25" Padding="5,1" FontSize="11" HorizontalContentAlignment="Right" LostFocus="PresetSpeed_LostFocus" ToolTip="Shared LINE / SHARED CONVEYOR preset in mm/s. Local preset only; no PLC setpoint write exists."/>
-                  <Button x:Name="OvPresetApplyButton" Content="APPLY" Click="PresetSpeedApply_Click" MinWidth="50" MinHeight="25" Padding="6,1" FontSize="10" Margin="6,0,0,0" ToolTip="Stores the mm/s preset used by the AUTO request. No ADS write is performed."/>
+                  <TextBox x:Name="OvPresetSpeedBox" Text="100" Width="64" MinHeight="25" Padding="5,1" FontSize="11" HorizontalContentAlignment="Right" LostFocus="PresetSpeed_LostFocus" ToolTip="Shared speed preset in mm/s [1.0..150.0]. Applied to conveyor calibration setpoint."/>
+                  <Button x:Name="OvPresetApplyButton" Content="APPLY" Click="PresetSpeedApply_Click" MinWidth="50" MinHeight="25" Padding="6,1" FontSize="10" Margin="6,0,0,0" ToolTip="Applies preset speed to TwinCAT MD200 manual mailbox via ADS."/>
                   <Rectangle Width="1" Height="20" Fill="{StaticResource ScadaBorder}" Margin="10,0"/>
                   <Button x:Name="SysStartButton" Content="START" Click="SysLineStart_Click" IsEnabled="False" MinWidth="62" MinHeight="25" Padding="8,1" FontSize="11" ToolTip="One operator START: PC vision tracking and the conveyor request go together. Disabled while any prerequisite is unknown, stale or uncommissioned."/>
                   <Button x:Name="SysStopButton" Content="STOP" Click="SysLineStop_Click" IsEnabled="False" MinWidth="58" MinHeight="25" Padding="6,1" FontSize="11" Margin="4,0,0,0" ToolTip="Requests the normal coordinated stop (tracking + conveyor request). NOT a certified emergency stop."/>
@@ -515,7 +529,7 @@
                   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                   <TextBlock x:Name="OvCvQuality" Text="NO DATA" FontSize="9.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                   <TextBlock Grid.Column="1" x:Name="OvAlarm" Text="No PLC alarm data." FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                  <TextBlock Grid.Column="2" Text="COMMANDS NOT COMMISSIONED" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                  <TextBlock Grid.Column="2" x:Name="OvCommandCommissionStatus" Text="PRODUCTION AUTO · COMMISSIONING PENDING" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </Grid>
               </Border>
             </Grid>
@@ -529,7 +543,6 @@
             <TextBlock x:Name="OverviewCam1Quality"/>
             <TextBlock x:Name="OverviewCam1Empty"/>
             <TextBlock x:Name="OverviewIoEstop"/>
-            <TextBlock x:Name="OverviewIoServo"/>
             <TextBlock x:Name="OverviewIoPlcQ"/>
             <TextBlock x:Name="OverviewIoGantryBusy"/>
             <TextBlock x:Name="OverviewIoGantryAlarm"/>
@@ -545,7 +558,6 @@
             <TextBlock x:Name="DashDistance"/>
             <TextBlock x:Name="DashBeltMmS"/>
             <TextBlock x:Name="Ov1Ready"/>
-            <TextBlock x:Name="Ov1Mode"/>
             <TextBlock x:Name="Ov1Busy"/>
             <TextBlock x:Name="Ov1Homed"/>
             <TextBlock x:Name="Ov1X"/>
@@ -553,12 +565,284 @@
             <TextBlock x:Name="Ov1Z"/>
             <TextBlock x:Name="Ov1Rz"/>
             <TextBlock x:Name="Ov1Io1"/>
-            <TextBlock x:Name="Ov1Io2"/>
             <TextBlock x:Name="Ov1Io3"/>
             <TextBlock x:Name="Ov1Io4"/>
             <TextBlock x:Name="Ov1Io5"/>
             <TextBlock x:Name="Ov1Io6"/>
           </StackPanel>
+        </Grid>
+      </TabItem>
+      <TabItem Header="CALIBRATION" x:Name="CalibrationWorkspaceTab">
+        <Grid Background="{StaticResource ScadaBg}" Margin="5">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+
+          <!-- A. Calibration Header Bar -->
+          <Border Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="CALIBRATION WORKSPACE" FontSize="12" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}" VerticalAlignment="Center"/>
+                <Border Background="#103028" CornerRadius="3" Padding="8,2" Margin="12,0,0,0" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1">
+                  <TextBlock x:Name="CalibModeBadge" Text="OFFLINE EVALUATION &amp; GEOMETRIC PREVIEW" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaTeal}"/>
+                </Border>
+              </StackPanel>
+              <TextBlock Grid.Column="1" Text="[4-CORNER GEOMETRIC PREVIEW ONLY · MASTER ENABLE SOURCE GATED PENDING COMMISSIONING]" Foreground="{StaticResource ScadaAmber}" FontSize="9.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="16,0,0,0"/>
+              <Button Grid.Column="2" Content="RETURN TO AUTO / LINE OVERVIEW" Click="ReturnToAuto_Click" MinHeight="26" Padding="12,2" FontSize="10" Background="#1B2B3A" Foreground="{StaticResource ScadaTextPrimary}"/>
+            </Grid>
+          </Border>
+
+          <!-- B. Inner Calibration Sections (Tabs: LOCAL VIDEO & OPENCV | GANTRY 4-CORNER PREVIEW | LIVE CONVEYOR) -->
+          <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0" Padding="0">
+            <!-- TAB 1: LOCAL VIDEO & OPENCV OVERLAY -->
+            <TabItem Header="LOCAL VIDEO &amp; OPENCV">
+              <Grid Background="{StaticResource ScadaBg}" Margin="4">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="68*" MinWidth="500"/>
+                  <ColumnDefinition Width="32*" MinWidth="320" MaxWidth="480"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left Column: Video Viewport -->
+                <Border Grid.Column="0" Background="{StaticResource ScadaVideoBg}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Margin="0,0,8,0">
+                  <Grid>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto"/>
+                      <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <!-- Video Controls Toolbar -->
+                    <Border Background="{StaticResource ScadaPanelHead}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="0,0,0,1" Padding="8,5">
+                      <WrapPanel VerticalAlignment="Center">
+                        <TextBlock Text="VIDEO FILE:" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="CalibVideoPathBox" Text="C:\Users\aml\Desktop\DEMO\1.avi" Width="240" MinHeight="25" Padding="5,1" FontSize="10" VerticalAlignment="Center" ToolTip="Enter or browse full path to a local AVI/MP4 video file."/>
+                        <Button x:Name="CalibLoadPathBtn" Content="LOAD" Click="CalibLoadPath_Click" MinHeight="26" Padding="8,1" FontSize="10" Margin="4,0,4,0" Background="#163832" Foreground="{StaticResource ScadaTeal}" ToolTip="Loads and starts evaluation of the specified video file path."/>
+                        <Button x:Name="CalibOpenVideoBtn" Content="BROWSE..." Click="CalibOpenVideo_Click" MinHeight="26" Padding="8,1" FontSize="10" Margin="0,0,4,0"/>
+                        <Button x:Name="CalibLoadDemoBtn" Content="DEMO 1.avi" Click="CalibLoadDemo_Click" MinHeight="26" Padding="8,1" FontSize="10" Margin="0,0,4,0"/>
+                        <Button x:Name="CalibPlayPauseBtn" Content="REPLAY" Click="CalibPlayPause_Click" MinHeight="26" Padding="8,1" FontSize="10" Margin="0,0,4,0" ToolTip="Replays the current active video file from the beginning."/>
+                        <Button x:Name="CalibStopVideoBtn" Content="STOP" Click="CalibStopVideo_Click" MinHeight="26" Padding="8,1" FontSize="10" Margin="0,0,6,0" Background="#3A2024" Foreground="{StaticResource ScadaRed}"/>
+                        <TextBlock x:Name="CalibVideoStatusText" Text="Ready to load video" FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                      </WrapPanel>
+                    </Border>
+                    <!-- Video Display -->
+                    <Grid Grid.Row="1">
+                      <Image x:Name="CalibVideoPreview" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                      <TextBlock x:Name="CalibVideoEmptyNotice" Text="NO VIDEO LOADED&#x0a;Click 'LOAD DEMO (1.avi)' or 'OPEN VIDEO FILE...'" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource ScadaTextSecondary}" FontSize="12" FontWeight="SemiBold" TextAlignment="Center"/>
+                    </Grid>
+                  </Grid>
+                </Border>
+
+                <!-- Right Column: Video HUD & Info -->
+                <Border Grid.Column="1" Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10">
+                  <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                      <TextBlock Text="OPENCV DETECTION OVERLAY" FontSize="11" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}" Margin="0,0,0,8"/>
+                      <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,10">
+                        <StackPanel>
+                          <TextBlock Text="CENTROID (IMAGE PIXELS)" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/>
+                          <TextBlock x:Name="CalibCentroidText" Text="X = — px, Y = — px" FontSize="14" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" Margin="0,2,0,6"/>
+                          <TextBlock Text="TILT ANGLE θ (MODULO 90°)" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/>
+                          <TextBlock x:Name="CalibAngleText" Text="θ = —° ([-45°, +45°))" FontSize="14" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" Margin="0,2,0,6"/>
+                          <TextBlock Text="CONFIDENCE &amp; LATENCY" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}"/>
+                          <TextBlock x:Name="CalibMetricsText" Text="Latency: — ms  |  Quality: —" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaTeal}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                      </Border>
+                      <Border Background="#101F2D" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,10">
+                        <StackPanel>
+                          <TextBlock Text="OVERLAY RENDER SPEC" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaTextPrimary}" Margin="0,0,0,4"/>
+                          <TextBlock Text="• Green contour bounding box&#x0a;• Crosshair at detected pixel centroid&#x0a;• In-frame label: X, Y, angle θ&#x0a;• Modulo normalized to [-45°, +45°)&#x0a;• Strictly pixel domain: zero physical mm or robot motion inference." FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </ScrollViewer>
+                </Border>
+              </Grid>
+            </TabItem>
+
+            <!-- TAB 2: GANTRY 4-CORNER PREVIEW -->
+            <TabItem Header="GANTRY 4-CORNER PREVIEW">
+              <Grid Background="{StaticResource ScadaBg}" Margin="4">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="42*" MinWidth="360"/>
+                  <ColumnDefinition Width="58*" MinWidth="480"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left Column: Explicit Manual Inputs -->
+                <Border Grid.Column="0" Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,8,0">
+                  <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                      <Border Background="#2B1417" BorderBrush="{StaticResource ScadaRed}" BorderThickness="1" CornerRadius="3" Padding="8,6" Margin="0,0,0,12">
+                        <StackPanel>
+                          <TextBlock Text="GANTRY LIVE TEST UNAVAILABLE — no commissioned command/feedback contract" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaRed}" TextWrapping="Wrap"/>
+                          <TextBlock Text="Manual four-corner preview is strictly a mathematical geometric verification. No PLC writes or robot motion commands are dispatched." FontSize="9" Foreground="#F4A0A2" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                        </StackPanel>
+                      </Border>
+
+                      <TextBlock Text="WORKPIECE CENTER &amp; ANGLE (EXPLICIT)" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}" Margin="0,0,0,6"/>
+                      <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,4,0">
+                          <TextBlock Text="Center X (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="CalibCenterXBox" Text="" FontSize="11" ToolTip="Explicit finite workpiece center X in mm (Cartesian)."/>
+                        </StackPanel>
+                        <StackPanel Margin="2,0,2,0" Grid.Column="1">
+                          <TextBlock Text="Center Y (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="CalibCenterYBox" Text="" FontSize="11" ToolTip="Explicit finite workpiece center Y in mm (Cartesian)."/>
+                        </StackPanel>
+                        <StackPanel Margin="4,0,0,0" Grid.Column="2">
+                          <TextBlock Text="Angle θ (deg CCW)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="CalibAngleBox" Text="" FontSize="11" ToolTip="Explicit finite tilt angle in degrees CCW."/>
+                        </StackPanel>
+                      </Grid>
+
+                      <TextBlock Text="HOLE PITCH (EXPLICIT, > 0)" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}" Margin="0,6,0,6"/>
+                      <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,4,0">
+                          <TextBlock Text="Pitch X (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="CalibPitchXBox" Text="" FontSize="11" ToolTip="Explicit finite hole pitch along X in mm (must be > 0)."/>
+                        </StackPanel>
+                        <StackPanel Margin="4,0,0,0" Grid.Column="1">
+                          <TextBlock Text="Pitch Y (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="CalibPitchYBox" Text="" FontSize="11" ToolTip="Explicit finite hole pitch along Y in mm (must be > 0)."/>
+                        </StackPanel>
+                      </Grid>
+
+                      <TextBlock Text="WORKSPACE BOUNDS ENVELOPE (MIN &lt; MAX)" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}" Margin="0,6,0,6"/>
+                      <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,3,0">
+                          <TextBlock Text="Min X (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="CalibBoundMinXBox" Text="" FontSize="11" ToolTip="Explicit finite Min X workspace limit."/>
+                        </StackPanel>
+                        <StackPanel Margin="2,0,2,0" Grid.Column="1">
+                          <TextBlock Text="Max X (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="CalibBoundMaxXBox" Text="" FontSize="11" ToolTip="Explicit finite Max X workspace limit."/>
+                        </StackPanel>
+                        <StackPanel Margin="2,0,2,0" Grid.Column="2">
+                          <TextBlock Text="Min Y (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="CalibBoundMinYBox" Text="" FontSize="11" ToolTip="Explicit finite Min Y workspace limit."/>
+                        </StackPanel>
+                        <StackPanel Margin="3,0,0,0" Grid.Column="3">
+                          <TextBlock Text="Max Y (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="CalibBoundMaxYBox" Text="" FontSize="11" ToolTip="Explicit finite Max Y workspace limit."/>
+                        </StackPanel>
+                      </Grid>
+
+                      <WrapPanel Margin="0,4,0,0">
+                        <Button x:Name="CalibEvaluateCornersBtn" Content="EVALUATE 4 CORNERS" Click="CalibEvaluateCorners_Click" MinHeight="28" Padding="12,2" FontSize="11" Background="#163832" Foreground="{StaticResource ScadaTeal}" Margin="0,0,8,0"/>
+                        <Button x:Name="CalibClearCornersBtn" Content="CLEAR" Click="CalibClearCorners_Click" MinHeight="28" Padding="10,2" FontSize="11" Background="{StaticResource ScadaBtn}"/>
+                      </WrapPanel>
+                      <TextBlock Text="All fields are required. Blank inputs fail closed." FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,8,0,0"/>
+                      <!-- GANTRY MASTER ENABLE CONTROL (CANONICAL CONTRACT) -->
+                      <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,12,0,0">
+                        <StackPanel>
+                          <TextBlock Text="GANTRY MASTER ENABLE (M0 / M10)" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}" Margin="0,0,0,6"/>
+                          <TextBlock Text="Gantry amplifier master enable handshake (TwinCAT Port 851). Controls M10 (0=ON, 1=OFF). Coils Y20..Y22 are command echoes, NOT physical drive ready." FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+                          <WrapPanel Margin="0,0,0,8">
+                            <Button x:Name="GantryMasterOnBtn" Content="MASTER ENABLE ON" Click="GantryMasterOn_Click" IsEnabled="False" MinHeight="26" Padding="10,2" FontSize="10" FontWeight="Bold" Background="#163832" Foreground="{StaticResource ScadaTeal}" Margin="0,0,6,0" ToolTip="Command Gantry Master Enable ON (requests M10=0, SET M0)."/>
+                            <Button x:Name="GantryMasterOffBtn" Content="MASTER ENABLE OFF" Click="GantryMasterOff_Click" IsEnabled="False" MinHeight="26" Padding="10,2" FontSize="10" FontWeight="Bold" Background="#4A1E24" Foreground="{StaticResource ScadaRed}" Margin="0,0,6,0" ToolTip="Command Gantry Master Enable OFF (requests M10=1, RST M0). Never drops brake during motion."/>
+                            <Button x:Name="GantryMasterRefreshBtn" Content="REFRESH ECHOES" Click="GantryMasterRefresh_Click" IsEnabled="False" MinHeight="26" Padding="8,2" FontSize="9.5" Background="{StaticResource ScadaBtn}" ToolTip="Requests coherent readback refresh of M0..3, M10, Y20..22 without issuing commands."/>
+                          </WrapPanel>
+
+                          <Border Background="#0A1622" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="3" Padding="8,6" Margin="0,0,0,6">
+                            <StackPanel>
+                              <TextBlock Text="STATUS (COMMAND ECHO &amp; READBACK):" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}"/>
+                              <TextBlock x:Name="GantryMasterStatusText" Text="COMMAND ECHO: UNKNOWN (NO SNAPSHOT / OFFLINE)" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" TextWrapping="Wrap" Margin="0,2,0,4"/>
+                              <TextBlock x:Name="GantryMasterOverrideText" Text="OVERRIDES: STALE / UNKNOWN (SNAPSHOT INVALID)" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                              <TextBlock x:Name="GantryMasterGateText" Text="COMMISSIONING PENDING: Live gate closed · No UI bypass" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource ScadaRed}" TextWrapping="Wrap"/>
+                              <TextBlock x:Name="GantryMasterDiagnosticsText" Text="DIAGNOSTICS: INITIALIZING" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource ScadaTextSecondary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            </StackPanel>
+                          </Border>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </ScrollViewer>
+                </Border>
+
+                <!-- Right Column: Computed 4-Corner Results & Verification -->
+                <Border Grid.Column="1" Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="12">
+                  <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                      <TextBlock Text="CALCULATED 4-CORNER GEOMETRY" FontSize="11" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}" Margin="0,0,0,8"/>
+                      <!-- Envelope Status Banner -->
+                      <Border x:Name="CalibStatusBorder" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,10">
+                        <TextBlock x:Name="CalibStatusBanner" Text="EVALUATION: PENDING INPUT (Enter all parameters and click EVALUATE)" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" TextWrapping="Wrap"/>
+                      </Border>
+
+                      <!-- Corners Display Grid -->
+                      <UniformGrid Columns="2" Margin="0,0,0,10">
+                        <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,4,4">
+                          <StackPanel>
+                            <TextBlock Text="POINT 1 (LOCAL QUAD I: +X, +Y)" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
+                            <TextBlock x:Name="CalibP1Text" Text="P1: —" FontSize="12.5" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" Margin="0,4,0,0"/>
+                          </StackPanel>
+                        </Border>
+                        <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="4,0,0,4">
+                          <StackPanel>
+                            <TextBlock Text="POINT 2 (LOCAL QUAD II: -X, +Y)" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
+                            <TextBlock x:Name="CalibP2Text" Text="P2: —" FontSize="12.5" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" Margin="0,4,0,0"/>
+                          </StackPanel>
+                        </Border>
+                        <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,4,4,0">
+                          <StackPanel>
+                            <TextBlock Text="POINT 3 (LOCAL QUAD III: -X, -Y)" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
+                            <TextBlock x:Name="CalibP3Text" Text="P3: —" FontSize="12.5" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" Margin="0,4,0,0"/>
+                          </StackPanel>
+                        </Border>
+                        <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="4,4,0,0">
+                          <StackPanel>
+                            <TextBlock Text="POINT 4 (LOCAL QUAD IV: +X, -Y)" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
+                            <TextBlock x:Name="CalibP4Text" Text="P4: —" FontSize="12.5" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" Margin="0,4,0,0"/>
+                          </StackPanel>
+                        </Border>
+                      </UniformGrid>
+
+                      <!-- Geometry Verification Details -->
+                      <Border Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,8">
+                        <StackPanel>
+                          <TextBlock Text="CALCULATED PITCH / ARITHMETIC CONSISTENCY" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaTextSecondary}"/>
+                          <TextBlock x:Name="CalibPitchVerifyText" Text="Calculated pitch / arithmetic consistency: —" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource ScadaTextPrimary}" Margin="0,4,0,0"/>
+                        </StackPanel>
+                      </Border>
+
+                      <TextBlock Text="Preview Isolation Guarantee: This preview is completely segregated from production TrackedWorkpiecePose, FIFO queues, TwinCAT ADS tags, and robot motion commands." FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                    </StackPanel>
+                  </ScrollViewer>
+                </Border>
+              </Grid>
+            </TabItem>
+
+            <!-- TAB 3: LIVE CONVEYOR SUBSYSTEM -->
+            <TabItem Header="LIVE CONVEYOR SUBSYSTEM">
+              <Border Background="{StaticResource ScadaPanelPrimary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="4" Padding="14" Margin="4">
+                <StackPanel>
+                  <Border Background="#1C2E40" BorderBrush="{StaticResource ScadaCyan}" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,12">
+                    <TextBlock Text="LIVE HARDWARE CONVEYOR ONLY · REQUIRES COMMISSIONED ADS 851 &amp; MD200 DRIVE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource ScadaCyan}"/>
+                  </Border>
+                  <TextBlock x:Name="CalibLiveConveyorNote" Text="Conveyor subsystem calibration controls are only active when connected to live TwinCAT ADS with commissioned hardware." FontSize="10" Foreground="{StaticResource ScadaTextSecondary}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                  <Button Content="OPEN SHARED CONVEYOR HARDWARE TAB" Click="DashOpenConveyor_Click" MinHeight="30" Padding="14,4" HorizontalAlignment="Left" FontSize="11"/>
+                </StackPanel>
+              </Border>
+            </TabItem>
+          </TabControl>
         </Grid>
       </TabItem>
       <TabItem Header="STATION 01" x:Name="GantryDetailTab">
@@ -592,40 +876,17 @@
             <Border Grid.Column="0" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,8,0">
               <Grid>
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                <Border Background="{StaticResource ScadaPanelPrimary}" CornerRadius="5,5,0,0" Padding="8,4">
-                  <StackPanel>
-                    <Grid>
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="6"/>
-                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="6"/>
-                        <ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
-                      </Grid.ColumnDefinitions>
-                      <TextBlock x:Name="S1CamBadge" Text="CAM 1" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
-                      <ComboBox x:Name="S1ModeBox" Grid.Column="2" Width="62" MinHeight="22" FontSize="9.5" SelectedIndex="0" SelectionChanged="S1ModeChanged" ToolTip="IP enumerates Hikrobot/Basler GigE plus read-only GVCP; USB enumerates USB3 Vision. Auto is removed.">
-                        <ComboBoxItem Content="IP"/><ComboBoxItem Content="USB"/>
-                      </ComboBox>
-                      <ComboBox x:Name="S1DeviceBox" Grid.Column="4" MinWidth="130" MinHeight="22" FontSize="9.5" DisplayMemberPath="Display" SelectionChanged="S1DeviceChanged" ToolTip="Scanned Hikrobot/Basler device: model · serial · vendor · transport."/>
-                      <Button x:Name="S1ScanButton" Grid.Column="5" Content="SCAN" Click="S1Scan_Click" MinWidth="48" MinHeight="22" Padding="6,0" FontSize="9" Margin="4,0,0,0"/>
-                      <Button x:Name="S1ConnectButton" Grid.Column="6" Content="CONNECT" Click="S1ConnectCamera_Click" MinWidth="64" MinHeight="22" Padding="6,0" FontSize="9" Margin="4,0,0,0"/>
-                      <Button x:Name="S1DisconnectButton" Grid.Column="7" Content="DISCONNECT" Click="S1DisconnectCamera_Click" MinWidth="78" MinHeight="22" Padding="6,0" FontSize="9" Margin="4,0,0,0"/>
-                      <TextBlock x:Name="S1CamLinkText" Grid.Column="8" Text="OFFLINE" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="7,0,0,0" TextTrimming="CharacterEllipsis" MaxWidth="120"/>
-                    </Grid>
-                    <WrapPanel x:Name="S1IpRow" Margin="0,4,0,0" Visibility="Collapsed">
-                      <TextBlock Text="IP" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                      <TextBox x:Name="S1CamIpBox" Width="112" MinHeight="22" Padding="4,0" FontSize="10" TextChanged="S1IpTextChanged" ToolTip="GigE IPv4 address or hostname. Only IP mode requires it."/>
-                      <TextBlock Text="NIC" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                      <TextBox x:Name="S1HostIpBox" Width="112" MinHeight="22" Padding="4,0" FontSize="10" TextChanged="S1NicTextChanged" ToolTip="Local NIC IPv4 for GVCP discovery and Hikrobot direct-IP connect; auto-detected when the camera subnet is local."/>
-                      <TextBlock Text="VENDOR" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                      <ComboBox x:Name="S1VendorBox" Width="88" MinHeight="22" FontSize="9.5" SelectedIndex="0" SelectionChanged="S1VendorChanged" ToolTip="Typed-IP manual connect is supported for HIKROBOT only. BASLER devices need SCAN.">
-                        <ComboBoxItem Content="HIKROBOT"/><ComboBoxItem Content="BASLER"/>
-                      </ComboBox>
-                    </WrapPanel>
-                    <Expander x:Name="S1DetailsExpander" Margin="0,4,0,0" FontSize="9.5" Visibility="Collapsed">
-                      <Expander.Header><TextBlock x:Name="S1DetailsHeader" Text="DETAILS" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}"/></Expander.Header>
-                      <TextBlock x:Name="S1DetailsText" TextWrapping="Wrap" MaxHeight="120" FontFamily="Consolas" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,3,0,0"/>
-                    </Expander>
-                  </StackPanel>
+                <Border Background="{StaticResource ScadaPanelPrimary}" CornerRadius="5,5,0,0" Padding="8,5">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="8"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="S1CamBadge" Text="CAM 1" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="2" x:Name="S1CamLinkText" Text="OFFLINE" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                  </Grid>
                 </Border>
                 <Grid Grid.Row="1">
                   <Image x:Name="Station1Preview" Source="{Binding Source,ElementName=Preview}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
@@ -722,19 +983,17 @@
                           <Border Height="1" Background="{StaticResource ScadaBorder}" Margin="0,5,0,6"/>
                           <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                             <TextBlock Text="Controller link" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}"/>
                             <TextBlock Grid.Column="1" x:Name="S1Link" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right"/>
                             <TextBlock Grid.Row="1" Text="Robot ready" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
                             <TextBlock Grid.Row="1" Grid.Column="1" x:Name="S1Ready" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                            <TextBlock Grid.Row="2" Text="Servo state" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="S1Servo" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                            <TextBlock Grid.Row="3" Text="Robot mode" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="S1Mode" Text="NO DATA" FontSize="9.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Grid.Row="4" Text="Busy / fault" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="S1Busy" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
-                            <TextBlock Grid.Row="5" Text="Homed" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
-                            <TextBlock Grid.Row="5" Grid.Column="1" x:Name="S1Homed" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="2" Text="Robot mode" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="S1Mode" Text="NO DATA" FontSize="9.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}" HorizontalAlignment="Right" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Row="3" Text="Busy / fault" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="S1Busy" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="4" Text="Homed" FontSize="9.5" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="S1Homed" Text="NO DATA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextSecondary}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
                           </Grid>
                           <Border Background="#0A1622" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="3" Padding="8,5" Margin="0,8,0,0">
                             <StackPanel>
@@ -884,40 +1143,17 @@
             <Border Grid.Column="0" Background="{StaticResource ScadaPanelSecondary}" BorderBrush="{StaticResource ScadaBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,8,0">
               <Grid>
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                <Border Background="{StaticResource ScadaPanelPrimary}" CornerRadius="5,5,0,0" Padding="8,4">
-                  <StackPanel>
-                    <Grid>
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="6"/>
-                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="6"/>
-                        <ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
-                      </Grid.ColumnDefinitions>
-                      <TextBlock x:Name="S2CamBadge" Text="CAM 2" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
-                      <ComboBox x:Name="S2ModeBox" Grid.Column="2" Width="62" MinHeight="22" FontSize="9.5" SelectedIndex="0" SelectionChanged="S2ModeChanged" ToolTip="IP enumerates Hikrobot/Basler GigE plus read-only GVCP; USB enumerates USB3 Vision. Auto is removed.">
-                        <ComboBoxItem Content="IP"/><ComboBoxItem Content="USB"/>
-                      </ComboBox>
-                      <ComboBox x:Name="S2DeviceBox" Grid.Column="4" MinWidth="130" MinHeight="22" FontSize="9.5" DisplayMemberPath="Display" SelectionChanged="S2DeviceChanged" ToolTip="Scanned Hikrobot/Basler device: model · serial · vendor · transport."/>
-                      <Button x:Name="S2ScanButton" Grid.Column="5" Content="SCAN" Click="S2Scan_Click" MinWidth="48" MinHeight="22" Padding="6,0" FontSize="9" Margin="4,0,0,0"/>
-                      <Button x:Name="S2ConnectButton" Grid.Column="6" Content="CONNECT" Click="S2ConnectCamera_Click" MinWidth="64" MinHeight="22" Padding="6,0" FontSize="9" Margin="4,0,0,0"/>
-                      <Button x:Name="S2DisconnectButton" Grid.Column="7" Content="DISCONNECT" Click="S2DisconnectCamera_Click" MinWidth="78" MinHeight="22" Padding="6,0" FontSize="9" Margin="4,0,0,0"/>
-                      <TextBlock x:Name="S2CamLinkText" Grid.Column="8" Text="OFFLINE" FontSize="9" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" Margin="7,0,0,0" TextTrimming="CharacterEllipsis" MaxWidth="120"/>
-                    </Grid>
-                    <WrapPanel x:Name="S2IpRow" Margin="0,4,0,0" Visibility="Collapsed">
-                      <TextBlock Text="IP" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                      <TextBox x:Name="S2CamIpBox" Width="112" MinHeight="22" Padding="4,0" FontSize="10" TextChanged="S2IpTextChanged" ToolTip="GigE IPv4 address or hostname. Only IP mode requires it."/>
-                      <TextBlock Text="NIC" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                      <TextBox x:Name="S2HostIpBox" Width="112" MinHeight="22" Padding="4,0" FontSize="10" TextChanged="S2NicTextChanged" ToolTip="Local NIC IPv4 for GVCP discovery and Hikrobot direct-IP connect; auto-detected when the camera subnet is local."/>
-                      <TextBlock Text="VENDOR" FontSize="9" Foreground="{StaticResource ScadaTextSecondary}" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                      <ComboBox x:Name="S2VendorBox" Width="88" MinHeight="22" FontSize="9.5" SelectedIndex="0" SelectionChanged="S2VendorChanged" ToolTip="Typed-IP manual connect is supported for HIKROBOT only. BASLER devices need SCAN.">
-                        <ComboBoxItem Content="HIKROBOT"/><ComboBoxItem Content="BASLER"/>
-                      </ComboBox>
-                    </WrapPanel>
-                    <Expander x:Name="S2DetailsExpander" Margin="0,4,0,0" FontSize="9.5" Visibility="Collapsed">
-                      <Expander.Header><TextBlock x:Name="S2DetailsHeader" Text="DETAILS" FontWeight="SemiBold" Foreground="{StaticResource ScadaAmber}"/></Expander.Header>
-                      <TextBlock x:Name="S2DetailsText" TextWrapping="Wrap" MaxHeight="120" FontFamily="Consolas" Foreground="{StaticResource ScadaTextSecondary}" Margin="0,3,0,0"/>
-                    </Expander>
-                  </StackPanel>
+                <Border Background="{StaticResource ScadaPanelPrimary}" CornerRadius="5,5,0,0" Padding="8,5">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="8"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="S2CamBadge" Text="CAM 2" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource ScadaTextPrimary}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="2" x:Name="S2CamLinkText" Text="OFFLINE" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                  </Grid>
                 </Border>
                 <Grid Grid.Row="1" Background="{StaticResource ScadaVideoBg}">
                   <Image x:Name="Station2Preview" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
@@ -1223,31 +1459,34 @@
                 <StackPanel>
                   <TextBlock Text="SPEED (mm/s) · SHARED" FontSize="10.5" FontWeight="Bold" Foreground="#27C9EC"/>
                   <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                    <TextBox x:Name="CvPresetSpeedBox" Text="100" Width="70" MinHeight="24" Padding="5,1" FontSize="11" HorizontalContentAlignment="Right" LostFocus="CvPresetSpeed_LostFocus" ToolTip="Shared mm/s preset used by the AUTO request. Local setpoint only; no PLC write exists."/>
-                    <Button x:Name="CvPresetApplyButton" Content="APPLY" Click="CvPresetSpeedApply_Click" MinHeight="24" Padding="8,1" FontSize="10" Margin="6,0,0,0"/>
+                    <TextBox x:Name="CvPresetSpeedBox" Text="100" Width="70" MinHeight="24" Padding="5,1" FontSize="11" HorizontalContentAlignment="Right" LostFocus="CvPresetSpeed_LostFocus" ToolTip="Shared speed preset in mm/s [1.0..150.0]. Applied to conveyor calibration setpoint."/>
+                    <Button x:Name="CvPresetApplyButton" Content="APPLY" Click="CvPresetSpeedApply_Click" MinHeight="24" Padding="8,1" FontSize="10" Margin="6,0,0,0" ToolTip="Applies preset speed to TwinCAT MD200 manual mailbox via ADS."/>
                     <TextBlock x:Name="CvPresetStatus" Text="Hz requires verified calibration." FontSize="9" Foreground="#92AABE" VerticalAlignment="Center" Margin="10,0,0,0"/>
                   </StackPanel>
                 </StackPanel>
               </Border>
               <Border x:Name="ConveyorManualControlPanel" Visibility="Visible" Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="6" Padding="12">
                 <StackPanel>
-                  <TextBlock Text="CONVEYOR MANUAL CONTROL · OPERATOR AUTHORIZATION" FontSize="11" FontWeight="Bold" Foreground="#A9BDCC"/>
-                  <TextBlock Text="DISARMED. Manual operation requires verified E-STOP and speed map." FontSize="9" Foreground="#F4BB45" TextWrapping="Wrap" Margin="0,5,0,9"/>
-                  <CheckBox x:Name="DashControlArm" Content="Arm manual conveyor commands (operator confirmation)" Foreground="#DCE8F0" Checked="DashArmChanged" Unchecked="DashArmChanged" Margin="0,0,0,8" FontSize="11"/>
+                  <TextBlock Text="CONVEYOR SUBSYSTEM CALIBRATION · OPERATOR AUTHORIZATION" FontSize="11" FontWeight="Bold" Foreground="#A9BDCC"/>
+                  <Border Background="#162C42" BorderBrush="#27C9EC" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,5,0,7">
+                    <TextBlock Text="CONVEYOR SUBSYSTEM CALIBRATION · ISOLATED BELT RUN" FontSize="10.5" FontWeight="Bold" Foreground="#27C9EC"/>
+                  </Border>
+                  <TextBlock Text="Conveyor speed &amp; encoder calibration mode (MD200 VFD + ST-5114). Not production; camera not required. Gantry motion, SCARA, robot jog, and glue dispense are inhibited. Uses authorized TwinCAT manual belt mailbox." FontSize="9" Foreground="#F4BB45" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                  <CheckBox x:Name="DashControlArm" Content="Arm conveyor subsystem calibration (operator confirmation)" Foreground="#DCE8F0" Checked="DashArmChanged" Unchecked="DashArmChanged" Margin="0,0,0,8" FontSize="11"/>
                   <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                     <TextBlock Text="Speed Setpoint (mm/s):" Foreground="#B9CBD8" VerticalAlignment="Center" FontSize="10" Margin="0,0,8,0"/>
                     <TextBlock x:Name="CvManualSpeedDisplay" Text="100.0 mm/s" FontWeight="Bold" FontFamily="Consolas" Foreground="#27C9EC" VerticalAlignment="Center"/>
                   </StackPanel>
                   <StackPanel Orientation="Horizontal">
-                    <Button x:Name="DashStartButton" Content="MANUAL START" Click="DashStart_Click" Background="#167B69" Foreground="White" IsEnabled="False" MinHeight="30" MinWidth="110" ToolTip="Manual conveyor START request via TwinCAT mailbox. Fails closed if not commissioned."/>
-                    <Button x:Name="DashStopButton" Content="MANUAL STOP" Click="DashStop_Click" Background="#8E4147" Foreground="White" IsEnabled="False" MinHeight="30" MinWidth="110" Margin="8,0,0,0" ToolTip="Manual conveyor STOP request via TwinCAT mailbox. Controlled stop; NOT certified emergency stop."/>
+                    <Button x:Name="DashStartButton" Content="CALIB START" Click="DashStart_Click" Background="#167B69" Foreground="White" IsEnabled="False" MinHeight="30" MinWidth="110" ToolTip="Start conveyor for subsystem calibration (1..150 mm/s). Camera is NOT required. Gantry, SCARA, and glue are inhibited."/>
+                    <Button x:Name="DashStopButton" Content="CALIB STOP" Click="DashStop_Click" Background="#8E4147" Foreground="White" IsEnabled="False" MinHeight="30" MinWidth="110" Margin="8,0,0,0" ToolTip="Stop conveyor subsystem calibration run. Controlled stop; NOT certified emergency stop."/>
                   </StackPanel>
-                  <TextBlock x:Name="DashControlNote" Text="Manual belt commands fail-closed. In danger use PHYSICAL E-STOP." Foreground="#C3D4DE" Margin="0,9,0,0" FontSize="9"/>
+                  <TextBlock x:Name="DashControlNote" Text="Conveyor subsystem calibration commands fail-closed. In danger use PHYSICAL E-STOP." Foreground="#C3D4DE" Margin="0,9,0,0" FontSize="9"/>
                 </StackPanel>
               </Border>
               <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,8,0,0">
                 <StackPanel>
-                  <TextBlock x:Name="ConveyorManualModeNote" Text="AUTO · READ-ONLY. Use MANUAL on LINE OVERVIEW for controls." Foreground="#F4BB45" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                  <TextBlock x:Name="ConveyorManualModeNote" Text="CONVEYOR SUBSYSTEM ISOLATION: Station 01 Gantry and Station 02 SCARA are disarmed during conveyor calibration. Camera 1 is not required. Production AUTO line requires verified camera and separate commissioning on Overview." Foreground="#F4BB45" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,8"/>
                   <TextBlock Text="STATION SYNCHRONIZATION" FontSize="11" FontWeight="Bold" Foreground="#27C9EC"/>
                   <Grid Margin="0,7,0,0">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -1390,13 +1629,13 @@
                         </Grid.RowDefinitions>
                         <TextBlock Text="Basler USB3 Vision" FontSize="10" Foreground="#DCE8F0"/>
                         <TextBlock Grid.Column="1" Text="SUPPORTED" FontSize="10" FontWeight="Bold" Foreground="#39C7A2"/>
-                        <TextBlock Grid.Column="2" Text="pylon 8.1 x64 / USB3 GenTL" FontSize="9.5" Foreground="#92AABE" Margin="10,0,0,0"/>
+                        <TextBlock Grid.Column="2" Text="pylon 8.1 x64 / USB3 GenTL (Station 01)" FontSize="9.5" Foreground="#92AABE" Margin="10,0,0,0"/>
                         <TextBlock Grid.Row="1" Text="Basler GigE Vision" FontSize="10" Foreground="#DCE8F0" Margin="0,5,0,0"/>
-                        <TextBlock Grid.Row="1" Grid.Column="1" Text="SUPPORTED" FontSize="10" FontWeight="Bold" Foreground="#39C7A2" Margin="0,5,0,0"/>
-                        <TextBlock Grid.Row="1" Grid.Column="2" Text="pylon 8.1 x64 / GigE GenTL" FontSize="9.5" Foreground="#92AABE" Margin="10,5,0,0"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="NOT IN USE" FontSize="10" FontWeight="Bold" Foreground="#92AABE" Margin="0,5,0,0"/>
+                        <TextBlock Grid.Row="1" Grid.Column="2" Text="Station 01 is Basler USB only (GigE not in use)" FontSize="9.5" Foreground="#92AABE" Margin="10,5,0,0"/>
                         <TextBlock Grid.Row="2" Text="Hikrobot GigE Vision" FontSize="10" Foreground="#DCE8F0" Margin="0,5,0,0"/>
                         <TextBlock Grid.Row="2" Grid.Column="1" Text="SUPPORTED" FontSize="10" FontWeight="Bold" Foreground="#39C7A2" Margin="0,5,0,0"/>
-                        <TextBlock Grid.Row="2" Grid.Column="2" Text="MVS GigE native direct / GVCP" FontSize="9.5" Foreground="#92AABE" Margin="10,5,0,0"/>
+                        <TextBlock Grid.Row="2" Grid.Column="2" Text="MVS GigE native direct / GVCP (Station 02)" FontSize="9.5" Foreground="#92AABE" Margin="10,5,0,0"/>
                         <TextBlock Grid.Row="3" Text="Hikrobot USB Vision" FontSize="10" Foreground="#DCE8F0" Margin="0,5,0,0"/>
                         <TextBlock Grid.Row="3" Grid.Column="1" Text="NOT SUPPORTED" FontSize="10" FontWeight="Bold" Foreground="#F4BB45" Margin="0,5,0,0"/>
                         <TextBlock Grid.Row="3" Grid.Column="2" Text="MVS USB kernel driver not installed" FontSize="9.5" Foreground="#92AABE" Margin="10,5,0,0"/>
@@ -1413,6 +1652,50 @@
             <TabItem Header="STATION 01 / GANTRY" x:Name="SettingsStation1Tab">
               <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="8">
                 <StackPanel HorizontalAlignment="Stretch">
+                  <!-- BASLER CAMERA 1 -->
+                  <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,8">
+                    <StackPanel>
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                          <TextBlock Text="BASLER USB CAMERA · STATION 01 (GANTRY)" FontSize="12" FontWeight="Bold" Foreground="#27C9EC"/>
+                          <TextBlock Text="Station 01 Gantry inspection camera. SCAN USB enumerates connected Basler USB cameras via pylon SDK. Select scanned USB camera and CONNECT (no IP/NIC required)." FontSize="10" Foreground="#B9CBD8" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Background="#0C1B2A" BorderBrush="#23384D" BorderThickness="1" CornerRadius="3" Padding="8,4" VerticalAlignment="Center" Margin="10,0,0,0">
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="STATUS: " FontSize="9.5" FontWeight="SemiBold" Foreground="#92AABE" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="SettingsS1CamLinkText" Text="OFFLINE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center"/>
+                          </StackPanel>
+                        </Border>
+                      </Grid>
+                      <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                          <TextBlock Text="Transport Mode" Style="{StaticResource FieldLabel}"/>
+                          <TextBox Text="USB 3.0 Vision (Basler pylon SDK)" IsReadOnly="True" FontSize="11" Background="#0C1B2A" Foreground="#39C7A2" BorderBrush="#23384D" ToolTip="Station 01 uses Basler USB3 Vision. No IP or network adapter configuration required."/>
+                          <TextBox x:Name="SettingsS1CamIpBox" Visibility="Collapsed"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                          <TextBlock Text="Scanned USB Device" Style="{StaticResource FieldLabel}"/>
+                          <ComboBox x:Name="SettingsS1DeviceBox" SelectionChanged="SettingsS1DeviceChanged" DisplayMemberPath="Display" FontSize="11" MinHeight="26" ToolTip="Select scanned Basler USB camera device."/>
+                          <TextBox x:Name="SettingsS1HostIpBox" Visibility="Collapsed"/>
+                        </StackPanel>
+                      </Grid>
+                      <WrapPanel Margin="0,10,0,0">
+                        <Button x:Name="SettingsS1ConnectButton" Content="CONNECT" Click="SettingsS1ConnectCamera_Click" MinHeight="28" Padding="14,3" Background="#1B4D3E" Foreground="White" FontWeight="SemiBold" Margin="0,0,8,0" ToolTip="Connect to selected scanned Basler USB camera."/>
+                        <Button x:Name="SettingsS1DisconnectButton" Content="DISCONNECT" Click="SettingsS1DisconnectCamera_Click" MinHeight="28" Padding="14,3" Background="#4A1E24" Foreground="White" FontWeight="SemiBold" Margin="0,0,8,0" ToolTip="Disconnect Station 01 Basler USB camera."/>
+                        <Button x:Name="SettingsS1SaveButton" Content="SAVE CONFIG" Click="SettingsS1Save_Click" MinHeight="28" Padding="12,3" Background="#162C42" Foreground="White" Margin="0,0,8,0" ToolTip="Persist Camera 1 configuration to slot profile."/>
+                        <Button x:Name="SettingsS1ScanButton" Content="SCAN USB" Click="SettingsS1Scan_Click" MinHeight="28" Padding="10,3" Background="#162C42" Foreground="White" ToolTip="Enumerate connected Basler USB cameras via pylon SDK."/>
+                      </WrapPanel>
+                      <TextBlock Text="Settings persist to local slot profile (camera_slots.json). Station 01 Basler connects through pylon SDK USB device scan (no IP/NIC)." FontSize="9" Foreground="#92AABE" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    </StackPanel>
+                  </Border>
                   <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="4" Padding="12">
                     <StackPanel>
                       <TextBlock Text="DETECTION / TRIGGER · STATION 01" FontSize="12" FontWeight="Bold" Foreground="#27C9EC"/>
@@ -1493,24 +1776,201 @@
             <TabItem Header="STATION 02 / SCARA" x:Name="SettingsStation2Tab">
               <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="8">
                 <StackPanel HorizontalAlignment="Stretch">
+                  <!-- HIKROBOT GigE CAMERA 2 -->
+                  <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,8">
+                    <StackPanel>
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                          <TextBlock Text="HIKROBOT GigE CAMERA · STATION 02 (SCARA)" FontSize="12" FontWeight="Bold" Foreground="#27C9EC"/>
+                          <TextBlock Text="Manual IPv4 configuration for Station 02 camera. Direct CONNECT establishes camera link without requiring GVCP scan. SCARA robot controls remain reserved and disabled." FontSize="10" Foreground="#B9CBD8" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Background="#0C1B2A" BorderBrush="#23384D" BorderThickness="1" CornerRadius="3" Padding="8,4" VerticalAlignment="Center" Margin="10,0,0,0">
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="STATUS: " FontSize="9.5" FontWeight="SemiBold" Foreground="#92AABE" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="SettingsS2CamLinkText" Text="OFFLINE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource ScadaAmber}" VerticalAlignment="Center"/>
+                          </StackPanel>
+                        </Border>
+                      </Grid>
+                      <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                          <TextBlock Text="Camera 2 IP (GigE IPv4)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2CamIpBox" FontSize="11" TextChanged="SettingsS2IpTextChanged" ToolTip="GigE IPv4 address of Station 02 Hikrobot camera. Direct CONNECT supported without SCAN."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                          <TextBlock Text="Host NIC IP (PC Network Adapter IPv4)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2HostIpBox" FontSize="11" TextChanged="SettingsS2NicTextChanged" ToolTip="Host NIC IPv4 on the Station 02 camera subnet."/>
+                        </StackPanel>
+                      </Grid>
+                      <WrapPanel Margin="0,10,0,0">
+                        <Button x:Name="SettingsS2ConnectButton" Content="CONNECT" Click="SettingsS2ConnectCamera_Click" MinHeight="28" Padding="14,3" Background="#1B4D3E" Foreground="White" FontWeight="SemiBold" Margin="0,0,8,0" ToolTip="Connect directly to entered Camera 2 IP and Host NIC."/>
+                        <Button x:Name="SettingsS2DisconnectButton" Content="DISCONNECT" Click="SettingsS2DisconnectCamera_Click" MinHeight="28" Padding="14,3" Background="#4A1E24" Foreground="White" FontWeight="SemiBold" Margin="0,0,8,0" ToolTip="Disconnect Station 02 camera."/>
+                        <Button x:Name="SettingsS2SaveButton" Content="SAVE CONFIG" Click="SettingsS2Save_Click" MinHeight="28" Padding="12,3" Background="#162C42" Foreground="White" Margin="0,0,8,0" ToolTip="Persist Camera 2 IP and Host NIC settings to slot configuration."/>
+                        <Button x:Name="SettingsS2ScanButton" Content="SCAN (OPTIONAL)" Click="SettingsS2Scan_Click" MinHeight="28" Padding="10,3" Background="#162C42" Foreground="#92AABE" ToolTip="Optional diagnostic GVCP scan. Direct IP CONNECT does not require SCAN."/>
+                      </WrapPanel>
+                      <TextBlock Text="Settings persist to local slot profile (camera_slots.json). Station 02 is reserved: camera preview only, no robot motion commands." FontSize="9" Foreground="#92AABE" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    </StackPanel>
+                  </Border>
                   <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="4" Padding="12">
                     <StackPanel>
                       <TextBlock Text="STATION 02 · NOT COMMISSIONED" FontSize="12" FontWeight="Bold" Foreground="#E3D3A0"/>
-                      <TextBlock Text="No validated SCARA or Camera 02 symbols exist in this build. Settings are shown for structure only and are not editable." FontSize="10" Foreground="#B9CBD8" TextWrapping="Wrap" Margin="0,5,0,10"/>
+                      <TextBlock Text="SCARA robot remains uncommissioned with no validated PLC symbols; robot controls are disabled. Camera 02 Hikrobot GigE manual IP connection is configurable above for camera preview." FontSize="10" Foreground="#B9CBD8" TextWrapping="Wrap" Margin="0,5,0,10"/>
                       <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Text="Robot controller" FontSize="10" Foreground="#92AABE" Margin="0,0,0,4"/>
                         <TextBlock Grid.Column="1" Text="UNMAPPED · no validated PLC symbols" FontSize="10" Foreground="#E3D3A0" Margin="0,0,0,4"/>
                         <TextBlock Grid.Row="1" Text="Camera 02 source" FontSize="10" Foreground="#92AABE" Margin="0,0,0,4"/>
-                        <TextBlock Grid.Row="1" Grid.Column="1" Text="NOT INSTALLED · no device configured" FontSize="10" Foreground="#E3D3A0" Margin="0,0,0,4"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="SettingsS2CamSourceSummary" Text="Hikrobot GigE · configured above" FontSize="10" Foreground="#27C9EC" Margin="0,0,0,4"/>
                         <TextBlock Grid.Row="2" Text="Vision calibration / ROI" FontSize="10" Foreground="#92AABE" Margin="0,0,0,4"/>
-                        <TextBlock Grid.Row="2" Grid.Column="1" Text="NOT CONFIGURED" FontSize="10" Foreground="#E3D3A0" Margin="0,0,0,4"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="SettingsS2CalibSummary" Text="NOT CONFIGURED (FAIL CLOSED)" FontSize="10" Foreground="#E3D3A0" Margin="0,0,0,4"/>
                         <TextBlock Grid.Row="3" Text="Tray recipe" FontSize="10" Foreground="#92AABE" Margin="0,0,0,4"/>
-                        <TextBlock Grid.Row="3" Grid.Column="1" Text="NOT CONFIGURED" FontSize="10" Foreground="#E3D3A0" Margin="0,0,0,4"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="SettingsS2TraySummary" Text="NOT CONFIGURED (FAIL CLOSED)" FontSize="10" Foreground="#E3D3A0" Margin="0,0,0,4"/>
                         <TextBlock Grid.Row="4" Text="Robot access level" FontSize="10" Foreground="#92AABE"/>
                         <TextBlock Grid.Row="4" Grid.Column="1" Text="NO COMMANDS PERMITTED" FontSize="10" Foreground="#FF6E70"/>
                       </Grid>
+                    </StackPanel>
+                  </Border>
+                  <!-- OFFLINE CALIBRATION & TRAY ALLOCATOR CONFIGURATION -->
+                  <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,8,0,0">
+                    <StackPanel>
+                      <TextBlock Text="OFFLINE CALIBRATION &amp; TRAY ALLOCATOR (PURE SIMULATION · NO ROBOT COMMANDS)" FontSize="11" FontWeight="Bold" Foreground="#27C9EC"/>
+                      <TextBlock Text="Explicit offline calibration and tray parameters. All values must be supplied explicitly. Non-finite or missing values fail closed. No default 3x4 layout; no auto-advance; zero PLC writes." FontSize="9.5" Foreground="#B9CBD8" TextWrapping="Wrap" Margin="0,4,0,8"/>
+                      
+                      <!-- Calibration parameters -->
+                      <TextBlock Text="CAMERA 2 CALIBRATION (NO IMPLICIT DEFAULTS)" FontSize="10" FontWeight="Bold" Foreground="#DCE8F0" Margin="0,4,0,4"/>
+                      <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,6,0">
+                          <TextBlock Text="Scale (mm/px)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2ScaleBox" Text="" FontSize="11" ToolTip="Explicit positive mm/pixel scale. Blank fails closed."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="0,0,6,0">
+                          <TextBlock Text="Origin X (px)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2OriginXBox" Text="" FontSize="11" ToolTip="Explicit finite Origin X in pixels. Blank fails closed."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="0,0,6,0">
+                          <TextBlock Text="Origin Y (px)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2OriginYBox" Text="" FontSize="11" ToolTip="Explicit finite Origin Y in pixels. Blank fails closed."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3">
+                          <TextBlock Text="Offset X (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2OffsetXBox" Text="" FontSize="11" ToolTip="Explicit finite Offset X in mm. Blank fails closed."/>
+                        </StackPanel>
+                      </Grid>
+                      <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,6,0">
+                          <TextBlock Text="Offset Y (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2OffsetYBox" Text="" FontSize="11" ToolTip="Explicit finite Offset Y in mm. Blank fails closed."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="0,0,6,0">
+                          <TextBlock Text="Hole Pitch (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2HolePitchBox" Text="" FontSize="11" ToolTip="Explicit strictly positive hole pitch in mm (e.g. 40.0). Blank fails closed."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="0,0,6,0">
+                          <TextBlock Text="Plate Size (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2PlateSizeBox" Text="" FontSize="11" ToolTip="Explicit strictly positive plate size in mm (e.g. 50.0). Blank fails closed."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3"/>
+                      </Grid>
+
+                      <!-- Tray parameters -->
+                      <TextBlock Text="OFFLINE TRAY LAYOUT (NO IMPLICIT DEFAULTS)" FontSize="10" FontWeight="Bold" Foreground="#DCE8F0" Margin="0,4,0,4"/>
+                      <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,6,0">
+                          <TextBlock Text="Rows (>0)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2TrayRowsBox" Text="" FontSize="11" ToolTip="Explicit positive row count (no default 3x4)."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="0,0,6,0">
+                          <TextBlock Text="Columns (>0)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2TrayColsBox" Text="" FontSize="11" ToolTip="Explicit positive column count."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="0,0,6,0">
+                          <TextBlock Text="Pitch X (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2TrayPitchXBox" Text="" FontSize="11" ToolTip="Explicit positive column pitch."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3">
+                          <TextBlock Text="Pitch Y (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2TrayPitchYBox" Text="" FontSize="11" ToolTip="Explicit positive row pitch."/>
+                        </StackPanel>
+                      </Grid>
+                      <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,6,0">
+                          <TextBlock Text="Origin X (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2TrayOriginXBox" Text="" FontSize="11" ToolTip="Explicit finite tray origin X in mm."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="0,0,6,0">
+                          <TextBlock Text="Origin Y (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2TrayOriginYBox" Text="" FontSize="11" ToolTip="Explicit finite tray origin Y in mm."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="0,0,6,0">
+                          <TextBlock Text="Tray Angle (°)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2TrayAngleBox" Text="" FontSize="11" ToolTip="Explicit finite tray angle in degrees."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3"/>
+                      </Grid>
+
+                      <!-- Tray Workspace Bounds -->
+                      <TextBlock Text="TRAY WORKSPACE BOUNDS (MM, NO IMPLICIT DEFAULTS)" FontSize="10" FontWeight="Bold" Foreground="#DCE8F0" Margin="0,4,0,4"/>
+                      <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,6,0">
+                          <TextBlock Text="Min X (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2TrayBoundMinXBox" Text="" FontSize="11" ToolTip="Explicit finite Min X workspace limit."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="0,0,6,0">
+                          <TextBlock Text="Max X (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2TrayBoundMaxXBox" Text="" FontSize="11" ToolTip="Explicit finite Max X workspace limit."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="0,0,6,0">
+                          <TextBlock Text="Min Y (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2TrayBoundMinYBox" Text="" FontSize="11" ToolTip="Explicit finite Min Y workspace limit."/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3">
+                          <TextBlock Text="Max Y (mm)" Style="{StaticResource FieldLabel}"/>
+                          <TextBox x:Name="SettingsS2TrayBoundMaxYBox" Text="" FontSize="11" ToolTip="Explicit finite Max Y workspace limit."/>
+                        </StackPanel>
+                      </Grid>
+
+                      <WrapPanel Margin="0,6,0,0">
+                        <Button x:Name="SettingsS2ApplyConfigButton" Content="APPLY OFFLINE CONFIG" Click="SettingsS2ApplyConfig_Click" MinHeight="28" Padding="14,3" Background="#162C42" Foreground="White" FontWeight="SemiBold" Margin="0,0,8,0" ToolTip="Validate and apply explicit calibration and tray layout atomically."/>
+                        <Button x:Name="SettingsS2ClearConfigButton" Content="RESET / FAIL CLOSED" Click="SettingsS2ClearConfig_Click" MinHeight="28" Padding="14,3" Background="#4A1E24" Foreground="White" FontWeight="SemiBold" ToolTip="Clear calibration and tray layout, returning to fail-closed state."/>
+                      </WrapPanel>
                     </StackPanel>
                   </Border>
                   <Border Background="#112335" BorderBrush="#23384D" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,8,0,0">
@@ -1881,6 +2341,22 @@
                     <TextBlock Text="Video mode supports image and coordinate tests only. No Gantry motion commands." TextWrapping="Wrap" FontSize="10" Foreground="{DynamicResource VDTheme055}" Margin="0,9,0,0" />
                   </StackPanel>
                 </Border>
+                <Border Background="#101F2D" BorderBrush="#23384D" BorderThickness="1" CornerRadius="0" Padding="12" Margin="0,0,0,10">
+                  <StackPanel>
+                    <TextBlock Text="OFFLINE WORKPIECE EVALUATION (LOCAL FILE ONLY)" Style="{StaticResource SectionHeading}" FontSize="12" />
+                    <TextBlock Text="[OFFLINE EVALUATION ONLY - NO PLC / FIFO / NO PRODUCTION TRACKING]" FontWeight="Bold" Foreground="#FFCC00" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,8" />
+                    <WrapPanel Margin="0,0,0,8">
+                      <Button Content="OPEN OFFLINE VIDEO" Click="OpenOfflineEvalVideo_Click" MinHeight="26" Padding="8,0" Margin="0,0,6,0" Background="#1B3A57" Foreground="#DCE9F2" FontSize="11" />
+                      <Button Content="STOP EVALUATION" Click="StopOfflineEvalVideo_Click" MinHeight="26" Padding="8,0" Background="#2A3845" Foreground="#88A0B2" FontSize="11" />
+                    </WrapPanel>
+                    <Border Background="#0B1520" BorderBrush="#1C2E40" BorderThickness="1" Height="140" Margin="0,0,0,8">
+                      <Image x:Name="OfflineEvalPreview" Stretch="Uniform" />
+                    </Border>
+                    <TextBlock x:Name="OfflineEvalCentroidText" Text="Centroid: — px" FontFamily="Consolas" FontSize="11" Foreground="#DCE9F2" Margin="0,2,0,0" />
+                    <TextBlock x:Name="OfflineEvalAngleText" Text="Tilt Angle θ: —°" FontFamily="Consolas" FontSize="11" Foreground="#F8D477" Margin="0,2,0,0" />
+                    <TextBlock x:Name="OfflineEvalBenchmarkText" Text="Frames: 0  |  Detected: 0  |  Latency: — ms" FontSize="10" Foreground="#88A0B2" Margin="0,4,0,0" />
+                  </StackPanel>
+                </Border>
               </StackPanel>
             </ScrollViewer>
           </Grid>
@@ -1897,18 +2373,18 @@
                 <TextBlock Text="Use the camera network on AML-IPC. Discover via GVCP or enter the device IP; do not change the camera IP." Foreground="{DynamicResource VDTheme058}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12" />
                 <WrapPanel Margin="0,4,0,6">
                   <Button Content="SCAN CAMERAS" Click="ScanCameras_Click" Background="{DynamicResource VDTheme028}" MinHeight="30" Foreground="{DynamicResource VDTheme029}" />
-                  <ComboBox x:Name="CameraPicker" Width="260" DisplayMemberPath="Name" />
+                  <ComboBox x:Name="CameraPicker" Width="260" DisplayMemberPath="Display" />
                   <Button Content="CONNECT" Click="ConnectCamera_Click" MinHeight="30" Foreground="{DynamicResource VDTheme025}" />
                   <Button Content="CONNECT ALL" Click="ConnectAll_Click" Background="{DynamicResource VDTheme028}" MinHeight="30" Foreground="{DynamicResource VDTheme029}" />
                 </WrapPanel>
                 <WrapPanel Margin="0,4,0,6">
                   <TextBlock Text="IP camera" Foreground="{DynamicResource VDTheme059}" VerticalAlignment="Center" Margin="7,0,0,0" />
-                  <TextBox x:Name="CameraIpBox" Width="174" Text="169.254.113.1" ToolTip="Hikrobot GigE Vision IPv4 address" />
+                  <TextBox x:Name="CameraIpBox" Width="174" Text="N/A (USB)" IsReadOnly="True" ToolTip="Station 01 Basler camera is USB only (IP not used)" />
                   <TextBlock Text="IP PC" Foreground="{DynamicResource VDTheme059}" VerticalAlignment="Center" />
-                  <TextBox x:Name="HostIpBox" Width="174" Text="169.254.113.10" ToolTip="Ethernet 2 IPv4 on the camera subnet" />
-                  <Button Content="CONNECT IP" Click="ConnectCameraIp_Click" Background="{DynamicResource VDTheme060}" ToolTip="Connect via Hikrobot SDK without MVS scanning" MinHeight="30" Foreground="{DynamicResource VDTheme025}" />
+                  <TextBox x:Name="HostIpBox" Width="174" Text="N/A (USB)" IsReadOnly="True" ToolTip="Station 01 Basler camera is USB only (NIC not used)" />
+                  <Button Content="CONNECT IP" Click="ConnectCameraIp_Click" Background="{DynamicResource VDTheme060}" ToolTip="Station 01 Basler is USB only (use Settings to SCAN USB)" MinHeight="30" Foreground="{DynamicResource VDTheme025}" />
                 </WrapPanel>
-                <TextBlock Text="Example: camera 169.254.113.1, Ethernet 2: 169.254.113.10. Connecting opens Live View only." Foreground="{DynamicResource VDTheme061}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                <TextBlock Text="Station 01 is Basler USB (pylon scan required); Station 02 connects via MVS direct IP. For full camera configuration, use Settings." Foreground="{DynamicResource VDTheme061}" TextWrapping="Wrap" Margin="0,8,0,0" />
               </StackPanel>
             </Border>
             <Border Background="{StaticResource Panel}" CornerRadius="0" BorderBrush="{StaticResource Stroke}" BorderThickness="1" Padding="12" Margin="0,0,0,14">

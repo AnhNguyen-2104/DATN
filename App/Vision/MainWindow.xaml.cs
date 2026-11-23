@@ -27,6 +27,9 @@ public partial class MainWindow : System.Windows.Window
     private readonly DispatcherTimer _timer=new() {Interval=TimeSpan.FromMilliseconds(75)};
     private readonly DispatcherTimer _adsTimer=new() {Interval=TimeSpan.FromMilliseconds(600)};
     private readonly VisionOptions _options=new();
+    private VisionOptions _optionsCam2=new() {FixedMmPerPixel=0};
+    private OfflineTrayAllocator? _s2TrayAllocator;
+    private Camera2ProcessingResult? _lastCam2Result;
     private readonly Dictionary<string,MidlineTracker> _trackers=new();
     private readonly List<string> _events=new();
     private readonly ObservableCollection<TriggerAuditRow> _auditRows=new();
@@ -88,20 +91,41 @@ public partial class MainWindow : System.Windows.Window
         PipelineTable.ItemsSource=_auditRows;
         PipelineHistoryTable.ItemsSource=_auditRows;
         _timer.Tick+=OnTick;
-        _adsTimer.Tick+=OnAdsTick;
-        _adsTimer.Start();
+        if (AppHardwareCapabilities.AllowAdsPolling)
+        {
+            _adsTimer.Tick+=OnAdsTick;
+            _adsTimer.Start();
+        }
         InitDashboard();
         InitStationOverview();
         InitStationDashboards();
         RefreshVideos();
         ResetDetectionHud();
         RefreshCaptureMode();
-        StatusText.Text="Camera offline | ADS read-only";
-        if(Environment.GetCommandLineArgs().Any(a=>a.Equals("--demo",StringComparison.OrdinalIgnoreCase)))
-            Dispatcher.BeginInvoke(new Action(()=>OpenVideo(@"C:\Users\aml\Desktop\DEMO\1.avi")));
-        // QA preview only: --mock starts the conspicuously labelled TEST ONLY interlock
-        // demonstration. It never writes ADS and never commands the conveyor.
-        InitCameraSlots();
+        if (AppHardwareCapabilities.IsOfflineCalibration)
+        {
+            Title = "DATN | OFFLINE CALIBRATION / NO HARDWARE";
+            StatusText.Text = "OFFLINE CALIBRATION / NO HARDWARE • ADS & CAMERAS INHIBITED";
+            if (CalibrationWorkspaceTab != null)
+                MainNavigation.SelectedItem = CalibrationWorkspaceTab;
+            if (GantryMasterGateText != null)
+                GantryMasterGateText.Text = "OFFLINE CALIBRATION: Zero ADS sockets / writes. Live master enable locked.";
+            if (GantryMasterStatusText != null)
+                GantryMasterStatusText.Text = "COMMAND ECHO: UNKNOWN (NO SNAPSHOT / OFFLINE)";
+            if (GantryMasterOverrideText != null)
+                GantryMasterOverrideText.Text = "OVERRIDES: STALE / UNKNOWN (SNAPSHOT INVALID)";
+            if (GantryMasterDiagnosticsText != null)
+                GantryMasterDiagnosticsText.Text = GantryOfflineDiagnosticsText;
+        }
+        else
+        {
+            StatusText.Text="Camera offline | ADS read-only";
+            if(Environment.GetCommandLineArgs().Any(a=>a.Equals("--demo",StringComparison.OrdinalIgnoreCase)))
+                Dispatcher.BeginInvoke(new Action(()=>OpenVideo(@"C:\Users\aml\Desktop\DEMO\1.avi")));
+            // QA preview only: --mock starts the conspicuously labelled TEST ONLY interlock
+            // demonstration. It never writes ADS and never commands the conveyor.
+            InitCameraSlots();
+        }
     }
     private bool HasActiveSource => _video!=null || _cam1.IsOpen;
 
@@ -117,16 +141,33 @@ public partial class MainWindow : System.Windows.Window
 
     private void UpdateControlSafetyBanner()
     {
-        if(_dashControlArmed)
+        if (_dashStatus?.BeltRun == true)
         {
-            ControlSafetyBanner.Text="HMI CONVEYOR ARMED · NO ROBOT";
+            ControlSafetyBanner.Text = _conveyorCalibrationMode
+                ? "CONVEYOR CALIBRATION RUNNING · ISOLATED BELT RUN · NO GANTRY/GLUE"
+                : "CONVEYOR RUNNING · MANUAL RUN ACTIVE · NOT PRODUCTION AUTO";
+            return;
+        }
+
+        if (_conveyorCalibrationMode)
+        {
+            if (_dashControlArmed)
+                ControlSafetyBanner.Text = "CONVEYOR SUBSYSTEM CALIBRATION ARMED · ISOLATED BELT RUN (NO ROBOT/GLUE)";
+            else
+                ControlSafetyBanner.Text = "CONVEYOR SUBSYSTEM CALIBRATION · ISOLATED BELT RUN (NO ROBOT/GLUE)";
+            return;
+        }
+
+        if (_dashControlArmed)
+        {
+            ControlSafetyBanner.Text = "HMI CONVEYOR ARMED · NO ROBOT";
             return;
         }
         // Distinguish data permission from motion authorization. A live PLC
         // state alone never confers permission to operate the robot.
-        ControlSafetyBanner.Text=_benchArmed
-            ?"ADS BENCH ONLY · NO MOTION"
-            :"ADS READ-ONLY · NO MOTION";
+        ControlSafetyBanner.Text = _benchArmed
+            ? "BENCH SIMULATION ONLY · PRODUCTION DISARMED"
+            : "PRODUCTION AUTO: DISARMED · COMMISSIONING PENDING";
     }
     private void RefreshCaptureMode()
     {
@@ -185,6 +226,11 @@ public partial class MainWindow : System.Windows.Window
     }
     private async void CheckLiveReadiness_Click(object sender,RoutedEventArgs e)
     {
+        if (!AppHardwareCapabilities.AllowAdsPolling)
+        {
+            ReadinessStatus.Text="NOT READY: Hardware ADS connection is inhibited in offline calibration mode.";
+            return;
+        }
         ReadinessStatus.Text="Checking TwinCAT symbols (READ ONLY)...";
         try {
             var plc=await Task.Run(()=>_bridge.InspectLiveReadiness());
@@ -430,16 +476,12 @@ public partial class MainWindow : System.Windows.Window
     {
         try
         {
-            string hostIp=HostIpBox.Text.Trim();
-            string cameraIp=CameraIpBox.Text.Trim();
-            StatusText.Text="Scanning HIKROBOT/Basler GigE and read-only GVCP on "+hostIp+"...";
-
-            CameraScanResult result=await Task.Run(()=>_cam1.Scan(CameraTransportMode.Ip,cameraIp,hostIp));
+            StatusText.Text="Scanning Station 01 Basler USB camera...";
+            CameraScanResult result=await Task.Run(()=>_cam1.Scan(CameraTransportMode.Usb));
             CameraPicker.ItemsSource=result.Devices;
             if(result.Devices.Count>0)
             {
                 CameraPicker.SelectedIndex=0;
-                if(!string.IsNullOrWhiteSpace(result.Devices[0].Address))CameraIpBox.Text=result.Devices[0].Address;
             }
 
             StatusText.Text="Camera: "+result.Summary+
@@ -452,23 +494,13 @@ public partial class MainWindow : System.Windows.Window
 
     private CameraSlotModel SlotModel(int slot)=>slot==1?_cam1.Model:_cam2.Model;
     private StationCameraController SlotController(int slot)=>slot==1?_cam1:_cam2;
-    private ComboBox SlotModeBox(int slot)=>slot==1?S1ModeBox:S2ModeBox;
-    private ComboBox SlotDeviceBox(int slot)=>slot==1?S1DeviceBox:S2DeviceBox;
-    private TextBox SlotIpBox(int slot)=>slot==1?S1CamIpBox:S2CamIpBox;
-    private TextBox SlotNicBox(int slot)=>slot==1?S1HostIpBox:S2HostIpBox;
-    private Button SlotScanButton(int slot)=>slot==1?S1ScanButton:S2ScanButton;
-    private Button SlotConnectButton(int slot)=>slot==1?S1ConnectButton:S2ConnectButton;
-    private Button SlotDisconnectButton(int slot)=>slot==1?S1DisconnectButton:S2DisconnectButton;
+    private TextBox SlotIpBox(int slot)=>slot==1?SettingsS1CamIpBox:SettingsS2CamIpBox;
+    private TextBox SlotNicBox(int slot)=>slot==1?SettingsS1HostIpBox:SettingsS2HostIpBox;
+    private Button SlotScanButton(int slot)=>slot==1?SettingsS1ScanButton:SettingsS2ScanButton;
+    private Button SlotConnectButton(int slot)=>slot==1?SettingsS1ConnectButton:SettingsS2ConnectButton;
+    private Button SlotDisconnectButton(int slot)=>slot==1?SettingsS1DisconnectButton:SettingsS2DisconnectButton;
     private TextBlock SlotStateText(int slot)=>slot==1?S1CamLinkText:S2CamLinkText;
     private FrameworkElement SlotEmptyText(int slot)=>slot==1?S1CamEmpty:S2CamEmpty;
-    private ComboBox SlotVendorBox(int slot)=>slot==1?S1VendorBox:S2VendorBox;
-    private Expander SlotDetailsExpander(int slot)=>slot==1?S1DetailsExpander:S2DetailsExpander;
-    private TextBlock SlotDetailsHeader(int slot)=>slot==1?S1DetailsHeader:S2DetailsHeader;
-    private TextBlock SlotDetailsText(int slot)=>slot==1?S1DetailsText:S2DetailsText;
-    private bool SlotVendorIsBasler(int slot)=>SlotVendorBox(slot).SelectedIndex==1;
-
-    private static CameraTransportMode ModeOf(ComboBox box)=>
-        box.SelectedIndex==1?CameraTransportMode.Usb:CameraTransportMode.Ip;
 
     private static int ModeIndex(CameraTransportMode mode)=>
         mode==CameraTransportMode.Usb?1:0;
@@ -487,86 +519,101 @@ public partial class MainWindow : System.Windows.Window
         var model=SlotModel(slot);
         model.Mode=saved.Mode;
         model.IpText=saved.Ip;
-        SlotModeBox(slot).SelectedIndex=ModeIndex(saved.Mode);
-        SlotVendorBox(slot).SelectedIndex=saved.Vendor.Equals("Basler",StringComparison.OrdinalIgnoreCase)?1:0;
         SlotIpBox(slot).Text=saved.Ip;
         SlotNicBox(slot).Text=saved.Nic;
+        if(slot==1&&SettingsS1CamIpBox!=null)
+        {
+            if(!string.IsNullOrWhiteSpace(saved.DeviceKey))model.SelectDevice(saved.DeviceKey);
+        }
+        else if(slot==2&&SettingsS2CamIpBox!=null)
+        {
+        }
     }
 
     private void SaveSlot(int slot)
     {
         var model=SlotModel(slot);
-        string vendor=SlotVendorIsBasler(slot)?"Basler":"Hikrobot";
+        string vendor=CameraSlotDefaults.DefaultVendor(slot);
         CameraTransportMode mode=model.Mode;
         string ipText=SlotIpBox(slot).Text.Trim();
-        CameraSlotSettingsStore.Save(slot,mode,ipText,
-            SlotNicBox(slot).Text.Trim(),model.Selected?.Key??"",vendor);
-    }
+        string nicText=SlotNicBox(slot).Text.Trim();
 
+        var existing=CameraSlotSettingsStore.Load(slot);
+        var (deviceKey, resolvedIp, resolvedNic)=CameraSlotDefaults.ResolveKeyForSave(
+            slot, vendor, model.Selected, ipText, nicText, existing.DeviceKey, existing.Ip, existing.Nic);
+
+        CameraSlotSettingsStore.Save(slot,mode,resolvedIp,
+            resolvedNic,deviceKey,vendor);
+    }
     private void BindSlotDevices(int slot)
     {
-        var model=SlotModel(slot);
-        var box=SlotDeviceBox(slot);
-        box.ItemsSource=null;
-        box.ItemsSource=model.FilteredDevices;
-        if(model.Selected is not null)box.SelectedItem=model.Selected;
+        if(slot==1&&SettingsS1DeviceBox!=null)
+        {
+            var model=SlotModel(1);
+            SettingsS1DeviceBox.ItemsSource=null;
+            SettingsS1DeviceBox.ItemsSource=model.FilteredDevices;
+            if(model.Selected!=null)
+                SettingsS1DeviceBox.SelectedItem=model.Selected;
+        }
     }
 
-    private void S1ModeChanged(object sender,SelectionChangedEventArgs e)=>SlotModeChanged(1);
-    private void S2ModeChanged(object sender,SelectionChangedEventArgs e)=>SlotModeChanged(2);
-
-    private void SlotModeChanged(int slot)
+    private void SettingsS1DeviceChanged(object sender,SelectionChangedEventArgs e)
     {
         if(!_cameraUiReady||_closing)return;
-        var model=SlotModel(slot);
-        model.Mode=ModeOf(SlotModeBox(slot));
-        model.IpText=SlotIpBox(slot).Text.Trim();
-        BindSlotDevices(slot);
-        UpdateCameraSlotUi(slot);
-        SaveSlot(slot);
-    }
-    private void S1DeviceChanged(object sender,SelectionChangedEventArgs e)=>SlotDeviceChanged(1);
-    private void S2DeviceChanged(object sender,SelectionChangedEventArgs e)=>SlotDeviceChanged(2);
-
-    private void S1VendorChanged(object sender,SelectionChangedEventArgs e)=>SlotVendorChanged(1);
-    private void S2VendorChanged(object sender,SelectionChangedEventArgs e)=>SlotVendorChanged(2);
-
-    private void SlotVendorChanged(int slot)
-    {
-        if(!_cameraUiReady||_closing)return;
-        SaveSlot(slot);
-        UpdateCameraSlotUi(slot);
-    }
-
-    private void SlotDeviceChanged(int slot)
-    {
-        if(!_cameraUiReady||_closing)return;
-        if(SlotDeviceBox(slot).SelectedItem is not CameraDevice device)return;
-        SlotModel(slot).SelectDevice(device.Key);
-        SaveSlot(slot);
-        UpdateCameraSlotUi(slot);
-    }
-    private void S1IpTextChanged(object sender,TextChangedEventArgs e)
-    {
-        if(!_cameraUiReady||_closing)return;
-        _cam1.Model.IpText=S1CamIpBox.Text.Trim();
+        if(SettingsS1DeviceBox?.SelectedItem is not CameraDevice device)return;
+        _cam1.Model.SelectDevice(device.Key);
+        SaveSlot(1);
         UpdateCameraSlotUi(1);
     }
-    private void S2IpTextChanged(object sender,TextChangedEventArgs e)
+    private void SettingsS1IpTextChanged(object sender,TextChangedEventArgs e)
     {
         if(!_cameraUiReady||_closing)return;
-        _cam2.Model.IpText=S2CamIpBox.Text.Trim();
-        UpdateCameraSlotUi(2);
+        _cam1.Model.IpText=SettingsS1CamIpBox.Text.Trim();
+        UpdateCameraSlotUi(1);
     }
-    private void S1NicTextChanged(object sender,TextChangedEventArgs e)
+    private void SettingsS1NicTextChanged(object sender,TextChangedEventArgs e)
     {
         if(!_cameraUiReady||_closing)return;
         UpdateCameraSlotUi(1);
     }
-    private void S2NicTextChanged(object sender,TextChangedEventArgs e)
+    private void SettingsS2IpTextChanged(object sender,TextChangedEventArgs e)
+    {
+        if(!_cameraUiReady||_closing)return;
+        _cam2.Model.IpText=SettingsS2CamIpBox.Text.Trim();
+        UpdateCameraSlotUi(2);
+    }
+    private void SettingsS2NicTextChanged(object sender,TextChangedEventArgs e)
     {
         if(!_cameraUiReady||_closing)return;
         UpdateCameraSlotUi(2);
+    }
+
+    private void SettingsS1ConnectCamera_Click(object sender,RoutedEventArgs e)
+    {
+        ConnectSlot(1);
+    }
+    private void SettingsS2ConnectCamera_Click(object sender,RoutedEventArgs e)
+    {
+        ConnectSlot(2);
+    }
+    private void SettingsS1DisconnectCamera_Click(object sender,RoutedEventArgs e)=>DisconnectSlot(1);
+    private void SettingsS2DisconnectCamera_Click(object sender,RoutedEventArgs e)=>DisconnectSlot(2);
+    private async void SettingsS1Scan_Click(object sender,RoutedEventArgs e)=>await ScanSlotAsync(1);
+    private async void SettingsS2Scan_Click(object sender,RoutedEventArgs e)=>await ScanSlotAsync(2);
+
+    private void SettingsS1Save_Click(object sender,RoutedEventArgs e)
+    {
+        _cam1.Model.IpText=SettingsS1CamIpBox.Text.Trim();
+        SaveSlot(1);
+        UpdateCameraSlotUi(1);
+        StatusText.Text="CAM 1 settings saved to profile";
+    }
+    private void SettingsS2Save_Click(object sender,RoutedEventArgs e)
+    {
+        _cam2.Model.IpText=SettingsS2CamIpBox.Text.Trim();
+        SaveSlot(2);
+        UpdateCameraSlotUi(2);
+        StatusText.Text="CAM 2 settings saved to profile";
     }
 
 
@@ -575,10 +622,17 @@ public partial class MainWindow : System.Windows.Window
 
     private async Task ScanSlotAsync(int slot)
     {
-        if(slot==1?_scanBusy1:_scanBusy2)return;
-        if(slot==1)_scanBusy1=true;else _scanBusy2=true;
         var controller=SlotController(slot);
         var model=controller.Model;
+        if (!AppHardwareCapabilities.AllowCameraHardware)
+        {
+            model.MarkOffline();
+            StatusText.Text = "CAM " + slot + ": SCAN INHIBITED IN OFFLINE CALIBRATION MODE";
+            UpdateCameraSlotUi(slot);
+            return;
+        }
+        if(slot==1?_scanBusy1:_scanBusy2)return;
+        if(slot==1)_scanBusy1=true;else _scanBusy2=true;
         int generation=model.ScanGeneration;
         CameraTransportMode mode=model.Mode;
         model.IpText=SlotIpBox(slot).Text.Trim();
@@ -594,8 +648,8 @@ public partial class MainWindow : System.Windows.Window
             if(model.ScanGeneration!=generation||model.Mode!=mode)return;
 
             var devices=result.Devices.ToList();
-            if(mode==CameraTransportMode.Ip&&CameraTransportPolicy.IsValidAddress(typedIp)&&
-               !SlotVendorIsBasler(slot))
+            string slotVendor=CameraSlotDefaults.DefaultVendor(slot);
+            if(CameraTransportPolicy.IsHikVendor(slotVendor)&&mode==CameraTransportMode.Ip&&CameraTransportPolicy.IsValidAddress(typedIp))
             {
                 var manual=ManualHikDevice(typedIp);
                 if(devices.All(d=>d.Key!=manual.Key))devices.Add(manual);
@@ -607,19 +661,16 @@ public partial class MainWindow : System.Windows.Window
 
             if(model.Selected is null&&model.FilteredDevices.Count>0)
             {
-                var chosen=model.AutoSelectForSlot(slot, SlotVendorIsBasler(slot) ? "Basler" : "Hikrobot");
+                var chosen=model.AutoSelectForSlot(slot, slotVendor);
                 if(chosen is not null)
                 {
                     if(mode==CameraTransportMode.Ip&&!string.IsNullOrWhiteSpace(chosen.Address))
                     {
                         SlotIpBox(slot).Text=chosen.Address;
                         model.IpText=chosen.Address;
+                        if(slot==1&&SettingsS1CamIpBox!=null)SettingsS1CamIpBox.Text=chosen.Address;
+                        else if(slot==2&&SettingsS2CamIpBox!=null)SettingsS2CamIpBox.Text=chosen.Address;
                     }
-                    SlotDeviceBox(slot).SelectedItem=chosen;
-                }
-                else
-                {
-                    SlotDeviceBox(slot).SelectedItem=null;
                 }
             }
 
@@ -649,22 +700,22 @@ public partial class MainWindow : System.Windows.Window
 
     private void ConnectSlot(int slot)
     {
+        if (!AppHardwareCapabilities.AllowCameraHardware)
+        {
+            StatusText.Text = "CAM " + slot + ": CONNECT INHIBITED IN OFFLINE CALIBRATION MODE";
+            return;
+        }
         var controller=SlotController(slot);
         var model=controller.Model;
         model.IpText=SlotIpBox(slot).Text.Trim();
 
-        if(model.Mode==CameraTransportMode.Ip&&CameraTransportPolicy.IsValidAddress(model.IpText)&&
+        string slotVendor=CameraSlotDefaults.DefaultVendor(slot);
+        if(CameraTransportPolicy.IsHikVendor(slotVendor)&&
+           model.Mode==CameraTransportMode.Ip&&CameraTransportPolicy.IsValidAddress(model.IpText)&&
            (model.Selected is null ||
-            (!SlotVendorIsBasler(slot) && CameraTransportPolicy.IsBaslerVendor(model.Selected.Vendor)) ||
-            (model.Selected.BackendIndex < 0 && model.Selected.Address != model.IpText)))
+            model.Selected.Address != model.IpText ||
+            CameraTransportPolicy.IsBaslerVendor(model.Selected.Vendor)))
         {
-            if(SlotVendorIsBasler(slot))
-            {
-                StatusText.Text="BASLER typed IP is not supported: SCAN REQUIRED. Scan in IP mode and select the discovered Basler camera.";
-                UpdateCameraSlotUi(slot);
-                return;
-            }
-
             var manual=ManualHikDevice(model.IpText);
             var merged=model.Devices.Where(d=>d.BackendIndex>=0).Append(manual).ToList();
             model.SetDevices(merged);
@@ -684,6 +735,14 @@ public partial class MainWindow : System.Windows.Window
         if(slot==1)StopVideo();
 
         string nic=SlotNicBox(slot).Text.Trim();
+        string resolvedNic=CameraTransportPolicy.ResolveCameraNic(model.IpText, nic);
+        if(string.IsNullOrWhiteSpace(nic)&&!string.IsNullOrWhiteSpace(resolvedNic))
+        {
+            SlotNicBox(slot).Text=resolvedNic;
+            nic=resolvedNic;
+            if(slot==1&&SettingsS1HostIpBox!=null)SettingsS1HostIpBox.Text=resolvedNic;
+            else if(slot==2&&SettingsS2HostIpBox!=null)SettingsS2HostIpBox.Text=resolvedNic;
+        }
         if(!controller.Connect(model.Selected!,model.Mode,model.IpText,nic,_cameraOwnership,out error))
         {
             StatusText.Text=error;
@@ -694,8 +753,16 @@ public partial class MainWindow : System.Windows.Window
         _paused=false;_timer.Start();
         if(slot==1)
         {
-            CameraIpBox.Text=model.IpText;
-            HostIpBox.Text=nic;
+            if(model.Mode==CameraTransportMode.Usb)
+            {
+                CameraIpBox.Text="N/A (USB)";
+                HostIpBox.Text="N/A (USB)";
+            }
+            else
+            {
+                CameraIpBox.Text=model.IpText;
+                HostIpBox.Text=nic;
+            }
             ResetDetectionHud();
         }
         UpdateCameraSlotUi(slot);
@@ -764,14 +831,15 @@ public partial class MainWindow : System.Windows.Window
         var color=DashBrush(shownFresh?"#39C7A2":
             hasIssues||model.State==CameraSlotState.Error||model.State==CameraSlotState.Lost?"#FF6E70":
             model.State==CameraSlotState.Offline?"#92AABE":"#F4BB45");
-        SlotStateText(slot).Text=state;
-        SlotStateText(slot).Foreground=color;
-        SlotModeBox(slot).IsEnabled=!open;
-        SlotVendorBox(slot).IsEnabled=!open;
+        bool isLive=slot==1?shownFresh:fresh;
+        string headerState=isLive?"LIVE":"OFFLINE";
+        var headerColor=DashBrush(isLive?"#39C7A2":"#92AABE");
+        SlotStateText(slot).Text=headerState;
+        SlotStateText(slot).Foreground=headerColor;
         SlotScanButton(slot).IsEnabled=!open&&(slot==1?!_scanBusy1:!_scanBusy2);
         SlotDisconnectButton(slot).IsEnabled=open;
 
-        string slotVendor=SlotVendorIsBasler(slot)?"Basler":"Hikrobot";
+        string slotVendor=CameraSlotDefaults.DefaultVendor(slot);
         string typedIp=SlotIpBox(slot).Text.Trim();
         string typedNic=SlotNicBox(slot).Text.Trim();
         bool manualEligible=CameraTransportPolicy.CanDispatchManualHik(model.Mode,slotVendor,typedIp,typedNic);
@@ -779,53 +847,65 @@ public partial class MainWindow : System.Windows.Window
         // CONNECT is offered for a selected dispatchable device, OR for fresh manual Hikrobot IP + explicit NIC without scan.
         bool canConnect=!open&&(
             (model.Selected is not null&&CameraTransportPolicy.CanDispatch(model.Selected,model.Mode,out _))||
-            (model.Selected is null&&manualEligible));
+            manualEligible);
         SlotConnectButton(slot).IsEnabled=canConnect;
-
-        bool showIp=model.Mode==CameraTransportMode.Ip;
-        if(slot==1)S1IpRow.Visibility=showIp?Visibility.Visible:Visibility.Collapsed;
-        else S2IpRow.Visibility=showIp?Visibility.Visible:Visibility.Collapsed;
+        if(slot==1)
+        {
+            if(SettingsS1CamLinkText!=null)
+            {
+                SettingsS1CamLinkText.Text=state;
+                SettingsS1CamLinkText.Foreground=color;
+            }
+            if(SettingsS1ConnectButton!=null)SettingsS1ConnectButton.IsEnabled=canConnect;
+            if(SettingsS1DisconnectButton!=null)SettingsS1DisconnectButton.IsEnabled=open;
+            if(SettingsS1ScanButton!=null)SettingsS1ScanButton.IsEnabled=!open&&!_scanBusy1;
+            if(SettingsS1DeviceBox!=null)
+            {
+                SettingsS1DeviceBox.IsEnabled=!open;
+                if(!Equals(SettingsS1DeviceBox.SelectedItem, model.Selected))
+                    SettingsS1DeviceBox.SelectedItem=model.Selected;
+            }
+            if(SettingsS1CamIpBox!=null&&SettingsS1CamIpBox.Text!=typedIp)
+                SettingsS1CamIpBox.Text=typedIp;
+            if(SettingsS1HostIpBox!=null&&SettingsS1HostIpBox.Text!=typedNic)
+                SettingsS1HostIpBox.Text=typedNic;
+        }
+        else
+        {
+            if(SettingsS2CamLinkText!=null)
+            {
+                SettingsS2CamLinkText.Text=state;
+                SettingsS2CamLinkText.Foreground=color;
+            }
+            if(SettingsS2ConnectButton!=null)SettingsS2ConnectButton.IsEnabled=canConnect;
+            if(SettingsS2DisconnectButton!=null)SettingsS2DisconnectButton.IsEnabled=open;
+            if(SettingsS2ScanButton!=null)SettingsS2ScanButton.IsEnabled=!open&&!_scanBusy2;
+            if(SettingsS2CamIpBox!=null&&SettingsS2CamIpBox.Text!=typedIp)
+                SettingsS2CamIpBox.Text=typedIp;
+            if(SettingsS2HostIpBox!=null&&SettingsS2HostIpBox.Text!=typedNic)
+                SettingsS2HostIpBox.Text=typedNic;
+        }
 
         string hint=model.State switch
         {
             CameraSlotState.Error=>model.LastError.Length>0?model.LastError:"SCAN ERROR",
-            CameraSlotState.Lost=>"NO FRAME",
+            CameraSlotState.Lost=>"NO FRAME · CONNECT IN SETTINGS",
             CameraSlotState.Scanning=>"SCANNING",
             CameraSlotState.Connecting=>"CONNECTING",
             CameraSlotState.Connected=>"CONNECTED · NO FRAME",
-            _=>"OFFLINE · SCAN / CONNECT"
+            _=>"OFFLINE · CONNECT IN SETTINGS"
         };
         if(!open&&scannedEmpty)
         {
             if(hasIssues)hint=model.ScanIssues[0].Summary;
-            else if(model.Mode==CameraTransportMode.Ip&&SlotVendorIsBasler(slot))
-                hint="SCAN REQUIRED · BASLER typed IP is not supported; scan the camera in IP mode";
             else if(model.Mode==CameraTransportMode.Usb)
-                hint="NO USB CAMERA · check the USB3 cable/port; Windows and pylon Viewer must list the camera";
+                hint="NO USB CAMERA · check USB connection";
             else
-                hint="NO IP CAMERA · check camera power/link on the camera NIC and SCAN again";
+                hint="NO IP CAMERA · check camera power/link on the camera NIC or SCAN/CONNECT in Settings";
         }
         if(slot==1)S1CamEmpty.Text=hint;else S2CamHint.Text=hint;
         SlotEmptyText(slot).Visibility=shownFresh?Visibility.Collapsed:Visibility.Visible;
 
-        // Diagnostics stay hidden unless a scan recorded a vendor or GVCP failure.
-        bool showDetails=hasIssues;
-        SlotDetailsExpander(slot).Visibility=showDetails?Visibility.Visible:Visibility.Collapsed;
-        if(showDetails)
-        {
-            SlotDetailsHeader(slot).Text=model.ScanIssues[0].Label;
-            var details=new StringBuilder();
-            foreach(var issue in model.ScanIssues)
-            {
-                details.Append(issue.Label).Append(" · ").Append(issue.Transport)
-                       .Append(" · ").Append(issue.ErrorType).AppendLine();
-                details.AppendLine(issue.Message);
-                if(!string.IsNullOrWhiteSpace(issue.Details))details.AppendLine(issue.Details);
-                details.AppendLine();
-            }
-            SlotDetailsText(slot).Text=details.ToString().Trim();
-        }
-        else SlotDetailsText(slot).Text="";
 
         if(slot==1)
         {
@@ -850,30 +930,38 @@ public partial class MainWindow : System.Windows.Window
 
     private void ConnectCameraIp_Click(object sender,RoutedEventArgs e)
     {
+        if(CameraTransportPolicy.IsBaslerVendor(CameraSlotDefaults.DefaultVendor(1)))
+        {
+            StatusText.Text="Station 01 Basler camera is USB only: IP connect is not supported. Use Settings to scan USB.";
+            return;
+        }
         _cam1.Model.Mode=CameraTransportMode.Ip;
-        S1ModeBox.SelectedIndex=ModeIndex(CameraTransportMode.Ip);
-        S1CamIpBox.Text=CameraIpBox.Text.Trim();
-        S1HostIpBox.Text=HostIpBox.Text.Trim();
+        if(SettingsS1CamIpBox!=null)SettingsS1CamIpBox.Text=CameraIpBox.Text.Trim();
+        if(SettingsS1HostIpBox!=null)SettingsS1HostIpBox.Text=HostIpBox.Text.Trim();
+        _cam1.Model.IpText=CameraIpBox.Text.Trim();
         ConnectSlot(1);
     }
     private void ConnectCamera_Click(object sender,RoutedEventArgs e)
     {
-        if(CameraPicker.SelectedItem is CameraInfo info)Connect(CameraInfoToDevice(info));
-        else StatusText.Text="Select a camera or enter an IP address.";
+        if(CameraPicker.SelectedItem is CameraDevice device)Connect(device);
+        else if(CameraPicker.SelectedItem is CameraInfo info)Connect(CameraInfoToDevice(info));
+        else StatusText.Text="Select a scanned camera from the picker.";
     }
     private void ConnectAll_Click(object sender,RoutedEventArgs e)=>ConnectCamera_Click(sender,e);
     private void Connect(CameraInfo info)=>Connect(CameraInfoToDevice(info));
 
     private void Connect(CameraDevice device)
     {
+        if(!device.Transport.Contains("USB",StringComparison.OrdinalIgnoreCase))
+        {
+            StatusText.Text="Station 01 Basler camera is USB only: "+device.Transport+" devices cannot be connected.";
+            return;
+        }
         var model=_cam1.Model;
-        model.Mode=device.Transport.Contains("USB",StringComparison.OrdinalIgnoreCase)
-            ?CameraTransportMode.Usb:CameraTransportMode.Ip;
-        S1ModeBox.SelectedIndex=ModeIndex(model.Mode);
+        model.Mode=CameraTransportMode.Usb;
         var merged=model.Devices.Where(d=>d.Key!=device.Key).Append(device).ToList();
         model.SetDevices(merged);
         model.SelectDevice(device.Key);
-        BindSlotDevices(1);
         ConnectSlot(1);
     }
 
@@ -947,11 +1035,225 @@ public partial class MainWindow : System.Windows.Window
         using var image=_cam2.CloneLatestFrame();
         if(image is null||image.Empty())return;
         _lastCam2Frame=id;
-        var bmp=BitmapSourceConverter.ToBitmapSource(image);
-        bmp.Freeze();
-        Station2Preview.Source=bmp;
-        Ov2CamImage.Source=bmp;
         _cam2.Model.MarkFrame(DateTime.UtcNow);
+
+        string sourceKey=Camera2Pipeline.BuildTrackerKey(_cam2.Model.Selected?.Key??_cam2.Model.IpText);
+        bool isCalibrated=Camera2Pipeline.IsCalibrationValid(_optionsCam2);
+
+        if(isCalibrated&&_trackingEnabled)
+        {
+            var tracker=GetTracker(sourceKey);
+            var result=Camera2Pipeline.ProcessFrame(
+                image,
+                sourceKey,
+                _optionsCam2,
+                _beltDirection,
+                tracker,
+                _s2TrayAllocator);
+
+            _lastCam2Result=result;
+            if(result.PlateDetected)
+            {
+                S2Detect.Text="PLATE OK";
+                S2Confidence.Text=result.Detection.Confidence.ToString("P0");
+                S2Track.Text=result.TrackId.HasValue?result.TrackId.Value.ToString():"--";
+                S2Pose.Text=result.BeltPose!=null
+                    ?$"X {result.BeltPose.Xmm:F1}   Y {result.BeltPose.Ymm:F1}   θ {result.BeltPose.ThetaDeg:F1}°"
+                    :"X --   Y --   θ --";
+                S2FrameQuality.Text="CAM 2 · VISION ONLY";
+
+                if(result.Allocation!=null&&result.Allocation.Success)
+                {
+                    S2Vertex.Text=$"Slot #{result.Allocation.Slot?.Index} (R{result.Allocation.Slot?.Row} C{result.Allocation.Slot?.Column})";
+                }
+
+                var focus=result.TrackId;
+                var indexToId=new Dictionary<int,int>();
+                if(result.TrackId.HasValue)indexToId[0]=result.TrackId.Value;
+                using var annotated=PlateDetector.DrawAll(image,[result.Detection],_optionsCam2,indexToId,focus);
+                var bmp=BitmapSourceConverter.ToBitmapSource(annotated);
+                bmp.Freeze();
+                Station2Preview.Source=bmp;
+                Ov2CamImage.Source=bmp;
+            }
+            else
+            {
+                S2Detect.Text="NO PLATE";
+                S2Confidence.Text="--";
+                S2Track.Text="--";
+                S2Pose.Text="X --   Y --   θ --";
+                S2FrameQuality.Text="CAM 2 · NO PLATE IN VIEW";
+                var bmp=BitmapSourceConverter.ToBitmapSource(image);
+                bmp.Freeze();
+                Station2Preview.Source=bmp;
+                Ov2CamImage.Source=bmp;
+            }
+        }
+        else
+        {
+            // Fail closed: display and audit NO pose
+            _lastCam2Result=null;
+            var bmp=BitmapSourceConverter.ToBitmapSource(image);
+            bmp.Freeze();
+            Station2Preview.Source=bmp;
+            Ov2CamImage.Source=bmp;
+            S2Track.Text="--";
+            S2Detect.Text=isCalibrated?"DETECT OFF":"NOT CALIBRATED";
+            S2Confidence.Text="--";
+            S2Pose.Text="X --   Y --   θ --";
+            S2FrameQuality.Text=isCalibrated
+                ?"CAM 2 · ACQUISITION ONLY"
+                :"CAM 2 · UNCALIBRATED (FAIL CLOSED)";
+        }
+    }
+
+    public bool TryApplyStation2OfflineConfig(VisionOptions options,TrayLayoutConfig? trayConfig,out string error)
+    {
+        if(trayConfig==null)
+        {
+            error="CAM2 offline tray layout configuration is required (no null tray layout permitted).";
+            return false;
+        }
+        VisionOptions targetOpt=_optionsCam2;
+        OfflineTrayAllocator? targetAlloc=_s2TrayAllocator;
+        if(!Camera2Pipeline.TryApplyOfflineConfig(ref targetOpt,ref targetAlloc,options,trayConfig,out error))
+        {
+            return false;
+        }
+
+        // Commit all state atomically only after successful construction and validation
+        _optionsCam2=targetOpt;
+        _s2TrayAllocator=targetAlloc;
+        _lastCam2Result=null;
+        return true;
+    }
+
+    public void ConfigureStation2Calibration(VisionOptions options,TrayLayoutConfig? trayConfig=null)
+    {
+        if(!TryApplyStation2OfflineConfig(options,trayConfig,out string err))
+            throw new ArgumentException(err);
+    }
+
+    private void SettingsS2ApplyConfig_Click(object sender,RoutedEventArgs e)
+    {
+        try
+        {
+            // All inputs must be non-blank and explicitly specified (no implicit defaults)
+            if(string.IsNullOrWhiteSpace(SettingsS2ScaleBox.Text))
+                throw new ArgumentException("Scale (mm/px) must not be blank.");
+            double scale=GetNumber(SettingsS2ScaleBox.Text,"scale mm/pixel");
+
+            if(string.IsNullOrWhiteSpace(SettingsS2OriginXBox.Text))
+                throw new ArgumentException("Origin X (px) must not be blank.");
+            double originX=GetNumber(SettingsS2OriginXBox.Text,"originX");
+
+            if(string.IsNullOrWhiteSpace(SettingsS2OriginYBox.Text))
+                throw new ArgumentException("Origin Y (px) must not be blank.");
+            double originY=GetNumber(SettingsS2OriginYBox.Text,"originY");
+
+            if(string.IsNullOrWhiteSpace(SettingsS2OffsetXBox.Text))
+                throw new ArgumentException("Offset X (mm) must not be blank.");
+            double offsetX=GetNumber(SettingsS2OffsetXBox.Text,"offsetX");
+
+            if(string.IsNullOrWhiteSpace(SettingsS2OffsetYBox.Text))
+                throw new ArgumentException("Offset Y (mm) must not be blank.");
+            double offsetY=GetNumber(SettingsS2OffsetYBox.Text,"offsetY");
+
+            if(string.IsNullOrWhiteSpace(SettingsS2HolePitchBox.Text))
+                throw new ArgumentException("Hole pitch (mm) must not be blank.");
+            double holePitch=GetNumber(SettingsS2HolePitchBox.Text,"hole pitch mm");
+
+            if(string.IsNullOrWhiteSpace(SettingsS2PlateSizeBox.Text))
+                throw new ArgumentException("Plate size (mm) must not be blank.");
+            double plateSize=GetNumber(SettingsS2PlateSizeBox.Text,"plate size mm");
+
+            if(!Camera2Pipeline.TryCreateCalibrationOptions(scale,originX,originY,offsetX,offsetY,holePitch,plateSize,out var calibOpt,out var calibErr))
+                throw new ArgumentException(calibErr);
+
+            // Tray layout parameters are mandatory (no null trayConfig success path)
+            if(string.IsNullOrWhiteSpace(SettingsS2TrayRowsBox.Text))
+                throw new ArgumentException("Tray rows must not be blank.");
+            if(string.IsNullOrWhiteSpace(SettingsS2TrayColsBox.Text))
+                throw new ArgumentException("Tray columns must not be blank.");
+            if(string.IsNullOrWhiteSpace(SettingsS2TrayPitchXBox.Text))
+                throw new ArgumentException("Tray pitch X must not be blank.");
+            if(string.IsNullOrWhiteSpace(SettingsS2TrayPitchYBox.Text))
+                throw new ArgumentException("Tray pitch Y must not be blank.");
+            if(string.IsNullOrWhiteSpace(SettingsS2TrayOriginXBox.Text))
+                throw new ArgumentException("Tray origin X must not be blank.");
+            if(string.IsNullOrWhiteSpace(SettingsS2TrayOriginYBox.Text))
+                throw new ArgumentException("Tray origin Y must not be blank.");
+            if(string.IsNullOrWhiteSpace(SettingsS2TrayAngleBox.Text))
+                throw new ArgumentException("Tray angle must not be blank.");
+            if(string.IsNullOrWhiteSpace(SettingsS2TrayBoundMinXBox.Text))
+                throw new ArgumentException("Workspace Min X must not be blank.");
+            if(string.IsNullOrWhiteSpace(SettingsS2TrayBoundMaxXBox.Text))
+                throw new ArgumentException("Workspace Max X must not be blank.");
+            if(string.IsNullOrWhiteSpace(SettingsS2TrayBoundMinYBox.Text))
+                throw new ArgumentException("Workspace Min Y must not be blank.");
+            if(string.IsNullOrWhiteSpace(SettingsS2TrayBoundMaxYBox.Text))
+                throw new ArgumentException("Workspace Max Y must not be blank.");
+
+            if(!int.TryParse(SettingsS2TrayRowsBox.Text.Trim(),NumberStyles.Integer,CultureInfo.InvariantCulture,out int rows)||rows<=0)
+                throw new ArgumentException("Tray rows must be a positive integer (> 0).");
+            if(!int.TryParse(SettingsS2TrayColsBox.Text.Trim(),NumberStyles.Integer,CultureInfo.InvariantCulture,out int cols)||cols<=0)
+                throw new ArgumentException("Tray columns must be a positive integer (> 0).");
+
+            double pitchX=GetNumber(SettingsS2TrayPitchXBox.Text,"tray pitchX");
+            double pitchY=GetNumber(SettingsS2TrayPitchYBox.Text,"tray pitchY");
+            double trayOx=GetNumber(SettingsS2TrayOriginXBox.Text,"tray originX");
+            double trayOy=GetNumber(SettingsS2TrayOriginYBox.Text,"tray originY");
+            double trayAngle=GetNumber(SettingsS2TrayAngleBox.Text,"tray angle");
+            double minX=GetNumber(SettingsS2TrayBoundMinXBox.Text,"workspace MinX");
+            double maxX=GetNumber(SettingsS2TrayBoundMaxXBox.Text,"workspace MaxX");
+            double minY=GetNumber(SettingsS2TrayBoundMinYBox.Text,"workspace MinY");
+            double maxY=GetNumber(SettingsS2TrayBoundMaxYBox.Text,"workspace MaxY");
+
+            var bounds=new TrayWorkspaceBounds(minX,maxX,minY,maxY);
+            if(!bounds.IsValid)
+                throw new ArgumentException($"Invalid workspace bounds: MinX({minX:F1}) < MaxX({maxX:F1}) and MinY({minY:F1}) < MaxY({maxY:F1}) required.");
+
+            // Apply atomically: if anything fails, prior state is untouched
+            VisionOptions targetOpt=_optionsCam2;
+            OfflineTrayAllocator? targetAlloc=_s2TrayAllocator;
+            if(!Camera2Pipeline.TryCreateAndApplyOfflineConfig(
+                ref targetOpt,ref targetAlloc,
+                scale,originX,originY,offsetX,offsetY,holePitch,plateSize,
+                rows,cols,pitchX,pitchY,trayOx,trayOy,trayAngle,bounds,
+                out var applyErr))
+            {
+                throw new InvalidOperationException(applyErr);
+            }
+
+            _optionsCam2=targetOpt;
+            _s2TrayAllocator=targetAlloc;
+            _lastCam2Result=null;
+
+            if(SettingsS2CalibSummary!=null)
+                SettingsS2CalibSummary.Text=FormattableString.Invariant($"{scale:F4} mm/px (OFFLINE)");
+            if(SettingsS2TraySummary!=null&&_s2TrayAllocator!=null)
+                SettingsS2TraySummary.Text=FormattableString.Invariant($"{rows}x{cols} ({pitchX}x{pitchY}mm, OFFLINE)");
+            StatusText.Text="CAM 2 offline calibration & tray configuration applied successfully.";
+        }
+        catch(Exception ex)
+        {
+            StatusText.Text="CAM 2 Config Error: "+ex.Message;
+        }
+    }
+
+    private void SettingsS2ClearConfig_Click(object sender,RoutedEventArgs e)
+    {
+        _optionsCam2.FixedMmPerPixel=0;
+        _s2TrayAllocator=null;
+        _lastCam2Result=null;
+        if(SettingsS2CalibSummary!=null)SettingsS2CalibSummary.Text="NOT CONFIGURED (FAIL CLOSED)";
+        if(SettingsS2TraySummary!=null)SettingsS2TraySummary.Text="NOT CONFIGURED (FAIL CLOSED)";
+        StatusText.Text="CAM 2 reset to fail closed / uncalibrated.";
+    }
+
+    public void ResetStation2Tray()
+    {
+        _s2TrayAllocator?.ResetTray();
     }
     private MidlineTracker GetTracker(string source)
     {
@@ -1255,7 +1557,7 @@ public partial class MainWindow : System.Windows.Window
     }
     private async void OnAdsTick(object? sender,EventArgs e)
     {
-        if(_adsPolling)return;
+        if(_adsPolling || !AppHardwareCapabilities.AllowAdsPolling)return;
         _adsPolling=true;
         try
         {
@@ -1294,7 +1596,11 @@ public partial class MainWindow : System.Windows.Window
     {
         // Deliberately separate from START and automatic midline triggers.
         // One frozen VIDEO pose -> safety-gated TwinCAT BENCH FIFO only.
-        if(_closing)return;
+        if(_closing || !AppHardwareCapabilities.AllowAdsWrites)
+        {
+            AdsStatus.Text="ADS TRANSFER INHIBITED: Hardware writes are disabled in offline calibration mode.";
+            return;
+        }
         if(_singleBenchCts!=null){
             AdsStatus.Text="One frame is being sent; wait before trying again.";
             return;
@@ -1359,6 +1665,13 @@ public partial class MainWindow : System.Windows.Window
     private void BenchQueue_Click(object sender,RoutedEventArgs e)
     {
         if(!IsLoaded)return;
+        if (!AppHardwareCapabilities.AllowAdsWrites)
+        {
+            BenchQueueBox.IsChecked = false;
+            DisarmBench();
+            AdsStatus.Text = "BENCH INHIBITED: Hardware writes are disabled in offline calibration mode.";
+            return;
+        }
         if(BenchQueueBox.IsChecked!=true){DisarmBench();AdsStatus.Text="Bench auto queue DISARMED";return;}
         try
         {

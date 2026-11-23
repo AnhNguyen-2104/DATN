@@ -20,37 +20,29 @@ public enum CameraTransportMode
 /// <summary>Station defaults and legacy persistence migration; Auto no longer exists.</summary>
 public static class CameraSlotDefaults
 {
-    /// <summary>Both Station 1 (Basler) and Station 2 (Hikrobot) default to IP.</summary>
+    /// <summary>Station 1 defaults to USB (Basler); Station 2 defaults to IP (Hikrobot GigE).</summary>
     public static CameraTransportMode DefaultMode(int slot) =>
-        CameraTransportMode.Ip;
+        slot == 1 ? CameraTransportMode.Usb : CameraTransportMode.Ip;
 
-    /// <summary>Both Station 1 and Station 2 default to Hikrobot.</summary>
+    /// <summary>Station 1 defaults to Basler; Station 2 defaults to Hikrobot.</summary>
     public static string DefaultVendor(int slot) =>
-        "Hikrobot";
+        slot == 1 ? "Basler" : "Hikrobot";
 
-    /// <summary>Saved USB/IP survive; legacy "Auto", null, blank and invalid values become the station default.</summary>
+    /// <summary>
+    /// Station 1 defaults and migrates strictly to USB (Basler USB only).
+    /// Station 2 defaults and migrates to IP (Hikrobot GigE).
+    /// </summary>
     public static CameraTransportMode MigrateMode(string? saved, int slot)
     {
+        if (slot == 1) return CameraTransportMode.Usb;
         string value = (saved ?? string.Empty).Trim();
-
-        if (value.Equals("Usb", StringComparison.OrdinalIgnoreCase)) return CameraTransportMode.Usb;
         if (value.Equals("Ip", StringComparison.OrdinalIgnoreCase)) return CameraTransportMode.Ip;
-
         return DefaultMode(slot);
     }
 
-    /// <summary>Saved Basler/Hikrobot survive; legacy, null, blank and invalid values become the station default.</summary>
-    public static string MigrateVendor(string? saved, int slot)
-    {
-        string value = (saved ?? string.Empty).Trim();
-
-        if (value.Equals("Basler", StringComparison.OrdinalIgnoreCase)) return "Basler";
-        if (value.Equals("Hikrobot", StringComparison.OrdinalIgnoreCase) ||
-            value.Equals("Hikvision", StringComparison.OrdinalIgnoreCase)) return "Hikrobot";
-
-        return DefaultVendor(slot);
-    }
-
+    /// <summary>Station 1 defaults to Basler; Station 2 defaults to Hikrobot. Saved values migrate per slot policy.</summary>
+    public static string MigrateVendor(string? saved, int slot) =>
+        DefaultVendor(slot);
     /// <summary>Checks whether a device key matches the vendor (Basler vs Hikrobot/Hikvision).</summary>
     public static bool IsKeyCompatibleWithVendor(string? deviceKey, string vendor)
     {
@@ -91,19 +83,41 @@ public static class CameraSlotDefaults
         CameraTransportMode mode = MigrateMode(savedMode, slot);
         string ip;
 
-        if (IsKeyCompatibleWithVendor(key, vendor) && CameraTransportPolicy.IsValidAddress(rawIp))
+        bool hasValidManualIp = CameraTransportPolicy.IsValidAddress(rawIp);
+        bool keyMatches = IsKeyCompatibleWithVendor(key, vendor);
+
+        if (CameraTransportPolicy.IsBaslerVendor(vendor))
         {
-            ip = rawIp;
+            // Basler Station 01 is USB only. USB cameras do not use IP or NIC addressing.
+            // Direct manual IP dispatch is not supported; USB requires a genuine scanned device key.
+            ip = string.Empty;
+            nic = string.Empty;
+            if (!keyMatches)
+            {
+                key = string.Empty;
+            }
         }
         else
         {
-            ip = string.Empty;
-        }
+            // Hikrobot / Hikvision supports direct manual IP with synthesized key when address is valid
+            if ((keyMatches || (string.IsNullOrEmpty(key) && hasValidManualIp)) && hasValidManualIp)
+            {
+                ip = rawIp;
+                if (string.IsNullOrEmpty(key) && hasValidManualIp)
+                {
+                    key = "HIKVISION|IP:" + rawIp;
+                }
+            }
+            else
+            {
+                ip = string.Empty;
+            }
 
-        if (!IsKeyCompatibleWithVendor(key, vendor))
-        {
-            key = string.Empty;
-            ip = string.Empty;
+            if (!keyMatches && !(string.IsNullOrEmpty(savedDeviceKey) && hasValidManualIp))
+            {
+                key = string.Empty;
+                ip = string.Empty;
+            }
         }
 
         // Clear duplicate keys across slots
@@ -126,6 +140,90 @@ public static class CameraSlotDefaults
         }
 
         return (mode, ip, nic, key, vendor);
+    }
+
+    /// <summary>
+    /// Deterministically normalizes a full dictionary of slot settings in numerical order (1, 2, ...).
+    /// Ensures invalid/incompatible legacy entries on slot 1 do not poison claimed keys or IPs for slot 2.
+    /// </summary>
+    public static Dictionary<string, (CameraTransportMode Mode, string Ip, string Nic, string DeviceKey, string Vendor)> NormalizeDictionary(
+        IDictionary<string, (string Mode, string Ip, string Nic, string DeviceKey, string? Vendor)> all)
+    {
+        var result = new Dictionary<string, (CameraTransportMode Mode, string Ip, string Nic, string DeviceKey, string Vendor)>(StringComparer.OrdinalIgnoreCase);
+        var claimedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var claimedIps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var orderedKeys = all.Keys.OrderBy(k => int.TryParse(k, out int n) ? n : 999).ToList();
+        foreach (var key in orderedKeys)
+        {
+            int slot = int.TryParse(key, out int n) ? n : 1;
+            var raw = all[key];
+            result[key] = NormalizeSlot(slot, raw.Mode, raw.Ip, raw.Nic, raw.DeviceKey, raw.Vendor, claimedKeys, claimedIps);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Resolves the device key, IP, and NIC to save for a slot:
+    /// - If a device is currently selected, uses its key.
+    /// - If Hikrobot and manual IP is valid, synthesizes a direct Hik key.
+    /// - If Basler and no device is currently selected (e.g. before scan), preserves an existing valid persisted Basler key
+    ///   if the IP was not changed to a different address, avoiding erasing valid configuration.
+    /// </summary>
+    public static (string DeviceKey, string Ip, string Nic) ResolveKeyForSave(
+        int slot,
+        string vendor,
+        CameraDevice? selectedDevice,
+        string inputIp,
+        string inputNic,
+        string persistedKey,
+        string persistedIp,
+        string persistedNic)
+    {
+        string ip = (inputIp ?? string.Empty).Trim();
+        string nic = (inputNic ?? string.Empty).Trim();
+
+        if (CameraTransportPolicy.IsBaslerVendor(vendor))
+        {
+            // Basler Station 01 is USB only: no IP or NIC addressing.
+            if (selectedDevice is not null)
+            {
+                return (selectedDevice.Key, string.Empty, string.Empty);
+            }
+
+            string pKey = (persistedKey ?? string.Empty).Trim();
+            if (IsKeyCompatibleWithVendor(pKey, vendor))
+            {
+                return (pKey, string.Empty, string.Empty);
+            }
+
+            return (string.Empty, string.Empty, string.Empty);
+        }
+
+        if (selectedDevice is not null)
+        {
+            return (selectedDevice.Key, ip, nic);
+        }
+
+        if (CameraTransportPolicy.IsHikVendor(vendor))
+        {
+            string pKey = (persistedKey ?? string.Empty).Trim();
+            string pIp = (persistedIp ?? string.Empty).Trim();
+
+            if (!string.IsNullOrWhiteSpace(pKey) &&
+                IsKeyCompatibleWithVendor(pKey, vendor) &&
+                (string.IsNullOrWhiteSpace(ip) || string.Equals(ip, pIp, StringComparison.OrdinalIgnoreCase)))
+            {
+                string resolvedIp = string.IsNullOrWhiteSpace(ip) ? pIp : ip;
+                return (pKey, resolvedIp, nic);
+            }
+
+            string hikKey = CameraTransportPolicy.IsValidAddress(ip) ? "HIKVISION|IP:" + ip : string.Empty;
+            return (hikKey, ip, nic);
+        }
+
+        return (string.Empty, ip, nic);
     }
 }
 
@@ -530,8 +628,8 @@ public static class CameraTransportPolicy
         if (mode != CameraTransportMode.Ip) return false;
         if (!IsHikVendor(vendor)) return false;
         if (!IsValidIpv4(cameraIp)) return false;
-        if (!IsValidIpv4(nicText)) return false;
-        return true;
+        if (!string.IsNullOrWhiteSpace(nicText)) return IsValidIpv4(nicText);
+        return ResolveCameraNic(cameraIp, nicText).Length > 0;
     }
 
     /// <summary>
@@ -595,6 +693,32 @@ public static class CameraTransportPolicy
         return name.Contains("TWINCAT") || name.Contains("ETHERCAT") || name.Contains("PLC") ||
                name.Contains("TAILSCALE") || name.Contains("LOOPBACK") || name.Contains("WSL") ||
                name.Contains("HYPER-V") || name.Contains("VMWARE") || name.Contains("VIRTUALBOX");
+    }
+
+    /// <summary>Detects Pylon or GenICam messages indicating exclusive device ownership by another client.</summary>
+    public static bool IsExclusiveDeviceLockError(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return false;
+        return message.Contains("exclusively opened", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("exclusive", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("exclus", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Concise operator-facing instruction for exclusive lock without raw driver paths or truncation.</summary>
+    public static string FormatExclusiveLockError(int slot = 1) =>
+        slot == 1
+            ? "Station 01 Basler is locked by another client. Close pylon Viewer/MVS before SCAN USB -> CONNECT."
+            : $"Station {slot:D2} camera is locked by another client. Close pylon Viewer/MVS before SCAN -> CONNECT.";
+
+    /// <summary>Formats connect exceptions, mapping exclusive locks to actionable instructions and clamping length.</summary>
+    public static string FormatConnectError(int slot, Exception ex)
+    {
+        if (ex is null) return string.Empty;
+        if (IsExclusiveDeviceLockError(ex.Message))
+            return FormatExclusiveLockError(slot);
+
+        string message = ex.Message.Replace("\r", " ").Replace("\n", " ").Trim();
+        return message.Length <= 160 ? message : message[..160];
     }
 }
 
@@ -784,7 +908,7 @@ public sealed class CameraSlotModel
 
     /// <summary>
     /// Auto-selects for a given station slot:
-    /// Defaults to Hikrobot on both stations; preserves Basler when preferredVendor is explicitly Basler.
+    /// Station 1 defaults to Basler; Station 2 defaults to Hikrobot.
     /// Returns the selected device, or null if unassigned.
     /// </summary>
     public CameraDevice? AutoSelectForSlot(int slot, string? preferredVendor = null)

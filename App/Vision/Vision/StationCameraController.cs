@@ -52,26 +52,37 @@ public sealed class StationCameraController : IDisposable
 
         try
         {
-            if (mode == CameraTransportMode.Usb)
+            if (_slot == 1)
             {
-                EnumerateHik(devices, issues, CameraTransportType.Usb, "USB");
                 EnumerateBasler(devices, issues, BaslerSdk.CameraTransportType.Usb, "USB");
             }
             else
             {
-                EnumerateHik(devices, issues, CameraTransportType.GigE, "GigE");
-                EnumerateBasler(devices, issues, BaslerSdk.CameraTransportType.GigE, "GigE");
-                DiscoverGvcp(devices, issues, ipText, nicText);
+                if (mode == CameraTransportMode.Usb)
+                {
+                    EnumerateHik(devices, issues, CameraTransportType.Usb, "USB");
+                }
+                else
+                {
+                    EnumerateHik(devices, issues, CameraTransportType.GigE, "GigE");
+                    DiscoverGvcp(devices, issues, ipText, nicText);
+                }
             }
         }
         catch (Exception ex)
         {
-            issues.Add(CreateIssue("Camera", mode == CameraTransportMode.Usb ? "USB" : "GigE", ex));
+            string vendor = _slot == 1 ? "Basler" : "Hikrobot";
+            string transportLabel = _slot == 1 ? "USB" : (mode == CameraTransportMode.Usb ? "USB" : "GigE");
+            issues.Add(CreateIssue(vendor, transportLabel, ex));
         }
 
         foreach (CameraScanIssue issue in issues) LogScanIssue(mode, issue);
 
-        return new CameraScanResult(DedupeSdkFirst(devices), issues);
+        string slotVendor = CameraSlotDefaults.DefaultVendor(_slot);
+        var slotDevices = devices.Where(d =>
+            CameraSlotDefaults.IsKeyCompatibleWithVendor(d.Key, slotVendor) &&
+            (_slot != 1 || d.Transport.Equals("USB", StringComparison.OrdinalIgnoreCase))).ToList();
+        return new CameraScanResult(DedupeSdkFirst(slotDevices), issues);
     }
 
     private static void EnumerateHik(List<CameraDevice> devices, List<CameraScanIssue> issues,
@@ -112,7 +123,6 @@ public sealed class StationCameraController : IDisposable
             service?.Dispose();
         }
     }
-
     private static void EnumerateBasler(List<CameraDevice> devices, List<CameraScanIssue> issues,
         BaslerSdk.CameraTransportType transport, string label)
     {
@@ -123,7 +133,10 @@ public sealed class StationCameraController : IDisposable
             service.Enumerate(transport);
             if (!string.IsNullOrWhiteSpace(service.LastError))
             {
-                issues.Add(new CameraScanIssue("Basler", label, "PylonSdkError", service.LastError,
+                string issueMsg = CameraTransportPolicy.IsExclusiveDeviceLockError(service.LastError)
+                    ? CameraTransportPolicy.FormatExclusiveLockError(1)
+                    : service.LastError;
+                issues.Add(new CameraScanIssue("Basler", label, "PylonSdkError", issueMsg,
                     service.LastErrorDetails));
             }
 
@@ -151,6 +164,7 @@ public sealed class StationCameraController : IDisposable
             service?.Dispose();
         }
     }
+
 
     private void DiscoverGvcp(List<CameraDevice> devices, List<CameraScanIssue> issues, string ipText, string nicText)
     {
@@ -185,7 +199,10 @@ public sealed class StationCameraController : IDisposable
     {
         string details = "HRESULT=0x" + ex.HResult.ToString("X8", CultureInfo.InvariantCulture) +
                          Environment.NewLine + ex;
-        return new CameraScanIssue(vendor, transport, ex.GetType().Name, Terse(ex), details);
+        string message = CameraTransportPolicy.IsExclusiveDeviceLockError(ex.Message)
+            ? CameraTransportPolicy.FormatExclusiveLockError(1)
+            : Terse(ex);
+        return new CameraScanIssue(vendor, transport, ex.GetType().Name, message, details);
     }
 
     private static string TerseText(string? text, int limit)
@@ -263,8 +280,20 @@ public sealed class StationCameraController : IDisposable
         error = "";
         if (device is null) { error = "Select a camera device"; return false; }
 
-        if (!CameraTransportPolicy.CanDispatch(device, mode, out error)) return false;
+        string expectedVendor = CameraSlotDefaults.DefaultVendor(_slot);
+        if (!CameraSlotDefaults.IsKeyCompatibleWithVendor(device.Key, expectedVendor))
+        {
+            error = "Station " + _slot.ToString("D2") + " camera is " + expectedVendor + " only: " +
+                    (string.IsNullOrWhiteSpace(device.Vendor) ? "unknown" : device.Vendor) + " devices cannot be connected";
+            return false;
+        }
 
+        if (_slot == 1 && !device.Transport.Contains("USB", StringComparison.OrdinalIgnoreCase))
+        {
+            error = "Station 01 Basler camera is USB only: " + device.Transport + " devices cannot be connected";
+            return false;
+        }
+        if (!CameraTransportPolicy.CanDispatch(device, mode, out error)) return false;
         string typedAddress = (ipText ?? string.Empty).Trim();
         string dispatchAddress = device.BackendIndex == -2 && !string.IsNullOrWhiteSpace(device.Address)
             ? device.Address.Trim()
@@ -373,8 +402,9 @@ public sealed class StationCameraController : IDisposable
         {
             LastSdkError = ex.Message;
             RegistryRelease(registry);
-            lock (_gate) { DisposeSource(); Model.MarkError(Terse(ex)); }
-            error = Terse(ex);
+            string formatted = FormatConnectError(_slot, ex);
+            lock (_gate) { DisposeSource(); Model.MarkError(formatted); }
+            error = formatted;
             return false;
         }
     }
@@ -384,6 +414,9 @@ public sealed class StationCameraController : IDisposable
         // The slot owns nothing else; releasing here also covers a failed half-open.
         registry.Release(_slot);
     }
+
+    public static string FormatConnectError(int slot, Exception ex) =>
+        CameraTransportPolicy.FormatConnectError(slot, ex);
 
     private static string Terse(Exception ex)
     {
@@ -467,19 +500,11 @@ public static class CameraSlotSettingsStore
             var all = JsonSerializer.Deserialize<Dictionary<string, SlotSetting>>(File.ReadAllText(FilePath));
             if (all is null) return (defaultMode, "", "", "", defaultVendor);
 
-            var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var claimedIps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var normalizedAll = new Dictionary<string, (CameraTransportMode Mode, string Ip, string Nic, string DeviceKey, string Vendor)>();
-            var orderedKeys = all.Keys.OrderBy(k => int.TryParse(k, out int n) ? n : 99).ToList();
+            var rawDict = all.ToDictionary(
+                kv => kv.Key,
+                kv => (kv.Value.Mode, kv.Value.Ip, kv.Value.Nic, kv.Value.DeviceKey, kv.Value.Vendor));
 
-            foreach (var key in orderedKeys)
-            {
-                int s = int.TryParse(key, out int n) ? n : 1;
-                var setting = all[key];
-                normalizedAll[key] = CameraSlotDefaults.NormalizeSlot(
-                    s, setting.Mode, setting.Ip, setting.Nic, setting.DeviceKey, setting.Vendor, claimed, claimedIps);
-            }
-
+            var normalizedAll = CameraSlotDefaults.NormalizeDictionary(rawDict);
             string slotKey = slot.ToString(CultureInfo.InvariantCulture);
             if (!normalizedAll.TryGetValue(slotKey, out var normalized))
                 return (defaultMode, "", "", "", defaultVendor);
@@ -500,24 +525,25 @@ public static class CameraSlotSettingsStore
                 ? JsonSerializer.Deserialize<Dictionary<string, SlotSetting>>(File.ReadAllText(FilePath)) ?? new()
                 : new();
 
-            var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var claimedIps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var kv in all)
+            string slotKey = slot.ToString(CultureInfo.InvariantCulture);
+            if (string.IsNullOrWhiteSpace(vendor)) vendor = CameraSlotDefaults.DefaultVendor(slot);
+
+            all[slotKey] = new SlotSetting(mode.ToString(), ip, nic, deviceKey, vendor);
+
+            var rawDict = all.ToDictionary(
+                kv => kv.Key,
+                kv => (kv.Value.Mode, kv.Value.Ip, kv.Value.Nic, kv.Value.DeviceKey, kv.Value.Vendor));
+
+            var normalized = CameraSlotDefaults.NormalizeDictionary(rawDict);
+
+            var toPersist = new Dictionary<string, SlotSetting>();
+            foreach (var kv in normalized)
             {
-                if (kv.Key != slot.ToString(CultureInfo.InvariantCulture))
-                {
-                    if (!string.IsNullOrWhiteSpace(kv.Value.DeviceKey))
-                        claimed.Add(kv.Value.DeviceKey.Trim().ToUpperInvariant());
-                    if (!string.IsNullOrWhiteSpace(kv.Value.Ip))
-                        claimedIps.Add(kv.Value.Ip.Trim());
-                }
+                toPersist[kv.Key] = new SlotSetting(kv.Value.Mode.ToString(), kv.Value.Ip, kv.Value.Nic, kv.Value.DeviceKey, kv.Value.Vendor);
             }
 
-            var norm = CameraSlotDefaults.NormalizeSlot(slot, mode.ToString(), ip, nic, deviceKey, vendor, claimed, claimedIps);
-            all[slot.ToString(CultureInfo.InvariantCulture)] =
-                new SlotSetting(norm.Mode.ToString(), norm.Ip, norm.Nic, norm.DeviceKey, norm.Vendor);
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all));
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(toPersist));
         }
         catch
         {

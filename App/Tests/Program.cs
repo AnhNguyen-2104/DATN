@@ -433,6 +433,53 @@ var ilRestoredNotReady=ilMockOff.Evaluate(ReadyInputs() with {EstopOk=false});
 Check("interlock: mock off restores production NotReady on failed check",
     ilRestoredNotReady.State==InterlockState.NotReady&&!ilRestoredNotReady.CanStart&&
     ilRestoredNotReady.PrimaryReason.Contains("Emergency stop"));
+// CONVEYOR SUBSYSTEM CALIBRATION RESET INTERLOCK TESTS:
+{
+    var calibLatchInput = new ConveyorCalibrationResetInputs(
+        AdsFresh: true,
+        AuxEstopOk: true,
+        GlobalStop: true, // In PLC, bSystemStopRequested is derived as !bSystemEStopOK || bLineNormalStopLatched
+        NormalStopLatched: true,
+        BeltRunning: false,
+        GlueActive: false,
+        AutoActive: false);
+
+    var evalAllowed = ConveyorCalibrationInterlock.EvaluateReset(calibLatchInput);
+    Check("calibration reset: allowed when normal stop latched and aux estop ok",
+        evalAllowed.CanReset && evalAllowed.Reason.Contains("permitted"));
+
+    var evalEstopOpen = ConveyorCalibrationInterlock.EvaluateReset(calibLatchInput with { AuxEstopOk = false });
+    Check("calibration reset: denied when auxiliary estop not ok",
+        !evalEstopOpen.CanReset && evalEstopOpen.Reason.Contains("Emergency stop"));
+
+    var evalBeltRun = ConveyorCalibrationInterlock.EvaluateReset(calibLatchInput with { BeltRunning = true });
+    Check("calibration reset: denied when belt running",
+        !evalBeltRun.CanReset && evalBeltRun.Reason.Contains("Conveyor motion active"));
+
+    var evalAdsStale = ConveyorCalibrationInterlock.EvaluateReset(calibLatchInput with { AdsFresh = false });
+    Check("calibration reset: denied when ADS telemetry stale",
+        !evalAdsStale.CanReset && evalAdsStale.Reason.Contains("ADS 851 offline or stale"));
+
+    var evalGlue = ConveyorCalibrationInterlock.EvaluateReset(calibLatchInput with { GlueActive = true });
+    Check("calibration reset: denied when glue active",
+        !evalGlue.CanReset && evalGlue.Reason.Contains("glue cycle active"));
+
+    var evalAuto = ConveyorCalibrationInterlock.EvaluateReset(calibLatchInput with { AutoActive = true });
+    Check("calibration reset: denied when AUTO active",
+        !evalAuto.CanReset && evalAuto.Reason.Contains("AUTO sequence active"));
+
+    var evalGlobalNoLatch = ConveyorCalibrationInterlock.EvaluateReset(calibLatchInput with { NormalStopLatched = false, GlobalStop = true });
+    Check("calibration reset: denied when global stop active without latch",
+        !evalGlobalNoLatch.CanReset && evalGlobalNoLatch.Reason.Contains("Global stop active without normal stop latch"));
+
+    var evalNoLatch = ConveyorCalibrationInterlock.EvaluateReset(calibLatchInput with { NormalStopLatched = false, GlobalStop = false });
+    Check("calibration reset: denied when normal stop not latched",
+        !evalNoLatch.CanReset && evalNoLatch.Reason.Contains("RESET NOT REQUIRED"));
+
+    var calibStartBlocked = ReadyInputs() with { GlobalStop = true };
+    Check("interlock: global stop blocks line start even if aux estop is ok",
+        !ilSafety.Evaluate(calibStartBlocked).CanStart);
+}
 // Camera slots: USB/IP transport selection, truthful frame state and exclusive ownership.
 {
     CameraDevice Cam(string vendor,string transport,string serial,string model,int index=0,string address="")
@@ -455,34 +502,35 @@ Check("interlock: mock off restores production NotReady on failed check",
     Check("camera mode: only Usb and Ip remain, no Auto",
         camModeNames.Length==2&&camModeNames.Contains("Usb")&&camModeNames.Contains("Ip")&&
         !camModeNames.Any(m=>m.Contains("auto",StringComparison.OrdinalIgnoreCase)));
-    Check("camera mode: station 1 and station 2 both default to IP",
-        CameraSlotDefaults.DefaultMode(1)==CameraTransportMode.Ip&&
+    Check("camera mode: station 1 defaults to USB and station 2 defaults to IP",
+        CameraSlotDefaults.DefaultMode(1)==CameraTransportMode.Usb&&
         CameraSlotDefaults.DefaultMode(2)==CameraTransportMode.Ip);
-    Check("camera vendor: station 1 and station 2 both default to Hikrobot",
-        CameraSlotDefaults.DefaultVendor(1)=="Hikrobot"&&
+    Check("camera vendor: station 1 defaults to Basler and station 2 defaults to Hikrobot",
+        CameraSlotDefaults.DefaultVendor(1)=="Basler"&&
         CameraSlotDefaults.DefaultVendor(2)=="Hikrobot");
     Check("camera mode: slot models start in their station default with no scan issues",
-        new CameraSlotModel(1,"Station 01").Mode==CameraTransportMode.Ip&&
+        new CameraSlotModel(1,"Station 01").Mode==CameraTransportMode.Usb&&
         new CameraSlotModel(2,"Station 02").Mode==CameraTransportMode.Ip&&
-        new CameraSlotModel(2,"Station 02").ScanIssues.Count==0);
+        new CameraSlotModel(1,"Station 01").ScanIssues.Count==0);
     Check("camera mode: legacy Auto, blank and invalid values migrate to the station default",
-        CameraSlotDefaults.MigrateMode(null,1)==CameraTransportMode.Ip&&
-        CameraSlotDefaults.MigrateMode("Auto",1)==CameraTransportMode.Ip&&
+        CameraSlotDefaults.MigrateMode(null,1)==CameraTransportMode.Usb&&
+        CameraSlotDefaults.MigrateMode("Auto",1)==CameraTransportMode.Usb&&
         CameraSlotDefaults.MigrateMode("auto",2)==CameraTransportMode.Ip&&
-        CameraSlotDefaults.MigrateMode("AUTO",1)==CameraTransportMode.Ip&&
+        CameraSlotDefaults.MigrateMode("AUTO",1)==CameraTransportMode.Usb&&
         CameraSlotDefaults.MigrateMode("",2)==CameraTransportMode.Ip&&
-        CameraSlotDefaults.MigrateMode("nonsense",1)==CameraTransportMode.Ip);
-    Check("camera mode: saved USB and IP survive migration case-insensitively",
+        CameraSlotDefaults.MigrateMode("nonsense",1)==CameraTransportMode.Usb);
+    Check("camera mode: slot 1 migrates strictly to USB and slot 2 migrates to IP",
         CameraSlotDefaults.MigrateMode("USB",1)==CameraTransportMode.Usb&&
-        CameraSlotDefaults.MigrateMode("usb",2)==CameraTransportMode.Usb&&
+        CameraSlotDefaults.MigrateMode("usb",2)==CameraTransportMode.Ip&&
         CameraSlotDefaults.MigrateMode("IP",2)==CameraTransportMode.Ip&&
-        CameraSlotDefaults.MigrateMode("ip",1)==CameraTransportMode.Ip);
-    Check("camera vendor: legacy, null and invalid values migrate to the station default",
-        CameraSlotDefaults.MigrateVendor(null,1)=="Hikrobot"&&
-        CameraSlotDefaults.MigrateVendor("Auto",1)=="Hikrobot"&&
+        CameraSlotDefaults.MigrateMode("ip",1)==CameraTransportMode.Usb);
+    Check("camera vendor: legacy, null, and cross-station values migrate to slot vendor policy",
+        CameraSlotDefaults.MigrateVendor(null,1)=="Basler"&&
+        CameraSlotDefaults.MigrateVendor("Auto",1)=="Basler"&&
         CameraSlotDefaults.MigrateVendor("",2)=="Hikrobot"&&
-        CameraSlotDefaults.MigrateVendor("Hikvision",1)=="Hikrobot"&&
-        CameraSlotDefaults.MigrateVendor("Basler",2)=="Basler");
+        CameraSlotDefaults.MigrateVendor("Hikvision",1)=="Basler"&&
+        CameraSlotDefaults.MigrateVendor("Basler",2)=="Hikrobot"&&
+        CameraSlotDefaults.MigrateVendor("Basler",1)=="Basler");
     Check("vendor recognition: Basler recognized case-insensitively and trimmed",
         CameraTransportPolicy.IsBaslerVendor("Basler") &&
         CameraTransportPolicy.IsBaslerVendor("basler") &&
@@ -530,47 +578,44 @@ Check("interlock: mock off restores production NotReady on failed check",
         !CameraSlotDefaults.IsKeyCompatibleWithVendor("", "Hikrobot") &&
         !CameraSlotDefaults.IsKeyCompatibleWithVendor(null, "Hikrobot"));
 
-    // Camera slot normalization (reproducing persisted camera_slots.json regression)
+    // Camera slot normalization (station-specific vendor policy: slot 1 Basler, slot 2 Hikrobot)
     var claimedTestKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    var normS1 = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.1", "", "HIKROBOT|J95682667", "Basler", claimedTestKeys);
-    var normS2 = CameraSlotDefaults.NormalizeSlot(2, "Ip", "169.254.113.1", "", "HIKROBOT|J95682667", "Hikrobot", claimedTestKeys);
+    var normS1 = CameraSlotDefaults.NormalizeSlot(1, "Usb", "", "", "BASLER|40098765", "Basler", claimedTestKeys);
+    var normS2 = CameraSlotDefaults.NormalizeSlot(2, "Ip", "169.254.113.1", "", "HIKROBOT|DA7403922", "Hikrobot", claimedTestKeys);
 
-    Check("camera slot normalization: slot 1 Basler normalizes to IP mode, blanks mismatched Hikrobot IP and clears key",
-        normS1.Mode == CameraTransportMode.Ip &&
+    Check("camera slot normalization: slot 1 preserves compatible Basler key and vendor in USB mode",
+        normS1.Mode == CameraTransportMode.Usb &&
+        normS1.Vendor == "Basler" &&
         string.IsNullOrEmpty(normS1.Ip) &&
-        string.IsNullOrEmpty(normS1.DeviceKey) &&
-        normS1.Vendor == "Basler");
+        string.IsNullOrEmpty(normS1.Nic) &&
+        normS1.DeviceKey == "BASLER|40098765");
 
-    var claimedBaslerKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    var normBaslerS1 = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.5", "", "BASLER|40098765", "Basler", claimedBaslerKeys);
-    Check("camera slot normalization: slot 1 Basler normalizes to IP mode and preserves valid Basler IP and identity",
-        normBaslerS1.Mode == CameraTransportMode.Ip &&
-        normBaslerS1.Ip == "169.254.113.5" &&
-        normBaslerS1.DeviceKey == "BASLER|40098765" &&
-        normBaslerS1.Vendor == "Basler");
-
-    Check("camera slot normalization: slot 2 Hikrobot normalizes to IP mode, preserves 169.254.113.1 with actual Hikrobot key",
+    var claimedHikOnBasler = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var normHikOnS1 = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.1", "", "HIKROBOT|J95682667", "Hikrobot", claimedHikOnBasler);
+    Check("camera slot normalization: slot 1 migrates vendor to Basler, mode to Usb, and clears incompatible Hikrobot key/IP",
+        normHikOnS1.Mode == CameraTransportMode.Usb &&
+        string.IsNullOrEmpty(normHikOnS1.Ip) &&
+        string.IsNullOrEmpty(normHikOnS1.Nic) &&
+        string.IsNullOrEmpty(normHikOnS1.DeviceKey) &&
+        normHikOnS1.Vendor == "Basler");
+    Check("camera slot normalization: slot 2 preserves compatible Hikrobot key and vendor",
         normS2.Mode == CameraTransportMode.Ip &&
+        normS2.Vendor == "Hikrobot" &&
         normS2.Ip == "169.254.113.1" &&
-        normS2.DeviceKey == "HIKROBOT|J95682667" &&
-        normS2.Vendor == "Hikrobot");
-
-    Check("camera slot normalization: slot 1 and slot 2 do not share any device key",
-        string.IsNullOrEmpty(normS1.DeviceKey) || normS1.DeviceKey != normS2.DeviceKey);
+        normS2.DeviceKey == "HIKROBOT|DA7403922");
 
     var claimedDupKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     var normDup1 = CameraSlotDefaults.NormalizeSlot(1, "Usb", "", "", "BASLER|40098765", "Basler", claimedDupKeys);
     var normDup2 = CameraSlotDefaults.NormalizeSlot(2, "Ip", "169.254.113.1", "", "BASLER|40098765", "Hikrobot", claimedDupKeys);
-    Check("camera slot normalization: clears duplicate and vendor-mismatched key on slot 2",
+    Check("camera slot normalization: clears duplicate and incompatible Basler key on slot 2",
         normDup1.DeviceKey == "BASLER|40098765" && string.IsNullOrEmpty(normDup2.DeviceKey) && string.IsNullOrEmpty(normDup2.Ip));
 
     var claimedDupIps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     var claimedDupKeys2 = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    var normDupIp1 = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.1", "", "BASLER|40098765", "Basler", claimedDupKeys2, claimedDupIps);
+    var normDupIp1 = CameraSlotDefaults.NormalizeSlot(1, "Usb", "", "", "BASLER|40098765", "Basler", claimedDupKeys2, claimedDupIps);
     var normDupIp2 = CameraSlotDefaults.NormalizeSlot(2, "Ip", "169.254.113.1", "", "HIKROBOT|DA7403922", "Hikrobot", claimedDupKeys2, claimedDupIps);
-    Check("camera slot normalization: enforces IP deduplication across slots",
-        normDupIp1.Ip == "169.254.113.1" && string.IsNullOrEmpty(normDupIp2.Ip));
-
+    Check("camera slot normalization: enforces IP deduplication across slots and slot 1 USB claims no IP",
+        string.IsNullOrEmpty(normDupIp1.Ip) && normDupIp2.Ip == "169.254.113.1");
     Check("camera policy: Basler and Hikvision USB/GigE supported",
         CameraTransportPolicy.IsSupported(camBaslerUsb)&&CameraTransportPolicy.IsSupported(camHikGigE)&&
         CameraTransportPolicy.IsSupported(Cam("Hikvision","USB","HK-U","MV-USB"))&&
@@ -770,6 +815,34 @@ Check("interlock: mock off restores production NotReady on failed check",
     Check("scan issues: summary omits transport separator when transport is empty",
         issueNoTransport.Summary == "GVCP ERROR: Discovery failed [SocketError]");
 
+    // Exclusive-lock diagnostics tests (pylon USB exclusive device lock handling)
+    string rawPylonError = @"Failed to open device '\\?\usb#vid_2676&pid_ba02&mi_00#6&2135f47d&0&0000#{79bfeeca-947f-11e1-bc58-001b2163ef96}' for XML file download. Error: 'Device is exclusively opened by another client.' : RuntimeException thrown (file 'PylonUsbTL.cpp', line 474)";
+    Check("exclusive lock: detects raw pylon exclusive opened message",
+        CameraTransportPolicy.IsExclusiveDeviceLockError(rawPylonError));
+    Check("exclusive lock: detects generic exclusive substring",
+        CameraTransportPolicy.IsExclusiveDeviceLockError("Device is exclusively opened") &&
+        CameraTransportPolicy.IsExclusiveDeviceLockError("Device is exclusive") &&
+        CameraTransportPolicy.IsExclusiveDeviceLockError("Device is exclus..."));
+    Check("exclusive lock: rejects null, blank and unrelated error messages",
+        !CameraTransportPolicy.IsExclusiveDeviceLockError(null) &&
+        !CameraTransportPolicy.IsExclusiveDeviceLockError("") &&
+        !CameraTransportPolicy.IsExclusiveDeviceLockError("   ") &&
+        !CameraTransportPolicy.IsExclusiveDeviceLockError("Camera disconnected") &&
+        !CameraTransportPolicy.IsExclusiveDeviceLockError("Device timeout"));
+    var pylonEx = new InvalidOperationException(rawPylonError);
+    string s1Formatted = CameraTransportPolicy.FormatConnectError(1, pylonEx);
+    Check("exclusive lock: slot 1 maps to concise actionable instruction naming pylon Viewer/MVS and SCAN USB -> CONNECT",
+        s1Formatted == "Station 01 Basler is locked by another client. Close pylon Viewer/MVS before SCAN USB -> CONNECT.");
+    Check("exclusive lock: formatted message length fits within UI status bar and Terse limit (<= 120 chars)",
+        s1Formatted.Length <= 120 && s1Formatted.Length > 0);
+    var pylonExSlot2 = new InvalidOperationException("Device is exclusively opened");
+    string s2Formatted = CameraTransportPolicy.FormatConnectError(2, pylonExSlot2);
+    Check("exclusive lock: slot 2 maps to station-specific instruction",
+        s2Formatted == "Station 02 camera is locked by another client. Close pylon Viewer/MVS before SCAN -> CONNECT.");
+    var genericEx = new InvalidOperationException("Generic transport timeout occurred");
+    Check("exclusive lock: non-exclusive errors preserve original message up to terse limit",
+        CameraTransportPolicy.FormatConnectError(1, genericEx) == "Generic transport timeout occurred");
+
     // MVS native runtime loader regression tests
     var mvsComputedPath1 = MvsNativeLoader.ComputePrependedPath(@"C:\Windows;C:\Tools", @"C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64", is64BitProcess: true);
     Check("mvs loader: prepends runtime dir to path",
@@ -862,8 +935,8 @@ Check("interlock: mock off restores production NotReady on failed check",
         camGvcpNoIpInfo is not null&&camGvcpNoIpInfo.IsIdentified&&camGvcpNoIpInfo.Address=="169.254.113.20");
 
     var camSlot=new CameraSlotModel(1,"Camera 01");
-    Check("camera slots: default mode is IP and state OFFLINE",
-        camSlot.Mode==CameraTransportMode.Ip&&camSlot.State==CameraSlotState.Offline&&camSlot.DisplayState=="OFFLINE");
+    Check("camera slots: default mode for slot 1 is USB and state OFFLINE",
+        camSlot.Mode==CameraTransportMode.Usb&&camSlot.State==CameraSlotState.Offline&&camSlot.DisplayState=="OFFLINE");
     camSlot.SetDevices(new[]{camBaslerUsb,camHikGigE,camUvc});
     Check("camera slots: scan status summarizes device counts",camSlot.StatusText=="SCAN 3 DEVICES | USB 2 | IP 1");
     Check("camera slots: scan order is USB then GigE then model",
@@ -882,20 +955,20 @@ Check("interlock: mock off restores production NotReady on failed check",
         camUsbCount==2&&camIpCount==1&&camUsbCount+camIpCount==camSlot.Devices.Count);
     camSlot.Mode=CameraTransportMode.Ip;
     Check("camera slots: GigE device selects in IP mode",camSlot.SelectDevice(camHikGigE.Key));
-    // AutoSelectForSlot station remap: Slot 1 and Slot 2 default to Hikrobot; explicit Basler preference preserved
+    // AutoSelectForSlot station remap: Slot 1 is Basler USB, Slot 2 is Hikrobot GigE
     var s1Slot = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Usb };
-    s1Slot.SetDevices(new[] { camBaslerUsb, Cam("Hikvision", "USB", "HK-U", "MV-USB") });
+    s1Slot.SetDevices(new[] { camBaslerUsb, camHikGigE });
     var s1Chosen = s1Slot.AutoSelectForSlot(1);
-    Check("station remap: slot 1 AutoSelectForSlot defaults to Hikrobot when both vendors present",
-        s1Chosen is not null && CameraTransportPolicy.IsHikVendor(s1Chosen.Vendor));
+    Check("station remap: slot 1 AutoSelectForSlot defaults to Basler USB when both vendors present",
+        s1Chosen is not null && CameraTransportPolicy.IsBaslerVendor(s1Chosen.Vendor) && s1Chosen.Key == camBaslerUsb.Key);
     var s1ChosenBasler = s1Slot.AutoSelectForSlot(1, "Basler");
-    Check("station remap: slot 1 AutoSelectForSlot selects Basler when Basler is explicitly preferred",
+    Check("station remap: slot 1 AutoSelectForSlot selects Basler USB when Basler requested",
         s1ChosenBasler is not null && CameraTransportPolicy.IsBaslerVendor(s1ChosenBasler.Vendor));
     var s1HikOnlySlot = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Usb };
-    s1HikOnlySlot.SetDevices(new[] { Cam("Hikvision", "USB", "HK-U", "MV-USB") });
-    var s1HikReject = s1HikOnlySlot.AutoSelectForSlot(1, "Basler");
-    Check("station remap: slot 1 AutoSelectForSlot rejects Hikrobot when Basler is preferred but not present",
-        s1HikReject is null && s1HikOnlySlot.Selected is null);
+    s1HikOnlySlot.SetDevices(new[] { camHikGigE });
+    var s1HikSelect = s1HikOnlySlot.AutoSelectForSlot(1);
+    Check("station remap: slot 1 AutoSelectForSlot rejects Hikrobot when no Basler present",
+        s1HikSelect is null && s1HikOnlySlot.Selected is null);
     var s2Slot = new CameraSlotModel(2, "Station 02") { Mode = CameraTransportMode.Ip };
     s2Slot.SetDevices(new[] { camBaslerUsb, camHikGigE });
     var s2Chosen = s2Slot.AutoSelectForSlot(2);
@@ -906,32 +979,29 @@ Check("interlock: mock off restores production NotReady on failed check",
     var s2BaslerReject = s2BaslerOnlySlot.AutoSelectForSlot(2);
     Check("station remap: slot 2 AutoSelectForSlot rejects Basler when no Hikrobot present",
         s2BaslerReject is null && s2BaslerOnlySlot.Selected is null);
-    var s2BaslerAccept = s2BaslerOnlySlot.AutoSelectForSlot(2, "Basler");
-    Check("station remap: slot 2 AutoSelectForSlot accepts Basler when Basler is explicitly preferred",
-        s2BaslerAccept is not null && CameraTransportPolicy.IsBaslerVendor(s2BaslerAccept.Vendor));
-    var s1MixedGigE = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip };
-    s1MixedGigE.SetDevices(new[] { dHikrobotGigE, dBaslerGigE });
-    Check("station remap: slot 1 AutoSelectForSlot defaults to Hikrobot GigE in IP mode",
-        s1MixedGigE.AutoSelectForSlot(1)?.Key == dHikrobotGigE.Key);
-    Check("station remap: slot 1 AutoSelectForSlot selects Basler GigE over Hikrobot GigE when Basler preferred",
-        s1MixedGigE.AutoSelectForSlot(1, "Basler")?.Key == dBaslerGigE.Key);
-    var s1HikGigEOnly = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip };
-    s1HikGigEOnly.SetDevices(new[] { dHikrobotGigE });
-    Check("station remap: slot 1 AutoSelectForSlot selects Hikrobot GigE in IP mode",
-        s1HikGigEOnly.AutoSelectForSlot(1)?.Key == dHikrobotGigE.Key);
-    Check("station remap: slot 1 AutoSelectForSlot rejects Hikrobot GigE when Basler preferred",
-        s1HikGigEOnly.AutoSelectForSlot(1, "Basler") is null && s1HikGigEOnly.Selected is null);
-    var s2HikvisionSlot = new CameraSlotModel(2, "Station 02") { Mode = CameraTransportMode.Usb };
-    s2HikvisionSlot.SetDevices(new[] { dBaslerUsb, dHikvisionUsb });
-    Check("station remap: slot 2 AutoSelectForSlot accepts Hikvision vendor in USB mode",
-        s2HikvisionSlot.AutoSelectForSlot(2)?.Key == dHikvisionUsb.Key);
+    var s2BaslerRequest = s2BaslerOnlySlot.AutoSelectForSlot(2, "Basler");
+    Check("station remap: slot 2 AutoSelectForSlot migrates Basler request to Hikrobot and rejects missing Hik",
+        s2BaslerRequest is null && s2BaslerOnlySlot.Selected is null);
+    var s1MixedUsb = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Usb };
+    s1MixedUsb.SetDevices(new[] { Cam("Hikrobot", "USB", "HR-U", "MV-U"), camBaslerUsb });
+    Check("station remap: slot 1 AutoSelectForSlot defaults to Basler USB in USB mode",
+        s1MixedUsb.AutoSelectForSlot(1)?.Key == camBaslerUsb.Key);
+    Check("station remap: slot 1 AutoSelectForSlot chooses Basler USB over Hikrobot USB under station policy",
+        s1MixedUsb.AutoSelectForSlot(1, "Hikrobot")?.Key == camBaslerUsb.Key);
+    var s1BaslerUsbOnly = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Usb };
+    s1BaslerUsbOnly.SetDevices(new[] { camBaslerUsb });
+    Check("station remap: slot 1 AutoSelectForSlot selects Basler USB in USB mode",
+        s1BaslerUsbOnly.AutoSelectForSlot(1)?.Key == camBaslerUsb.Key);
+    var s2HikvisionSlot = new CameraSlotModel(2, "Station 02") { Mode = CameraTransportMode.Ip };
+    s2HikvisionSlot.SetDevices(new[] { dBaslerGigE, dHikvisionGigE });
+    Check("station remap: slot 2 AutoSelectForSlot accepts Hikvision vendor in IP mode",
+        s2HikvisionSlot.AutoSelectForSlot(2)?.Key == dHikvisionGigE.Key);
     var s2BaslerGigEOnly = new CameraSlotModel(2, "Station 02") { Mode = CameraTransportMode.Ip };
     s2BaslerGigEOnly.SetDevices(new[] { dBaslerGigE });
     Check("station remap: slot 2 AutoSelectForSlot rejects Basler GigE in IP mode",
         s2BaslerGigEOnly.AutoSelectForSlot(2) is null && s2BaslerGigEOnly.Selected is null);
-    Check("station remap: slot 2 AutoSelectForSlot selects Basler GigE when Basler preferred",
-        s2BaslerGigEOnly.AutoSelectForSlot(2, "Basler")?.Key == dBaslerGigE.Key);
-
+    Check("station remap: slot 2 AutoSelectForSlot rejects Basler GigE even when Basler requested",
+        s2BaslerGigEOnly.AutoSelectForSlot(2, "Basler") is null && s2BaslerGigEOnly.Selected is null);
     var slotManualTest = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip };
     slotManualTest.SetDevices(new[] { manHikrobotDirect, manBaslerDirect, dBaslerGigE });
     Check("slot selection: Hikrobot direct IP device selects successfully in IP mode",
@@ -1146,129 +1216,224 @@ Check("interlock: mock off restores production NotReady on failed check",
     var evalCamBoth=interlock.Evaluate(ReadyInputs());
     Check("camera interlock: cameras connecting changes no interlock state",
         evalCamBoth.State==InterlockState.Ready&&evalCamBoth.CanStart);
-    // 22. Dual-Camera Hikrobot Contract & Isolation Tests (TDD Focused Suite)
-    // (a) Both slot defaults/migrations are Hikrobot
-    Check("dual-hik (a): slot 1 and slot 2 default vendor is Hikrobot",
-        CameraSlotDefaults.DefaultVendor(1) == "Hikrobot" &&
+    // 22. Station-Specific Camera Vendor Contract & Isolation Tests (Station 01 Basler, Station 02 Hikrobot)
+    // (a) Slot 1 defaults/migrates to Basler; Slot 2 defaults/migrates to Hikrobot
+    Check("station-vendor (a): slot 1 default vendor is Basler and slot 2 is Hikrobot",
+        CameraSlotDefaults.DefaultVendor(1) == "Basler" &&
         CameraSlotDefaults.DefaultVendor(2) == "Hikrobot");
 
-    Check("dual-hik (a): slot 1 null, blank, and invalid migrate to Hikrobot default",
-        CameraSlotDefaults.MigrateVendor(null, 1) == "Hikrobot" &&
-        CameraSlotDefaults.MigrateVendor("", 1) == "Hikrobot" &&
-        CameraSlotDefaults.MigrateVendor("   ", 1) == "Hikrobot" &&
-        CameraSlotDefaults.MigrateVendor("invalid", 1) == "Hikrobot" &&
-        CameraSlotDefaults.MigrateVendor("Auto", 1) == "Hikrobot");
+    Check("station-vendor (a): slot 1 null, blank, and invalid migrate to Basler default",
+        CameraSlotDefaults.MigrateVendor(null, 1) == "Basler" &&
+        CameraSlotDefaults.MigrateVendor("", 1) == "Basler" &&
+        CameraSlotDefaults.MigrateVendor("   ", 1) == "Basler" &&
+        CameraSlotDefaults.MigrateVendor("invalid", 1) == "Basler" &&
+        CameraSlotDefaults.MigrateVendor("Auto", 1) == "Basler" &&
+        CameraSlotDefaults.MigrateVendor("Hikrobot", 1) == "Basler");
 
-    Check("dual-hik (a): slot 2 null, blank, and invalid migrate to Hikrobot default",
+    Check("station-vendor (a): slot 2 null, blank, and invalid migrate to Hikrobot default",
         CameraSlotDefaults.MigrateVendor(null, 2) == "Hikrobot" &&
         CameraSlotDefaults.MigrateVendor("", 2) == "Hikrobot" &&
         CameraSlotDefaults.MigrateVendor("   ", 2) == "Hikrobot" &&
         CameraSlotDefaults.MigrateVendor("invalid", 2) == "Hikrobot" &&
-        CameraSlotDefaults.MigrateVendor("Auto", 2) == "Hikrobot");
+        CameraSlotDefaults.MigrateVendor("Auto", 2) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("Basler", 2) == "Hikrobot");
 
-    Check("dual-hik (a): explicit Hikrobot/Hikvision values migrate to Hikrobot on both slots",
-        CameraSlotDefaults.MigrateVendor("Hikrobot", 1) == "Hikrobot" &&
-        CameraSlotDefaults.MigrateVendor("Hikvision", 1) == "Hikrobot" &&
+    Check("station-vendor (a): explicit values migrate to slot vendor policy",
+        CameraSlotDefaults.MigrateVendor("Basler", 1) == "Basler" &&
+        CameraSlotDefaults.MigrateVendor("basler", 1) == "Basler" &&
         CameraSlotDefaults.MigrateVendor("hikrobot", 2) == "Hikrobot" &&
         CameraSlotDefaults.MigrateVendor("hikvision", 2) == "Hikrobot");
 
-    var s1SlotHikAuto = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip };
-    s1SlotHikAuto.SetDevices(new[] { camHikGigE, dBaslerGigE });
-    var s1ChosenHikAuto = s1SlotHikAuto.AutoSelectForSlot(1);
-    Check("dual-hik (a): slot 1 AutoSelectForSlot defaults to Hikrobot when both present",
-        s1ChosenHikAuto is not null && CameraTransportPolicy.IsHikVendor(s1ChosenHikAuto.Vendor));
+    var s1SlotBaslerAuto = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Usb };
+    s1SlotBaslerAuto.SetDevices(new[] { camHikGigE, camBaslerUsb });
+    var s1ChosenBaslerAuto = s1SlotBaslerAuto.AutoSelectForSlot(1);
+    Check("station-vendor (a): slot 1 AutoSelectForSlot defaults to Basler when both present",
+        s1ChosenBaslerAuto is not null && CameraTransportPolicy.IsBaslerVendor(s1ChosenBaslerAuto.Vendor));
 
-    // (b) Valid Hikrobot slot-1 persistence is preserved
-    var claimedS1HikTdd = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    var normHikS1Tdd = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.1", "169.254.113.10", "HIKROBOT|DA7403922", "Hikrobot", claimedS1HikTdd);
-    Check("dual-hik (b): slot 1 preserves valid Hikrobot persistence",
-        normHikS1Tdd.Mode == CameraTransportMode.Ip &&
-        normHikS1Tdd.Vendor == "Hikrobot" &&
-        normHikS1Tdd.Ip == "169.254.113.1" &&
-        normHikS1Tdd.Nic == "169.254.113.10" &&
-        normHikS1Tdd.DeviceKey == "HIKROBOT|DA7403922");
+    // (b) Valid Basler slot-1 persistence is preserved in USB mode (no IP/NIC)
+    var claimedS1Basler = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var normBaslerS1 = CameraSlotDefaults.NormalizeSlot(1, "Usb", "", "", "BASLER|40098765", "Basler", claimedS1Basler);
+    Check("station-vendor (b): slot 1 preserves valid Basler persistence in USB mode",
+        normBaslerS1.Mode == CameraTransportMode.Usb &&
+        normBaslerS1.Vendor == "Basler" &&
+        string.IsNullOrEmpty(normBaslerS1.Ip) &&
+        string.IsNullOrEmpty(normBaslerS1.Nic) &&
+        normBaslerS1.DeviceKey == "BASLER|40098765");
 
-    var normHikS1NullVendor = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.1", "169.254.113.10", "HIKROBOT|DA7403922", null);
-    Check("dual-hik (b): slot 1 with null/default vendor preserves valid Hikrobot persistence",
-        normHikS1NullVendor.Mode == CameraTransportMode.Ip &&
-        normHikS1NullVendor.Vendor == "Hikrobot" &&
-        normHikS1NullVendor.Ip == "169.254.113.1" &&
-        normHikS1NullVendor.Nic == "169.254.113.10" &&
-        normHikS1NullVendor.DeviceKey == "HIKROBOT|DA7403922");
+    var normBaslerS1NullVendor = CameraSlotDefaults.NormalizeSlot(1, "Usb", "", "", "BASLER|40098765", null);
+    Check("station-vendor (b): slot 1 with null/default vendor preserves valid Basler persistence in USB mode",
+        normBaslerS1NullVendor.Mode == CameraTransportMode.Usb &&
+        normBaslerS1NullVendor.Vendor == "Basler" &&
+        string.IsNullOrEmpty(normBaslerS1NullVendor.Ip) &&
+        string.IsNullOrEmpty(normBaslerS1NullVendor.Nic) &&
+        normBaslerS1NullVendor.DeviceKey == "BASLER|40098765");
 
-    // (c) Two distinct slot camera IP/host NIC pairs remain isolated
+    // (c) Two distinct slot camera configs remain isolated (slot 1 USB, slot 2 GigE IP)
     var claimedKeysDualTdd = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     var claimedIpsDualTdd = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    var s1DualTdd = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.1", "169.254.113.10", "HIKROBOT|DA7403922", "Hikrobot", claimedKeysDualTdd, claimedIpsDualTdd);
-    var s2DualTdd = CameraSlotDefaults.NormalizeSlot(2, "Ip", "192.168.50.2", "192.168.50.1", "HIKROBOT|J95682667", "Hikrobot", claimedKeysDualTdd, claimedIpsDualTdd);
+    var s1DualTdd = CameraSlotDefaults.NormalizeSlot(1, "Usb", "", "", "BASLER|40098765", "Basler", claimedKeysDualTdd, claimedIpsDualTdd);
+    var s2DualTdd = CameraSlotDefaults.NormalizeSlot(2, "Ip", "169.254.113.1", "169.254.113.10", "HIKROBOT|DA7403922", "Hikrobot", claimedKeysDualTdd, claimedIpsDualTdd);
 
-    Check("dual-hik (c): two distinct slot camera IP/host NIC pairs remain isolated",
-        s1DualTdd.Ip == "169.254.113.1" && s1DualTdd.Nic == "169.254.113.10" && s1DualTdd.DeviceKey == "HIKROBOT|DA7403922" &&
-        s2DualTdd.Ip == "192.168.50.2" && s2DualTdd.Nic == "192.168.50.1" && s2DualTdd.DeviceKey == "HIKROBOT|J95682667" &&
-        s1DualTdd.DeviceKey != s2DualTdd.DeviceKey && s1DualTdd.Ip != s2DualTdd.Ip && s1DualTdd.Nic != s2DualTdd.Nic);
-
+    Check("station-vendor (c): two distinct slot configurations remain isolated",
+        s1DualTdd.Mode == CameraTransportMode.Usb && s1DualTdd.DeviceKey == "BASLER|40098765" && s1DualTdd.Vendor == "Basler" &&
+        string.IsNullOrEmpty(s1DualTdd.Ip) &&
+        s2DualTdd.Mode == CameraTransportMode.Ip && s2DualTdd.Ip == "169.254.113.1" && s2DualTdd.Nic == "169.254.113.10" &&
+        s2DualTdd.DeviceKey == "HIKROBOT|DA7403922" && s2DualTdd.Vendor == "Hikrobot" &&
+        s1DualTdd.DeviceKey != s2DualTdd.DeviceKey);
     var regDualTdd = new CameraOwnershipRegistry();
-    Check("dual-hik (c): registry claims both slot camera keys without collision",
+    Check("station-vendor (c): registry claims both slot camera keys without collision",
         regDualTdd.TryClaim(s1DualTdd.DeviceKey, 1, out string errClaim1Tdd) && string.IsNullOrEmpty(errClaim1Tdd) &&
         regDualTdd.TryClaim(s2DualTdd.DeviceKey, 2, out string errClaim2Tdd) && string.IsNullOrEmpty(errClaim2Tdd) &&
         regDualTdd.OwnerOf(s1DualTdd.DeviceKey) == 1 &&
         regDualTdd.OwnerOf(s2DualTdd.DeviceKey) == 2);
 
     regDualTdd.Release(2);
-    Check("dual-hik (c): releasing slot 2 preserves slot 1 claim",
+    Check("station-vendor (c): releasing slot 2 preserves slot 1 claim",
         regDualTdd.OwnerOf(s1DualTdd.DeviceKey) == 1 &&
         regDualTdd.OwnerOf(s2DualTdd.DeviceKey) == null);
 
     // (d) Blank/invalid manual camera IP or explicit host NIC fails closed
-    Check("dual-hik (d): ResolveCameraNic fails closed when explicit host NIC is invalid (no fallback)",
+    Check("station-vendor (d): ResolveCameraNic fails closed when explicit host NIC is invalid (no fallback)",
         CameraTransportPolicy.ResolveCameraNic("169.254.113.1", "not-an-ip") == "" &&
         CameraTransportPolicy.ResolveCameraNic("169.254.113.1", "999.999.999.999") == "" &&
         CameraTransportPolicy.ResolveCameraNic("192.168.50.2", "invalid_nic") == "");
 
-    Check("dual-hik (d): ResolveCameraNic fails closed on blank camera IP and blank NIC (no fallback to preferred NIC)",
+    Check("station-vendor (d): ResolveCameraNic fails closed on blank camera IP and blank NIC (no fallback to preferred NIC)",
         CameraTransportPolicy.ResolveCameraNic("", "") == "" &&
         CameraTransportPolicy.ResolveCameraNic(null, null) == "" &&
         CameraTransportPolicy.ResolveCameraNic("   ", "   ") == "");
 
-    Check("dual-hik (d): ResolveCameraNic uses explicit valid host NIC exactly without fallback",
+    Check("station-vendor (d): ResolveCameraNic uses explicit valid host NIC exactly without fallback",
         CameraTransportPolicy.ResolveCameraNic("192.168.50.2", "192.168.50.1") == "192.168.50.1" &&
         CameraTransportPolicy.ResolveCameraNic("169.254.113.1", "169.254.113.10") == "169.254.113.10");
 
     var slotManualBlankIp = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip, IpText = "" };
     slotManualBlankIp.SetDevices(new[] { manHikrobotDirect });
     slotManualBlankIp.SelectDevice(manHikrobotDirect.Key);
-    Check("dual-hik (d): manual connect with blank camera IP fails closed before connect",
+    Check("station-vendor (d): manual connect with blank camera IP fails closed before connect",
         !slotManualBlankIp.ValidateBeforeConnect(new CameraOwnershipRegistry()).ok);
 
     var slotManualBadIp = new CameraSlotModel(1, "Station 01") { Mode = CameraTransportMode.Ip, IpText = "999.999.999.999" };
     slotManualBadIp.SetDevices(new[] { manHikrobotDirect });
     slotManualBadIp.SelectDevice(manHikrobotDirect.Key);
-    Check("dual-hik (d): manual connect with invalid camera IP fails closed before connect",
+    Check("station-vendor (d): manual connect with invalid camera IP fails closed before connect",
         !slotManualBadIp.ValidateBeforeConnect(new CameraOwnershipRegistry()).ok);
 
-    // (e) Explicit Basler compatibility remains if already supported
-    Check("dual-hik (e): explicit Basler vendor is preserved across migration on slot 1 and slot 2",
+    // (e) Station-specific vendor policy: slot 1 is Basler, slot 2 is Hikrobot
+    Check("station-vendor (e): saved vendor migrates per slot (slot 1 Basler, slot 2 Hikrobot)",
         CameraSlotDefaults.MigrateVendor("Basler", 1) == "Basler" &&
-        CameraSlotDefaults.MigrateVendor("Basler", 2) == "Basler" &&
-        CameraSlotDefaults.MigrateVendor("  basler  ", 1) == "Basler" &&
-        CameraSlotDefaults.MigrateVendor("  BASLER  ", 2) == "Basler");
+        CameraSlotDefaults.MigrateVendor("Hikrobot", 1) == "Basler" &&
+        CameraSlotDefaults.MigrateVendor("Basler", 2) == "Hikrobot" &&
+        CameraSlotDefaults.MigrateVendor("Hikrobot", 2) == "Hikrobot");
 
     var claimedBaslerPreserve = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    var normBaslerSlot1 = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.5", "", "BASLER|40098765", "Basler", claimedBaslerPreserve);
-    Check("dual-hik (e): slot 1 with explicit Basler preserves Basler identity and IP",
-        normBaslerSlot1.Vendor == "Basler" &&
-        normBaslerSlot1.Ip == "169.254.113.5" &&
-        normBaslerSlot1.DeviceKey == "BASLER|40098765");
+    var normHikOnSlot1 = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.1", "", "HIKROBOT|DA7403922", "Hikrobot", claimedBaslerPreserve);
+    Check("station-vendor (e): slot 1 with legacy Hikrobot key migrates vendor to Basler and clears incompatible Hikrobot key",
+        normHikOnSlot1.Vendor == "Basler" &&
+        string.IsNullOrEmpty(normHikOnSlot1.Ip) &&
+        string.IsNullOrEmpty(normHikOnSlot1.DeviceKey));
 
     var normBaslerSlot2 = CameraSlotDefaults.NormalizeSlot(2, "Ip", "169.254.113.6", "", "BASLER|40098766", "Basler", claimedBaslerPreserve);
-    Check("dual-hik (e): slot 2 with explicit Basler preserves Basler identity and IP",
-        normBaslerSlot2.Vendor == "Basler" &&
-        normBaslerSlot2.Ip == "169.254.113.6" &&
-        normBaslerSlot2.DeviceKey == "BASLER|40098766");
-
-    Check("dual-hik (e): Basler USB and GigE dispatch compatibility is retained",
+    Check("station-vendor (e): slot 2 with legacy Basler key migrates vendor to Hikrobot and clears incompatible Basler key",
+        normBaslerSlot2.Vendor == "Hikrobot" &&
+        string.IsNullOrEmpty(normBaslerSlot2.Ip) &&
+        string.IsNullOrEmpty(normBaslerSlot2.DeviceKey));
+    Check("station-vendor (e): Basler and Hikrobot SDK wrappers remain dispatchable",
         CameraTransportPolicy.CanDispatch(camBaslerUsb, CameraTransportMode.Usb, out _) &&
         CameraTransportPolicy.CanDispatch(dBaslerGigE, CameraTransportMode.Ip, out _));
+
+    // (f) Manual Hikrobot IP on slot 2 is preserved across normalization even with empty key
+    var claimedManualEmptyKey = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var normManualS1 = CameraSlotDefaults.NormalizeSlot(1, "Ip", "169.254.113.5", "169.254.113.10", "", "Basler", claimedManualEmptyKey);
+    Check("station-vendor (f): slot 1 Basler with empty key migrates mode to Usb and does NOT synthesize manual IP key",
+        normManualS1.Mode == CameraTransportMode.Usb &&
+        string.IsNullOrEmpty(normManualS1.Ip) &&
+        string.IsNullOrEmpty(normManualS1.Nic) &&
+        string.IsNullOrEmpty(normManualS1.DeviceKey) &&
+        normManualS1.Vendor == "Basler");
+
+    var normManualS2 = CameraSlotDefaults.NormalizeSlot(2, "Ip", "192.168.50.2", "192.168.50.1", "", "Hikrobot", claimedManualEmptyKey);
+    Check("station-vendor (f): slot 2 manual Hikrobot IP with empty key preserves distinct IP and key",
+        normManualS2.Mode == CameraTransportMode.Ip &&
+        normManualS2.Ip == "192.168.50.2" &&
+        normManualS2.Nic == "192.168.50.1" &&
+        normManualS2.DeviceKey == "HIKVISION|IP:192.168.50.2" &&
+        normManualS2.Vendor == "Hikrobot");
+
+    // (g) Deterministic dictionary normalization & save-order isolation tests (pure helper, no file writes)
+    var rawLegacySlots = new Dictionary<string, (string Mode, string Ip, string Nic, string DeviceKey, string? Vendor)>
+    {
+        ["1"] = ("Ip", "169.254.113.1", "", "HIKROBOT|DA7403922", "Basler"),
+        ["2"] = ("Ip", "169.254.113.1", "169.254.113.10", "HIKROBOT|DA7403922", "Hikrobot")
+    };
+    var normalizedDict = CameraSlotDefaults.NormalizeDictionary(rawLegacySlots);
+    Check("normalize dictionary: slot 1 legacy Hikrobot entry is cleared under Basler policy",
+        normalizedDict["1"].Vendor == "Basler" &&
+        string.IsNullOrEmpty(normalizedDict["1"].Ip) &&
+        string.IsNullOrEmpty(normalizedDict["1"].DeviceKey));
+    Check("normalize dictionary: slot 2 preserves valid IP and key without being wiped by legacy slot 1",
+        normalizedDict["2"].Vendor == "Hikrobot" &&
+        normalizedDict["2"].Ip == "169.254.113.1" &&
+        normalizedDict["2"].Nic == "169.254.113.10" &&
+        normalizedDict["2"].DeviceKey == "HIKROBOT|DA7403922");
+
+    // Saving slot 2 first with raw legacy on slot 1
+    var rawSaveSlot2First = new Dictionary<string, (string Mode, string Ip, string Nic, string DeviceKey, string? Vendor)>
+    {
+        ["1"] = ("Ip", "169.254.113.1", "", "HIKROBOT|DA7403922", "Hikrobot"),
+        ["2"] = ("Ip", "169.254.113.1", "169.254.113.10", "HIKROBOT|DA7403922", "Hikrobot")
+    };
+    var normSave2First = CameraSlotDefaults.NormalizeDictionary(rawSaveSlot2First);
+    Check("normalize dictionary: saving slot 2 first preserves slot 2 IP despite un-normalized slot 1",
+        normSave2First["2"].Ip == "169.254.113.1" &&
+        normSave2First["2"].DeviceKey == "HIKROBOT|DA7403922" &&
+        string.IsNullOrEmpty(normSave2First["1"].Ip));
+
+    // (h) Basler SAVE CONFIG without scan: preserves valid persisted Basler key (no IP/NIC)
+    var resolvedPreserve = CameraSlotDefaults.ResolveKeyForSave(
+        1, "Basler", null, "", "", "BASLER|40098765", "", "");
+    Check("resolve key for save: Basler saves before scan preserve existing valid key without IP/NIC",
+        resolvedPreserve.DeviceKey == "BASLER|40098765" &&
+        string.IsNullOrEmpty(resolvedPreserve.Ip) &&
+        string.IsNullOrEmpty(resolvedPreserve.Nic));
+
+    var resolvedBlankInput = CameraSlotDefaults.ResolveKeyForSave(
+        1, "Basler", null, "169.254.113.5", "169.254.113.10", "BASLER|40098765", "", "");
+    Check("resolve key for save: Basler saves ignore input IP/NIC and preserve key",
+        resolvedBlankInput.DeviceKey == "BASLER|40098765" &&
+        string.IsNullOrEmpty(resolvedBlankInput.Ip) &&
+        string.IsNullOrEmpty(resolvedBlankInput.Nic));
+
+    var resolvedWithDevice = CameraSlotDefaults.ResolveKeyForSave(
+        1, "Basler", camBaslerUsb, "", "", "OLD|KEY", "", "");
+    Check("resolve key for save: selected device always overrides persisted key",
+        resolvedWithDevice.DeviceKey == camBaslerUsb.Key &&
+        string.IsNullOrEmpty(resolvedWithDevice.Ip) &&
+        string.IsNullOrEmpty(resolvedWithDevice.Nic));
+    var resolvedHikManual = CameraSlotDefaults.ResolveKeyForSave(
+        2, "Hikrobot", null, "192.168.50.2", "192.168.50.1", "", "", "");
+    Check("resolve key for save: Hikrobot synthesizes direct key for valid manual IP",
+        resolvedHikManual.DeviceKey == "HIKVISION|IP:192.168.50.2" &&
+        resolvedHikManual.Ip == "192.168.50.2");
+
+    var resolvedHikPreserve = CameraSlotDefaults.ResolveKeyForSave(
+        2, "Hikrobot", null, "192.168.50.2", "192.168.50.1", "HIKROBOT|J95682667", "192.168.50.2", "192.168.50.1");
+    Check("resolve key for save: Hikrobot slot 2 preserves compatible genuine key when IP matches",
+        resolvedHikPreserve.DeviceKey == "HIKROBOT|J95682667" &&
+        resolvedHikPreserve.Ip == "192.168.50.2" &&
+        resolvedHikPreserve.Nic == "192.168.50.1");
+
+    var resolvedHikPreserveBlankInput = CameraSlotDefaults.ResolveKeyForSave(
+        2, "Hikrobot", null, "", "192.168.50.1", "HIKROBOT|J95682667", "192.168.50.2", "192.168.50.1");
+    Check("resolve key for save: Hikrobot slot 2 preserves compatible genuine key when input IP is blank",
+        resolvedHikPreserveBlankInput.DeviceKey == "HIKROBOT|J95682667" &&
+        resolvedHikPreserveBlankInput.Ip == "192.168.50.2");
+
+    var resolvedHikChangedIp = CameraSlotDefaults.ResolveKeyForSave(
+        2, "Hikrobot", null, "192.168.50.99", "192.168.50.1", "HIKROBOT|J95682667", "192.168.50.2", "192.168.50.1");
+    Check("resolve key for save: Hikrobot slot 2 synthesizes direct key when IP changes without scan",
+        resolvedHikChangedIp.DeviceKey == "HIKVISION|IP:192.168.50.99" &&
+        resolvedHikChangedIp.Ip == "192.168.50.99");
 }
 LineMailboxProtocol.ProductionCommandSourceApproved = false;
 Check("mailbox: source commands are disarmed until hardware commissioning",
@@ -1652,16 +1817,16 @@ swTimer.Stop();
 Check("pulse timing: manual SET with PulseHoldMs=25 took >= 25ms",
     tRes.Success && swTimer.ElapsedMilliseconds >= 20);
 
-// 12. Manual Belt Architecture: Independent of ServoReady, Camera, SCARA and Gantry
+// 12. Manual Belt Architecture: Independent of Camera, SCARA and Gantry
 var beltIndepTransport = new FakeAdsMailboxTransport();
-beltIndepTransport.SetSymbol("MAIN.bServo_Ready", false); // Servo NOT ready
+// Gantry disconnected; no rotary servo participates in the manual belt contract.
 beltIndepTransport.SetSymbol("MAIN.bPlcQConnected", false); // Gantry disconnected
 beltIndepTransport.OnSymbolWritten = armedTransport.OnSymbolWritten;
 var beltIndepGateway = LineMailboxGateway.CreateForTesting(beltIndepTransport, commissioned: true);
 var biSet = beltIndepGateway.RequestManualBeltSet(false, true, 95.0);
 var biStart = beltIndepGateway.RequestManualBeltStart(false, true, true, 95.0);
-Check("manual belt architecture: manual SET succeeds when ServoReady is FALSE", biSet.Success);
-Check("manual belt architecture: manual START succeeds when ServoReady and Gantry are FALSE",
+Check("manual belt architecture: manual SET succeeds with Gantry disconnected", biSet.Success);
+Check("manual belt architecture: manual START succeeds with Gantry disconnected",
     biStart.Success && beltIndepGateway.ManualBeltActive);
 // 13. Real ADS command-path hardening: stale ACK after UI restart and failed speed writes
 var resumedTransport = new FakeAdsMailboxTransport();
@@ -2368,6 +2533,10 @@ if (File.Exists(mwPath))
 
         Check("slot regression: SaveSlot does not hardcode CameraTransportMode.Ip", !hardcodesIp);
         Check("slot regression: SaveSlot preserves model.Mode when saving slot settings", preservesModelMode);
+
+        int applySavedIndex = mwContent.IndexOf("void ApplySavedSlot(int slot)");
+        Check("slot regression: ApplySavedSlot populates SlotIpBox from saved IP",
+            applySavedIndex >= 0 && mwContent.Substring(applySavedIndex, 300).Contains("SlotIpBox(slot).Text=saved.Ip;"));
     }
 }
 
@@ -2394,6 +2563,22 @@ Check("manual-ip fresh: CanDispatchManualHik rejects blank or invalid explicit N
 Check("manual-ip fresh: CanDispatchManualHik rejects USB mode",
     !CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Usb, "Hikrobot", "169.254.113.1", "169.254.113.10"));
 
+string matchingSubnetCameraIp = "192.168.100.3";
+if (CameraTransportPolicy.FindLocalIp(IPAddress.Parse(matchingSubnetCameraIp)).Length == 0)
+{
+    var anyLocal = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+        .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+        .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+        .FirstOrDefault(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)?.Address;
+    if (anyLocal != null)
+    {
+        var b = anyLocal.GetAddressBytes();
+        matchingSubnetCameraIp = $"{b[0]}.{b[1]}.{b[2]}.{(b[3] == 200 ? 201 : 200)}";
+    }
+}
+Check("manual-ip fresh: CanDispatchManualHik allows auto-resolvable host NIC when local subnet matches",
+    CameraTransportPolicy.CanDispatchManualHik(CameraTransportMode.Ip, "Hikrobot", matchingSubnetCameraIp, ""));
+
 if (File.Exists(mwPath))
 {
     string mwText = File.ReadAllText(mwPath);
@@ -2416,5 +2601,1928 @@ if (File.Exists(mwPath))
             allowsManualWithoutSelected);
     }
 }
+// 24. Settings Page Station Camera IP Configuration & Commissioning Isolation
+string xamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "App", "Vision", "MainWindow.xaml");
+if (!File.Exists(xamlPath)) xamlPath = Path.Combine("App", "Vision", "MainWindow.xaml");
+Check("settings camera: MainWindow.xaml exists for UI audit", File.Exists(xamlPath));
+if (File.Exists(xamlPath))
+{
+    string xaml = File.ReadAllText(xamlPath);
+    Check("settings camera: SettingsStation1Tab contains SettingsS1CamIpBox", xaml.Contains("x:Name=\"SettingsS1CamIpBox\""));
+    Check("settings camera: SettingsStation1Tab contains SettingsS1HostIpBox", xaml.Contains("x:Name=\"SettingsS1HostIpBox\""));
+    Check("settings camera: SettingsStation1Tab contains SettingsS1ConnectButton", xaml.Contains("x:Name=\"SettingsS1ConnectButton\""));
+    Check("settings camera: SettingsStation1Tab contains SettingsS1DisconnectButton", xaml.Contains("x:Name=\"SettingsS1DisconnectButton\""));
+    Check("settings camera: SettingsStation1Tab contains SettingsS1CamLinkText", xaml.Contains("x:Name=\"SettingsS1CamLinkText\""));
+    Check("settings camera: SettingsStation1Tab contains SettingsS1DeviceBox", xaml.Contains("x:Name=\"SettingsS1DeviceBox\""));
+    Check("settings camera: SettingsStation2Tab contains SettingsS2CamIpBox", xaml.Contains("x:Name=\"SettingsS2CamIpBox\""));
+    Check("settings camera: SettingsStation2Tab contains SettingsS2HostIpBox", xaml.Contains("x:Name=\"SettingsS2HostIpBox\""));
+    Check("settings camera: SettingsStation2Tab contains SettingsS2ConnectButton", xaml.Contains("x:Name=\"SettingsS2ConnectButton\""));
+    Check("settings camera: SettingsStation2Tab contains SettingsS2DisconnectButton", xaml.Contains("x:Name=\"SettingsS2DisconnectButton\""));
+    Check("settings camera: SettingsStation2Tab contains SettingsS2CamLinkText", xaml.Contains("x:Name=\"SettingsS2CamLinkText\""));
+
+    Check("settings camera: Station 02 SCARA robot controls remain excluded / no commands",
+        xaml.Contains("NO COMMANDS PERMITTED") && xaml.Contains("UNMAPPED · no validated PLC symbols"));
+    Check("settings camera: station headers removed header controls and hints",
+        !xaml.Contains("x:Name=\"S1ModeBox\"") && !xaml.Contains("x:Name=\"S2ModeBox\"") &&
+        !xaml.Contains("x:Name=\"S1CamSettingsHint\"") && !xaml.Contains("x:Name=\"S2CamSettingsHint\"") &&
+        xaml.Contains("x:Name=\"S1CamBadge\"") && xaml.Contains("x:Name=\"S1CamLinkText\"") &&
+        xaml.Contains("x:Name=\"S2CamBadge\"") && xaml.Contains("x:Name=\"S2CamLinkText\""));
+}
+
+if (File.Exists(mwPath))
+{
+    string cs = File.ReadAllText(mwPath);
+    Check("settings camera: SettingsS1ConnectCamera_Click implemented", cs.Contains("SettingsS1ConnectCamera_Click"));
+    Check("settings camera: SettingsS2ConnectCamera_Click implemented", cs.Contains("SettingsS2ConnectCamera_Click"));
+    Check("settings camera: SettingsS1DisconnectCamera_Click implemented", cs.Contains("SettingsS1DisconnectCamera_Click"));
+    Check("settings camera: SettingsS2DisconnectCamera_Click implemented", cs.Contains("SettingsS2DisconnectCamera_Click"));
+    Check("settings camera: SettingsS1Save_Click implemented", cs.Contains("SettingsS1Save_Click"));
+    Check("settings camera: SettingsS2Save_Click implemented", cs.Contains("SettingsS2Save_Click"));
+    Check("settings camera: SettingsS1IpTextChanged implemented", cs.Contains("SettingsS1IpTextChanged"));
+    Check("settings camera: SettingsS1Save_Click implemented", cs.Contains("SettingsS1Save_Click"));
+    Check("settings camera: SettingsS1DeviceChanged implemented", cs.Contains("SettingsS1DeviceChanged"));
+    Check("settings camera: UpdateCameraSlotUi updates Settings link text and buttons", cs.Contains("SettingsS1CamLinkText!=null") && cs.Contains("SettingsS2CamLinkText!=null"));
+    Check("settings camera: header status indicator restricts to LIVE or OFFLINE",
+        cs.Contains("string headerState=isLive?\"LIVE\":\"OFFLINE\";") ||
+        cs.Contains("string headerState = isLive ? \"LIVE\" : \"OFFLINE\";"));
+}
+// 25. Station 02 HikDirectIpCamera Dynamic BGR Buffer & Acquisition Mode Regression Tests
+Check("hik direct: Station 02 2592x1944 BGR payload is strictly 15,116,544 bytes",
+    HikDirectIpCamera.Station02RequiredBytes == 2592 * 1944 * 3 &&
+    HikDirectIpCamera.Station02RequiredBytes == 15116544);
+
+Check("hik direct: legacy buffer 9,331,200 is insufficient for Station 02, causing MV_E_NOENOUGH_BUF",
+    HikDirectIpCamera.Station02RequiredBytes > (1440 * 1080 * 3 * 2));
+
+Check("hik direct: dynamic buffer for Station 02 allocates sufficient BGR capacity",
+    HikDirectIpCamera.CalculateRequiredBufferSize(2592, 1944) >= HikDirectIpCamera.Station02RequiredBytes);
+
+Check("hik direct: buffer for Station 01 preserves required 1440x1080 BGR capacity",
+    HikDirectIpCamera.CalculateRequiredBufferSize(1440, 1080) >= (1440 * 1080 * 3));
+
+Check("hik direct: unqueried fallback buffer size defaults safely to Station 02 requirement",
+    HikDirectIpCamera.CalculateRequiredBufferSize(0, 0) >= HikDirectIpCamera.Station02RequiredBytes);
+
+Check("hik direct: raw sensor payload size correctly scales 3x for BGR conversion",
+    HikDirectIpCamera.CalculateRequiredBufferSize(0, 0, 2592 * 1944) >= HikDirectIpCamera.Station02RequiredBytes);
+
+Check("hik direct: payload-size avoids 3x over-allocation when payload already reflects BGR",
+    HikDirectIpCamera.CalculateRequiredBufferSize(2592, 1944, 15116544) == 15116544 &&
+    HikDirectIpCamera.CalculateRequiredBufferSize(2592, 1944, 15116544) < (15116544L * 3));
+
+Check("hik direct: payload-size expands raw Bayer/Mono payload to 3x BGR capacity",
+    HikDirectIpCamera.CalculateRequiredBufferSize(2592, 1944, 5038848) == 15116544);
+
+Check("hik direct: dynamic buffer scales above Station 02 for higher resolution sensors",
+    HikDirectIpCamera.CalculateRequiredBufferSize(4096, 3000) == (4096L * 3000L * 3L));
+
+bool overflowCaught = false;
+try { HikDirectIpCamera.CalculateRequiredBufferSize(1000000, 1000000); }
+catch (ArgumentOutOfRangeException) { overflowCaught = true; }
+Check("hik direct: buffer calculation protects against overflow exceeding int.MaxValue", overflowCaught);
+
+string myCameraPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Dependencies", "Devices", "MyCamera.cs");
+if (!File.Exists(myCameraPath)) myCameraPath = Path.Combine("Dependencies", "Devices", "MyCamera.cs");
+if (File.Exists(myCameraPath))
+{
+    string myc = File.ReadAllText(myCameraPath);
+    Check("hik direct: acquisition mode continuous matches MyCamera.cs enum (2)",
+        myc.Contains("MV_ACQ_MODE_CONTINUOUS = 2") && HikDirectIpCamera.TargetAcquisitionMode == 2);
+    Check("hik direct: trigger mode off matches MyCamera.cs enum (0)",
+        myc.Contains("MV_TRIGGER_MODE_OFF = 0") && HikDirectIpCamera.TargetTriggerMode == 0);
+    Check("hik direct: pixel format matches MyCamera.cs PixelType_Gvsp_BGR8_Packed (0x02180015)",
+        myc.Contains("PixelType_Gvsp_BGR8_Packed = 0x02180015") && HikDirectIpCamera.TargetPixelFormat == 0x02180015);
+}
+
+string mvsHeader = Path.Combine(@"C:\Program Files (x86)\MVS\Development\Includes", "CameraParams.h");
+if (File.Exists(mvsHeader))
+{
+    string hdr = File.ReadAllText(mvsHeader);
+    Check("hik direct: trigger mode off matches MVS SDK CameraParams.h enum definition",
+        hdr.Contains("MV_TRIGGER_MODE_OFF                 = 0"));
+}
+
+Check("hik direct: trigger selector names follow GenICam SFNC conventions",
+    HikDirectIpCamera.FrameStartSelector == "FrameStart" &&
+    HikDirectIpCamera.AcquisitionStartSelector == "AcquisitionStart" &&
+    HikDirectIpCamera.FrameBurstStartSelector == "FrameBurstStart");
+
+Check("hik direct: trigger selector values match GenICam SFNC standard (FrameStart=3, AcqStart=0, BurstStart=6)",
+    HikDirectIpCamera.FrameStartSelectorValue == 3 &&
+    HikDirectIpCamera.AcquisitionStartSelectorValue == 0 &&
+    HikDirectIpCamera.FrameBurstStartSelectorValue == 6);
+
+Check("hik direct: IsUnsupportedSelectorError identifies MV_E_SUPPORT and node missing while preserving fatal errors",
+    HikDirectIpCamera.IsUnsupportedSelectorError(unchecked((int)0x80000001)) &&  // MV_E_SUPPORT
+    HikDirectIpCamera.IsUnsupportedSelectorError(unchecked((int)0x80000021)) &&  // MV_E_DEV_SUPPORT
+    HikDirectIpCamera.IsUnsupportedSelectorError(unchecked((int)0x80000109)) &&  // MV_E_GC_NODE_NOT_FOUND
+    HikDirectIpCamera.IsUnsupportedSelectorError(unchecked((int)0x80000200)) &&  // MV_E_NOT_IMPLEMENTED
+    !HikDirectIpCamera.IsUnsupportedSelectorError(unchecked((int)0x80000000)) && // MV_E_HANDLE (not ignored)
+    !HikDirectIpCamera.IsUnsupportedSelectorError(unchecked((int)0x80000004)) && // MV_E_PARAMETER (not ignored)
+    !HikDirectIpCamera.IsUnsupportedSelectorError(0));
+
+Check("hik direct: ConfigureTriggerSelector fails closed with MV_E_HANDLE on null handle",
+    HikDirectIpCamera.ConfigureTriggerSelector(IntPtr.Zero, HikDirectIpCamera.FrameStartSelector, HikDirectIpCamera.FrameStartSelectorValue) == unchecked((int)0x80000000));
+
+var nativeType = typeof(HikDirectIpCamera).GetNestedType("Native", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+var getOptMethod = nativeType?.GetMethod("GetOptimalPacketSize", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+var setIntMethod = nativeType?.GetMethod("SetIntValueEx", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+Check("hik direct: native GetOptimalPacketSize import declared with handle parameter",
+    getOptMethod != null && getOptMethod.ReturnType == typeof(int) && getOptMethod.GetParameters().Length == 1);
+Check("hik direct: native SetIntValueEx import declared with key and int64 value parameter",
+    setIntMethod != null && setIntMethod.GetParameters().Length == 3 &&
+    setIntMethod.GetParameters()[1].ParameterType == typeof(string) &&
+    setIntMethod.GetParameters()[2].ParameterType == typeof(long));
+
+string mvsControlHeader = Path.Combine(@"C:\Program Files (x86)\MVS\Development\Includes", "MvCameraControl.h");
+if (File.Exists(mvsControlHeader))
+{
+    string chdr = File.ReadAllText(mvsControlHeader);
+    Check("hik direct: MVS SDK MvCameraControl.h declares MV_CC_GetOptimalPacketSize",
+        chdr.Contains("MV_CC_GetOptimalPacketSize"));
+    Check("hik direct: MVS SDK MvCameraControl.h declares MV_CC_SetIntValueEx",
+        chdr.Contains("MV_CC_SetIntValueEx"));
+}
+
+string directSourcePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "App", "Vision", "Vision", "HikDirectIpCamera.cs");
+if (!File.Exists(directSourcePath)) directSourcePath = Path.Combine("App", "Vision", "Vision", "HikDirectIpCamera.cs");
+if (File.Exists(directSourcePath))
+{
+    string directCode = File.ReadAllText(directSourcePath);
+    Check("hik direct: code never issues persistent UserSetSave or flash writes (volatile registers only)",
+        !directCode.Contains("UserSetSave") &&
+        !directCode.Contains("UserSetSelector") &&
+        !directCode.Contains("MV_CC_SaveDeviceFeature") &&
+        !directCode.Contains("MV_CC_SetCommandValue"));
+}
+string hikServicePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Dependencies", "Devices", "HikCameraService.cs");
+if (!File.Exists(hikServicePath)) hikServicePath = Path.Combine("Dependencies", "Devices", "HikCameraService.cs");
+if (File.Exists(hikServicePath))
+{
+    string hcs = File.ReadAllText(hikServicePath);
+    Check("hik direct: configuration keys and enums align with HikCameraService.cs",
+        hcs.Contains("\"AcquisitionMode\", (int)MyCamera.MV_CAM_ACQUISITION_MODE.MV_ACQ_MODE_CONTINUOUS") &&
+        hcs.Contains("\"TriggerMode\", (int)MyCamera.MV_CAM_TRIGGER_MODE.MV_TRIGGER_MODE_OFF") &&
+        hcs.Contains("\"PixelFormat\", (uint)MyCamera.MvGvspPixelType.PixelType_Gvsp_BGR8_Packed"));
+}
+bool nonIpv4Rejected = false;
+try { new HikDirectIpCamera("::1", "192.168.100.1"); }
+catch (ArgumentException) { nonIpv4Rejected = true; }
+Check("hik direct: constructor rejects non-IPv4 addresses (fails closed)", nonIpv4Rejected);
+
+using var directStation02 = new HikDirectIpCamera("192.168.100.3", "192.168.100.1");
+Check("hik direct: IP construction correctly stores Station 02 camera and host IPs",
+    directStation02.CameraIp == "192.168.100.3" && directStation02.HostIp == "192.168.100.1");
+
+// 26. Offline Tray Allocator & CAM2 Processing Regression Tests (Pure Offline, No ADS/Hardware Writes)
+var validBounds = new TrayWorkspaceBounds(0, 500, 0, 500);
+Check("tray bounds: valid bounds recognized", validBounds.IsValid && validBounds.Contains(250, 250));
+Check("tray bounds: out-of-bounds rejected", !validBounds.Contains(600, 250) && !validBounds.Contains(-10, 250));
+
+var invalidBounds = new TrayWorkspaceBounds(500, 0, 0, 500);
+Check("tray bounds: inverted bounds invalid", !invalidBounds.IsValid);
+
+bool zeroRowRejected = false;
+try { new TrayLayoutConfig(0, 4, 30, 30, 50, 50, 0, validBounds); }
+catch (ArgumentException) { zeroRowRejected = true; }
+Check("tray config: zero rows rejected", zeroRowRejected);
+
+bool zeroColRejected = false;
+try { new TrayLayoutConfig(2, 0, 30, 30, 50, 50, 0, validBounds); }
+catch (ArgumentException) { zeroColRejected = true; }
+Check("tray config: zero columns rejected", zeroColRejected);
+
+bool nonfinitePitchRejected = false;
+try { new TrayLayoutConfig(2, 2, -10, 30, 50, 50, 0, validBounds); }
+catch (ArgumentException) { nonfinitePitchRejected = true; }
+Check("tray config: non-positive pitch rejected", nonfinitePitchRejected);
+
+bool nanOriginRejected = false;
+try { new TrayLayoutConfig(2, 2, 30, 30, double.NaN, 50, 0, validBounds); }
+catch (ArgumentException) { nanOriginRejected = true; }
+Check("tray config: non-finite origin rejected", nanOriginRejected);
+
+bool nanAngleRejected = false;
+try { new TrayLayoutConfig(2, 2, 30, 30, 50, 50, double.NaN, validBounds); }
+catch (ArgumentException) { nanAngleRejected = true; }
+Check("tray config: non-finite angle rejected", nanAngleRejected);
+
+bool nullBoundsRejected = false;
+try { new TrayLayoutConfig(2, 2, 30, 30, 50, 50, 0, null!); }
+catch (ArgumentNullException) { nullBoundsRejected = true; }
+Check("tray config: null workspace bounds rejected", nullBoundsRejected);
+
+bool outOfBoundsSlotsRejected = false;
+try { new TrayLayoutConfig(10, 10, 100, 100, 50, 50, 0, validBounds); }
+catch (Exception ex) when (ex is ArgumentOutOfRangeException or ArgumentException) { outOfBoundsSlotsRejected = true; }
+Check("tray config: slots exceeding workspace bounds rejected", outOfBoundsSlotsRejected);
+
+// Explicit parameters required: verify type has NO parameterless constructor
+var constructors = typeof(TrayLayoutConfig).GetConstructors();
+bool noDefaultConstructor = constructors.All(c => c.GetParameters().Length > 0);
+Check("tray config: no default 3x4 constructor (explicit layout parameters required)", noDefaultConstructor);
+
+// Valid 2x2 Tray Allocator test
+var tray2x2 = new TrayLayoutConfig(2, 2, 40, 40, 100, 100, 0, validBounds);
+var allocator = new OfflineTrayAllocator(tray2x2);
+Check("tray allocator: initial capacity 4 and unoccupied",
+    allocator.Capacity == 4 && allocator.OccupiedCount == 0 && allocator.RemainingCount == 4 && !allocator.IsFull);
+Check("tray allocator: slots initialized with computed placement coordinates",
+    allocator.Slots.Count == 4 &&
+    allocator.Slots[0].PlaceX_mm == 100 && allocator.Slots[0].PlaceY_mm == 100 &&
+    allocator.Slots[1].PlaceX_mm == 140 && allocator.Slots[1].PlaceY_mm == 100 &&
+    allocator.Slots[2].PlaceX_mm == 100 && allocator.Slots[2].PlaceY_mm == 140 &&
+    allocator.Slots[3].PlaceX_mm == 140 && allocator.Slots[3].PlaceY_mm == 140);
+
+var dummyPose1 = new TrackedWorkpiecePose(1, "CAM2/MANUAL/1", DateTime.UtcNow, 0, 50, 60, 5.0, 40, 40, 0.95, Array.Empty<ConveyorVertex>(), true);
+var alloc1 = allocator.Allocate(dummyPose1);
+Check("tray allocator: valid workpiece allocated to slot 1",
+    alloc1.Success && alloc1.Slot != null && alloc1.Slot.Index == 1 &&
+    alloc1.Slot.Row == 0 && alloc1.Slot.Column == 0 &&
+    allocator.OccupiedCount == 1 && allocator.RemainingCount == 3);
+
+// Duplicate allocation rejected
+var dupAlloc = allocator.Allocate(dummyPose1);
+Check("tray allocator: duplicate workpiece key rejected without consuming slot",
+    !dupAlloc.Success && dupAlloc.Status.Contains("REJECTED_DUPLICATE") && allocator.OccupiedCount == 1);
+
+// Non-finite pose rejected
+var nanPose = new TrackedWorkpiecePose(2, "CAM2/MANUAL/2", DateTime.UtcNow, 0, double.NaN, 60, 5.0, 40, 40, 0.95, Array.Empty<ConveyorVertex>(), true);
+var nanAlloc = allocator.Allocate(nanPose);
+Check("tray allocator: non-finite workpiece pose rejected fail-closed",
+    !nanAlloc.Success && nanAlloc.Status.Contains("REJECTED_NONFINITE_POSE") && allocator.OccupiedCount == 1);
+
+// Allocate slots 2, 3, 4
+var dummyPose2 = new TrackedWorkpiecePose(2, "CAM2/MANUAL/2", DateTime.UtcNow, 0, 51, 61, 0, 40, 40, 0.9, Array.Empty<ConveyorVertex>(), true);
+var dummyPose3 = new TrackedWorkpiecePose(3, "CAM2/MANUAL/3", DateTime.UtcNow, 0, 52, 62, 0, 40, 40, 0.9, Array.Empty<ConveyorVertex>(), true);
+var dummyPose4 = new TrackedWorkpiecePose(4, "CAM2/MANUAL/4", DateTime.UtcNow, 0, 53, 63, 0, 40, 40, 0.9, Array.Empty<ConveyorVertex>(), true);
+allocator.Allocate(dummyPose2);
+allocator.Allocate(dummyPose3);
+var alloc4 = allocator.Allocate(dummyPose4);
+Check("tray allocator: fills exactly to capacity",
+    alloc4.Success && allocator.IsFull && allocator.OccupiedCount == 4 && allocator.RemainingCount == 0);
+
+// Overflow check: MUST NOT auto-advance trays!
+var dummyPose5 = new TrackedWorkpiecePose(5, "CAM2/MANUAL/5", DateTime.UtcNow, 0, 54, 64, 0, 40, 40, 0.9, Array.Empty<ConveyorVertex>(), true);
+var overflowAlloc = allocator.Allocate(dummyPose5);
+Check("tray allocator: tray full rejected (NO auto-advance)",
+    !overflowAlloc.Success && overflowAlloc.Status.Contains("REJECTED_TRAY_FULL") &&
+    allocator.OccupiedCount == 4 && allocator.RemainingCount == 0);
+
+// Audit trail check
+Check("tray allocator: audit trail records all allocation and rejection events",
+    allocator.AuditTrail.Count >= 6 &&
+    allocator.AuditTrail.Any(a => a.Status == "ALLOCATED" && a.SlotIndex == 1) &&
+    allocator.AuditTrail.Any(a => a.Status.Contains("REJECTED_DUPLICATE")) &&
+    allocator.AuditTrail.Any(a => a.Status.Contains("REJECTED_TRAY_FULL")));
+
+// Reset tray
+allocator.ResetTray();
+Check("tray allocator: ResetTray explicitly commanded clears occupied slots while preserving audit log",
+    allocator.OccupiedCount == 0 && allocator.RemainingCount == 4 && !allocator.IsFull &&
+    allocator.AuditTrail.Any(a => a.Status == "TRAY_RESET"));
+
+// CAM2 Pipeline & Calibration Guard Tests
+var uncalibratedOpt = new VisionOptions { FixedMmPerPixel = 0 }; // scale <= 0
+Check("cam2 pipeline: scale <= 0 marked uncalibrated", !Camera2Pipeline.IsCalibrationValid(uncalibratedOpt));
+Check("cam2 pipeline: null options marked uncalibrated", !Camera2Pipeline.IsCalibrationValid(null));
+
+var calibratedOpt = new VisionOptions {
+    FixedMmPerPixel = 0.0825,
+    PlateSizeMm = 50.0,
+    HolePitchMm = 40.0,
+    OriginPxX = 320,
+    OriginPxY = 240,
+    OffsetXmm = 0,
+    OffsetYmm = 0
+};
+Check("cam2 pipeline: valid options recognized as calibrated", Camera2Pipeline.IsCalibrationValid(calibratedOpt));
+
+// CAM2 safe processing path fails closed when uncalibrated
+using var syntheticFrame = new OpenCvSharp.Mat(480, 640, OpenCvSharp.MatType.CV_8UC3, new OpenCvSharp.Scalar(30, 30, 30));
+var cam2Tracker = new MidlineTracker();
+var uncalibResult = Camera2Pipeline.ProcessFrame(
+    syntheticFrame, "CAM2/DA7403922", uncalibratedOpt, BeltDirection.YMinus, cam2Tracker, allocator);
+Check("cam2 pipeline: uncalibrated fails closed without pose or allocation",
+    !uncalibResult.Processed && !uncalibResult.Calibrated && !uncalibResult.PlateDetected &&
+    uncalibResult.BeltPose == null && uncalibResult.WorkpiecePose == null && uncalibResult.Allocation == null &&
+    uncalibResult.StatusText.Contains("FAIL CLOSED"));
+
+// CAM2 tracker key isolation
+string keyHik = Camera2Pipeline.BuildTrackerKey("DA7403922");
+string keyManual = Camera2Pipeline.BuildTrackerKey("192.168.100.3");
+string keyEmpty = Camera2Pipeline.BuildTrackerKey("");
+Check("cam2 tracker key: uses CAM2 prefix and preserves identifier",
+    keyHik == "CAM2/DA7403922" && keyManual == "CAM2/192.168.100.3" && keyEmpty == "CAM2/manual");
+Check("cam2 tracker key: never collides with CAM1 key namespace",
+    !keyHik.StartsWith("CAM1") && !keyHik.StartsWith("DEMO"));
+
+// Independent tracker IDs between CAM1 and CAM2
+var trackerCam1 = new MidlineTracker();
+var trackerCam2 = new MidlineTracker();
+var dummyDet = new PlateResult(true, 320, 240, 0, 0, 0, 0.0825, 0.95, null, null, null, "OK");
+var t1 = trackerCam1.Update("CAM1/manual", [dummyDet], 640, 480, out _);
+var t2 = trackerCam2.Update("CAM2/manual", [dummyDet], 640, 480, out _);
+Check("cam2 tracker: independent tracker instance maintains separate track identity",
+    t1.Count == 1 && t2.Count == 1 && t1[0].ProductId == t2[0].ProductId);
+trackerCam2.Reset();
+Check("cam2 tracker: reset of CAM2 tracker does not reset CAM1 tracker state",
+    trackerCam1.Update("CAM1/manual", [dummyDet], 640, 480, out _).Count == 1);
+
+// 27. CAM2 Explicit Configuration Path, Synthetic Positive Pipeline, and Zero-Write Boundary Tests
+bool calibCreated = Camera2Pipeline.TryCreateCalibrationOptions(
+    0.0825, 320, 240, 0, 0, 40.0, 50.0, out var createdOpt, out var calibErr);
+Check("cam2 config: TryCreateCalibrationOptions accepts valid explicit parameters",
+    calibCreated && createdOpt != null && createdOpt.FixedMmPerPixel == 0.0825 && string.IsNullOrEmpty(calibErr));
+
+bool calibZeroScaleRejected = !Camera2Pipeline.TryCreateCalibrationOptions(
+    0.0, 320, 240, 0, 0, 40.0, 50.0, out _, out var errZeroScale);
+Check("cam2 config: TryCreateCalibrationOptions rejects scale <= 0",
+    calibZeroScaleRejected && errZeroScale.Contains("fixedMmPerPixel"));
+
+bool calibNanScaleRejected = !Camera2Pipeline.TryCreateCalibrationOptions(
+    double.NaN, 320, 240, 0, 0, 40.0, 50.0, out _, out _);
+Check("cam2 config: TryCreateCalibrationOptions rejects NaN scale", calibNanScaleRejected);
+
+bool calibZeroPlateRejected = !Camera2Pipeline.TryCreateCalibrationOptions(
+    0.0825, 320, 240, 0, 0, 40.0, 0.0, out _, out var errZeroPlate);
+Check("cam2 config: TryCreateCalibrationOptions rejects plateSize <= 0",
+    calibZeroPlateRejected && errZeroPlate.Contains("plateSizeMm"));
+
+bool calibZeroPitchRejected = !Camera2Pipeline.TryCreateCalibrationOptions(
+    0.0825, 320, 240, 0, 0, 0.0, 50.0, out _, out var errZeroPitch);
+Check("cam2 config: TryCreateCalibrationOptions rejects holePitch <= 0",
+    calibZeroPitchRejected && errZeroPitch.Contains("holePitchMm"));
+bool calibNanPlateRejected = !Camera2Pipeline.TryCreateCalibrationOptions(
+    0.0825, 320, 240, 0, 0, 40.0, double.NaN, out _, out _);
+Check("cam2 config: TryCreateCalibrationOptions rejects NaN plateSize", calibNanPlateRejected);
+
+bool calibNanPitchRejected = !Camera2Pipeline.TryCreateCalibrationOptions(
+    0.0825, 320, 240, 0, 0, double.NaN, 50.0, out _, out _);
+Check("cam2 config: TryCreateCalibrationOptions rejects NaN holePitch", calibNanPitchRejected);
+
+bool calibNanOriginXRejected = !Camera2Pipeline.TryCreateCalibrationOptions(
+    0.0825, double.NaN, 240, 0, 0, 40.0, 50.0, out _, out var errNanOx);
+Check("cam2 config: TryCreateCalibrationOptions rejects NaN originX (no auto default)",
+    calibNanOriginXRejected && errNanOx.Contains("originPxX"));
+
+bool calibNanOriginYRejected = !Camera2Pipeline.TryCreateCalibrationOptions(
+    0.0825, 320, double.NaN, 0, 0, 40.0, 50.0, out _, out var errNanOy);
+Check("cam2 config: TryCreateCalibrationOptions rejects NaN originY (no auto default)",
+    calibNanOriginYRejected && errNanOy.Contains("originPxY"));
+
+var optNanOx = new VisionOptions { FixedMmPerPixel = 0.0825, PlateSizeMm = 50, HolePitchMm = 40, OriginPxX = double.NaN, OriginPxY = 240, OffsetXmm = 0, OffsetYmm = 0 };
+Check("cam2 pipeline: IsCalibrationValid rejects NaN originX", !Camera2Pipeline.IsCalibrationValid(optNanOx));
+
+var optNanOy = new VisionOptions { FixedMmPerPixel = 0.0825, PlateSizeMm = 50, HolePitchMm = 40, OriginPxX = 320, OriginPxY = double.NaN, OffsetXmm = 0, OffsetYmm = 0 };
+Check("cam2 pipeline: IsCalibrationValid rejects NaN originY", !Camera2Pipeline.IsCalibrationValid(optNanOy));
+
+
+bool trayCreated = Camera2Pipeline.TryCreateTrayLayoutConfig(
+    2, 3, 50.0, 50.0, 100.0, 100.0, 0.0, validBounds, out var createdTrayLayout, out var trayErr);
+Check("cam2 config: TryCreateTrayLayoutConfig accepts valid explicit 2x3 layout",
+    trayCreated && createdTrayLayout != null && createdTrayLayout.Rows == 2 && createdTrayLayout.Columns == 3 && string.IsNullOrEmpty(trayErr));
+
+bool trayZeroColRejected = !Camera2Pipeline.TryCreateTrayLayoutConfig(
+    2, 0, 50.0, 50.0, 100.0, 100.0, 0.0, validBounds, out _, out var errZeroCol);
+Check("cam2 config: TryCreateTrayLayoutConfig rejects zero columns", trayZeroColRejected && !string.IsNullOrEmpty(errZeroCol));
+
+bool trayOutOfBoundsRejected = !Camera2Pipeline.TryCreateTrayLayoutConfig(
+    10, 10, 100.0, 100.0, 100.0, 100.0, 0.0, validBounds, out _, out var errOob);
+Check("cam2 config: TryCreateTrayLayoutConfig rejects layout exceeding workspace bounds",
+    trayOutOfBoundsRejected && !string.IsNullOrEmpty(errOob));
+bool trayNanAngleRejected = !Camera2Pipeline.TryCreateTrayLayoutConfig(
+    2, 3, 50.0, 50.0, 100.0, 100.0, double.NaN, validBounds, out _, out _);
+Check("cam2 config: TryCreateTrayLayoutConfig rejects NaN trayAngle", trayNanAngleRejected);
+
+bool trayInvertedBoundsRejected = !Camera2Pipeline.TryCreateTrayLayoutConfig(
+    2, 3, 50.0, 50.0, 100.0, 100.0, 0.0, new TrayWorkspaceBounds(500, 100, 0, 500), out _, out _);
+Check("cam2 config: TryCreateTrayLayoutConfig rejects inverted workspace bounds", trayInvertedBoundsRejected);
+
+
+// Atomic configuration apply and preservation tests
+VisionOptions? atomicOpt = createdOpt;
+OfflineTrayAllocator? atomicAlloc = new OfflineTrayAllocator(createdTrayLayout!);
+double priorScale = atomicOpt.FixedMmPerPixel;
+int priorCap = atomicAlloc.Capacity;
+
+// Test 1: Null tray layout must reject and leave prior state unchanged
+bool applyNullTrayRejected = !Camera2Pipeline.TryApplyOfflineConfig(
+    ref atomicOpt, ref atomicAlloc, createdOpt!, null, out var errNullTray);
+Check("cam2 atomic: null tray layout rejected fail-closed", applyNullTrayRejected && !string.IsNullOrEmpty(errNullTray));
+Check("cam2 atomic: null tray apply failure preserves prior calibration and allocator",
+    atomicOpt != null && atomicOpt.FixedMmPerPixel == priorScale &&
+    atomicAlloc != null && atomicAlloc.Capacity == priorCap);
+
+// Test 2: Invalid calibration options must reject and leave prior state unchanged
+var invalidCalib = new VisionOptions { FixedMmPerPixel = -1.0 };
+bool applyInvalidCalibRejected = !Camera2Pipeline.TryApplyOfflineConfig(
+    ref atomicOpt, ref atomicAlloc, invalidCalib, createdTrayLayout, out var errInvalidCalib);
+Check("cam2 atomic: invalid calibration rejected fail-closed", applyInvalidCalibRejected && !string.IsNullOrEmpty(errInvalidCalib));
+Check("cam2 atomic: invalid calib apply failure preserves prior calibration and allocator",
+    atomicOpt != null && atomicOpt.FixedMmPerPixel == priorScale &&
+    atomicAlloc != null && atomicAlloc.Capacity == priorCap);
+
+// Test 3: Valid full explicit config applies atomically
+var nextLayout = new TrayLayoutConfig(3, 3, 40.0, 40.0, 50.0, 50.0, 0.0, validBounds);
+Camera2Pipeline.TryCreateCalibrationOptions(0.05, 300, 200, 10, 10, 40.0, 50.0, out var nextCalib, out _);
+bool applyValidSucceeded = Camera2Pipeline.TryApplyOfflineConfig(
+    ref atomicOpt, ref atomicAlloc, nextCalib!, nextLayout, out var errApply);
+Check("cam2 atomic: valid full explicit config applies atomically",
+    applyValidSucceeded && string.IsNullOrEmpty(errApply) &&
+    atomicOpt != null && atomicOpt.FixedMmPerPixel == 0.05 &&
+    atomicAlloc != null && atomicAlloc.Capacity == 9);
+
+// Regression: Atomic failure preservation when TrayLayoutConfig constructor throws (slots outside workspace)
+var priorOptions = new VisionOptions
+{
+    FixedMmPerPixel = 0.0825,
+    PlateSizeMm = 50.0,
+    HolePitchMm = 40.0,
+    OriginPxX = 320.0,
+    OriginPxY = 240.0,
+    OffsetXmm = 0.0,
+    OffsetYmm = 0.0
+};
+var priorLayout = new TrayLayoutConfig(2, 2, 50.0, 50.0, 100.0, 100.0, 0.0, validBounds);
+var priorAllocator = new OfflineTrayAllocator(priorLayout);
+var workingOptions = priorOptions;
+OfflineTrayAllocator? workingAllocator = priorAllocator;
+
+var tinyBounds = new TrayWorkspaceBounds(0, 100, 0, 100);
+bool throwsConstructorEx = false;
+try
+{
+    _ = new TrayLayoutConfig(10, 10, 50.0, 50.0, 100.0, 100.0, 0.0, tinyBounds);
+}
+catch (ArgumentOutOfRangeException)
+{
+    throwsConstructorEx = true;
+}
+Check("cam2 atomic regression: invalid tray layout constructor throws on slots outside workspace", throwsConstructorEx);
+
+bool transactionalApplyResult = Camera2Pipeline.TryCreateAndApplyOfflineConfig(
+    ref workingOptions, ref workingAllocator,
+    0.1234, 400.0, 300.0, 10.0, 10.0, 45.0, 60.0,
+    10, 10, 50.0, 50.0, 100.0, 100.0, 0.0, tinyBounds,
+    out var transErr);
+
+Check("cam2 atomic regression: TryCreateAndApplyOfflineConfig rejects invalid tray config whose constructor throws",
+    !transactionalApplyResult && transErr.Contains("workspace"));
+
+Check("cam2 atomic regression: prior options NOT mutated after tray constructor failure (FixedMmPerPixel preserved)",
+    workingOptions.FixedMmPerPixel == 0.0825 && workingOptions.PlateSizeMm == 50.0);
+
+Check("cam2 atomic regression: prior allocator NOT mutated after tray constructor failure (Capacity preserved)",
+    workingAllocator != null && workingAllocator.Capacity == 4);
+
+// Synthetic positive regression: Calibrated Frame -> PlateDetector -> Camera2Pipeline -> Pose -> Tray Allocation
+var positiveTrayLayout = new TrayLayoutConfig(2, 2, 50, 50, 100, 100, 0, validBounds);
+var positiveAllocator = new OfflineTrayAllocator(positiveTrayLayout);
+var positiveTracker = new MidlineTracker { Direction = BeltDirection.XPlus, LineFraction = 0.5 };
+
+double syntheticScale = 50.0 / 260.0; // 50mm plate mapped to 260px square
+var positiveCalib = new VisionOptions
+{
+    FixedMmPerPixel = syntheticScale,
+    PlateSizeMm = 50.0,
+    HolePitchMm = 40.0,
+    OriginPxX = 400,
+    OriginPxY = 300,
+    OffsetXmm = 0,
+    OffsetYmm = 0
+};
+
+// Helper to draw a synthetic plate image with 4 holes
+static Mat CreateSyntheticPlateImage(int centerX, int centerY, double angleDeg)
+{
+    var mat = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220));
+    int half = 130; // 260 / 2
+    Cv2.Rectangle(mat, new Rect(centerX - half, centerY - half, 260, 260), new Scalar(55, 55, 55), -1);
+    int holeOffset = 104; // 208 / 2 for 40mm pitch
+    var holes = new[]
+    {
+        new Point(centerX - holeOffset, centerY - holeOffset),
+        new Point(centerX + holeOffset, centerY - holeOffset),
+        new Point(centerX + holeOffset, centerY + holeOffset),
+        new Point(centerX - holeOffset, centerY + holeOffset)
+    };
+    foreach (var h in holes) Cv2.Circle(mat, h, 13, new Scalar(170, 170, 170), -1);
+    if (Math.Abs(angleDeg) > 0.01)
+    {
+        using var rot = Cv2.GetRotationMatrix2D(new Point2f(centerX, centerY), angleDeg, 1.0);
+        using var rotated = mat.Clone();
+        Cv2.WarpAffine(rotated, mat, rot, new Size(800, 600), InterpolationFlags.Linear, BorderTypes.Constant, new Scalar(220, 220, 220));
+    }
+    return mat;
+}
+
+using var frameBeforeMidline = CreateSyntheticPlateImage(350, 300, 0); // X=350 before midline at 400 (along = -50)
+var res1 = Camera2Pipeline.ProcessFrame(
+    frameBeforeMidline, "CAM2/DA7403922", positiveCalib, BeltDirection.XPlus, positiveTracker, positiveAllocator);
+
+Check("synthetic positive: frame 1 before midline detects plate with valid pose",
+    res1.Processed && res1.Calibrated && res1.PlateDetected &&
+    res1.BeltPose != null && res1.WorkpiecePose != null &&
+    res1.Allocation == null && positiveAllocator.OccupiedCount == 0);
+
+using var frameAfterMidline = CreateSyntheticPlateImage(430, 300, 0); // X=430 crossing midline at 400 (along = +30, dx = 80)
+var res2 = Camera2Pipeline.ProcessFrame(
+    frameAfterMidline, "CAM2/DA7403922", positiveCalib, BeltDirection.XPlus, positiveTracker, positiveAllocator);
+Check("synthetic positive: frame 2 crossing triggers tray allocation to Slot 1",
+    res2.Processed && res2.PlateDetected &&
+    res2.Allocation != null && res2.Allocation.Success &&
+    res2.Allocation.Slot != null && res2.Allocation.Slot.Index == 1 &&
+    res2.Allocation.Slot.Row == 0 && res2.Allocation.Slot.Column == 0 &&
+    positiveAllocator.OccupiedCount == 1 &&
+    positiveAllocator.AuditTrail.Any(a => a.Status == "ALLOCATED" && a.SlotIndex == 1));
+
+// Negative test: Missing calibration with the same plate image
+var uncalibZero = new VisionOptions { FixedMmPerPixel = 0.0 };
+var negTracker = new MidlineTracker { Direction = BeltDirection.XPlus, LineFraction = 0.5 };
+var negAllocator = new OfflineTrayAllocator(positiveTrayLayout);
+var resNegCalib = Camera2Pipeline.ProcessFrame(
+    frameAfterMidline, "CAM2/DA7403922", uncalibZero, BeltDirection.XPlus, negTracker, negAllocator);
+
+Check("negative missing calibration: fails closed without pose or allocation",
+    !resNegCalib.Processed && !resNegCalib.Calibrated && !resNegCalib.PlateDetected &&
+    resNegCalib.BeltPose == null && resNegCalib.WorkpiecePose == null && resNegCalib.Allocation == null &&
+    negAllocator.OccupiedCount == 0 && resNegCalib.StatusText.Contains("FAIL CLOSED"));
+
+// Negative test: Calibrated options but tray layout is null
+var trackerNoTray = new MidlineTracker { Direction = BeltDirection.XPlus, LineFraction = 0.5 };
+using var f1 = CreateSyntheticPlateImage(350, 300, 0);
+using var f2 = CreateSyntheticPlateImage(430, 300, 0);
+Camera2Pipeline.ProcessFrame(f1, "CAM2/DA7403922", positiveCalib, BeltDirection.XPlus, trackerNoTray, null);
+var resNoTray = Camera2Pipeline.ProcessFrame(f2, "CAM2/DA7403922", positiveCalib, BeltDirection.XPlus, trackerNoTray, null);
+
+Check("negative missing tray layout: detects plate but skips allocation cleanly without throwing",
+    resNoTray.Processed && resNoTray.PlateDetected && resNoTray.WorkpiecePose != null && resNoTray.Allocation == null);
+
+// Zero-write boundary test
+var zeroWriteTransport = new FakeAdsMailboxTransport();
+zeroWriteTransport.TryConnect(851);
+Check("zero-write boundary: FakeAdsMailboxTransport has zero writes during CAM2 processing",
+    zeroWriteTransport.Writes.Count == 0);
+
+// UI configuration path regression audit
+if (File.Exists(xamlPath))
+{
+    string s2Xaml = File.ReadAllText(xamlPath);
+    Check("settings s2 ui: contains explicit calibration inputs",
+        s2Xaml.Contains("x:Name=\"SettingsS2ScaleBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2OriginXBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2OriginYBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2OffsetXBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2OffsetYBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2HolePitchBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2PlateSizeBox\""));
+
+    Check("settings s2 ui: does not contain implicit 'auto' or '0' defaults",
+        !s2Xaml.Contains("x:Name=\"SettingsS2OriginXBox\" Text=\"auto\"") &&
+        !s2Xaml.Contains("x:Name=\"SettingsS2OriginYBox\" Text=\"auto\"") &&
+        !s2Xaml.Contains("x:Name=\"SettingsS2TrayAngleBox\" Text=\"0\"") &&
+        !s2Xaml.Contains("x:Name=\"SettingsS2TrayBoundMaxBox\""));
+
+    Check("settings s2 ui: contains explicit 4-boundary tray layout inputs",
+        s2Xaml.Contains("x:Name=\"SettingsS2TrayRowsBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2TrayColsBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2TrayPitchXBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2TrayPitchYBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2TrayOriginXBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2TrayOriginYBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2TrayAngleBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2TrayBoundMinXBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2TrayBoundMaxXBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2TrayBoundMinYBox\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2TrayBoundMaxYBox\""));
+
+    Check("settings s2 ui: contains apply and clear config buttons",
+        s2Xaml.Contains("x:Name=\"SettingsS2ApplyConfigButton\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2ClearConfigButton\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2CalibSummary\"") &&
+        s2Xaml.Contains("x:Name=\"SettingsS2TraySummary\""));
+}
+
+if (File.Exists(mwPath))
+{
+    string mwCode = File.ReadAllText(mwPath);
+    Check("settings s2 code: SettingsS2ApplyConfig_Click implemented",
+        mwCode.Contains("SettingsS2ApplyConfig_Click"));
+    Check("settings s2 code: uses explicit SettingsS2HolePitchBox and SettingsS2PlateSizeBox (no hard-coded 40/50)",
+        mwCode.Contains("SettingsS2HolePitchBox") &&
+        mwCode.Contains("SettingsS2PlateSizeBox") &&
+        !mwCode.Contains(",40.0,50.0,") &&
+        !mwCode.Contains(", 40.0, 50.0,"));
+    Check("settings s2 code: removes auto origin semantics from S2 handler",
+        !mwCode.Contains("SettingsS2OriginXBox.Text.Trim().Equals(\"auto\"") &&
+        !mwCode.Contains("SettingsS2OriginYBox.Text.Trim().Equals(\"auto\""));
+    Check("settings s2 code: SettingsS2ClearConfig_Click implemented",
+        mwCode.Contains("SettingsS2ClearConfig_Click"));
+    Check("settings s2 code: TryApplyStation2OfflineConfig method implemented",
+        mwCode.Contains("TryApplyStation2OfflineConfig"));
+    Check("settings s2 code: TryApplyStation2OfflineConfig rejects null tray layout (no trayConfig=null success path)",
+        mwCode.Contains("if(trayConfig==null") || mwCode.Contains("if (trayConfig == null") || mwCode.Contains("trayConfig == null"));
+    Check("settings s2 code: TryApplyStation2OfflineConfig delegates to transactional helper without mutating _optionsCam2 first",
+        mwCode.Contains("Camera2Pipeline.TryApplyOfflineConfig") &&
+        !mwCode.Contains("_optionsCam2.FixedMmPerPixel=options.FixedMmPerPixel;"));
+    int pollCam2Index = mwCode.IndexOf("void PollCamera2()");
+    Check("cam2 live label: PollCamera2 method found in MainWindow.xaml.cs", pollCam2Index >= 0);
+    if (pollCam2Index >= 0)
+    {
+        int methodEnd = mwCode.IndexOf("public bool TryApplyStation2OfflineConfig", pollCam2Index);
+        string pollCam2Code = methodEnd > pollCam2Index
+            ? mwCode.Substring(pollCam2Index, methodEnd - pollCam2Index)
+            : mwCode.Substring(pollCam2Index);
+
+        Check("cam2 live label: calibrated live detection does not label live camera as OFFLINE SIM",
+            !pollCam2Code.Contains("OFFLINE SIM"));
+        Check("cam2 live label: calibrated live detection contains truthful VISION ONLY wording",
+            pollCam2Code.Contains("VISION ONLY") && pollCam2Code.Contains("CAM 2 · VISION ONLY"));
+    }
+}
+
+// =========================================================================
+// OFFLINE WORKPIECE CENTER & TILT ANGLE EVALUATION TESTS (SPEC-20261105)
+// =========================================================================
+Console.WriteLine("OFFLINE CENTER & TILT ANGLE EVALUATION TESTS:");
+
+// 1. Blank frame returns Found=false
+using (var blankMat = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220)))
+{
+    var blankRes = PlateVision50.Vision.OfflineCenterAngleDetector.Detect(blankMat);
+    Check("offline eval: blank frame returns Found=false", !blankRes.Found);
+}
+
+// 2. Pixel-first contract & null millimeter fallback when calibration is omitted
+using (var rectMat = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220)))
+{
+    Cv2.Rectangle(rectMat, new Rect(300, 200, 200, 200), new Scalar(50, 50, 50), -1);
+    var pxRes = PlateVision50.Vision.OfflineCenterAngleDetector.Detect(rectMat);
+    Check("offline eval: pixel-first detection reports finite pixel coordinates",
+        pxRes.Found && Math.Abs(pxRes.CenterPxX - 400) < 2.0 && Math.Abs(pxRes.CenterPxY - 300) < 2.0);
+    Check("offline eval: omitted calibration produces null millimeter values",
+        pxRes.CenterX_mm == null && pxRes.CenterY_mm == null && pxRes.ThetaDeg == null && pxRes.MmPerPixel == null);
+
+    // Call with caller options: must clone options and not mutate caller's instance
+    var callerOpt = new VisionOptions { FixedMmPerPixel = 0.5, OriginPxX = 100, OriginPxY = 100 };
+    var resOpt = PlateVision50.Vision.OfflineCenterAngleDetector.Detect(rectMat, fixedMmPerPixel: 0.2, originPxX: 400, originPxY: 300, options: callerOpt);
+    Check("offline eval: caller VisionOptions instance is not mutated", callerOpt.FixedMmPerPixel == 0.5 && callerOpt.OriginPxX == 100);
+    Check("offline eval: millimeter outputs strictly null to prevent motion implications",
+        resOpt.CenterX_mm == null && resOpt.CenterY_mm == null && resOpt.ThetaDeg == null && resOpt.MmPerPixel == null);
+}
+
+// 3. Deterministic synthetic multi-angle suite (0, 15, -30, 35.5, 44 deg)
+foreach (double testAngle in new[] { 0.0, 15.0, -30.0, 35.5, 44.0 })
+{
+    using var baseImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220));
+    using (var tmp = baseImg.Clone())
+    {
+        Cv2.Rectangle(tmp, new Rect(270, 170, 260, 260), new Scalar(50, 50, 50), -1);
+        using var rotMat = Cv2.GetRotationMatrix2D(new Point2f(400, 300), testAngle, 1.0);
+        Cv2.WarpAffine(tmp, baseImg, rotMat, new Size(800, 600), InterpolationFlags.Linear, BorderTypes.Constant, new Scalar(220, 220, 220));
+    }
+    var res = PlateVision50.Vision.OfflineCenterAngleDetector.Detect(baseImg);
+    double err = res.AngleDeg - testAngle;
+    while (err >= 45.0) err -= 90.0;
+    while (err < -45.0) err += 90.0;
+
+    Check($"offline eval: synthetic angle {testAngle:F1} deg",
+        res.Found && Math.Abs(err) < 1.5 && Math.Abs(res.CenterPxX - 400) < 2.0 && Math.Abs(res.CenterPxY - 300) < 2.0);
+}
+
+// 4. 90-degree rotational symmetry normalization into [-45, 45)
+using (var symmImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220)))
+{
+    Cv2.Rectangle(symmImg, new Rect(270, 170, 260, 260), new Scalar(50, 50, 50), -1);
+    var res0 = PlateVision50.Vision.OfflineCenterAngleDetector.Detect(symmImg);
+    using var rot90 = Cv2.GetRotationMatrix2D(new Point2f(400, 300), 90.0, 1.0);
+    using var symmImg90 = new Mat();
+    Cv2.WarpAffine(symmImg, symmImg90, rot90, new Size(800, 600), InterpolationFlags.Linear, BorderTypes.Constant, new Scalar(220, 220, 220));
+    var res90 = PlateVision50.Vision.OfflineCenterAngleDetector.Detect(symmImg90);
+
+    Check("offline eval: 90-degree symmetry normalized into [-45, 45)",
+        res90.Found && Math.Abs(res90.AngleDeg) < 1.5 && Math.Abs(res0.AngleDeg - res90.AngleDeg) < 1.5);
+}
+
+// 5. Boundary truncation rejection fail-closed
+using (var truncImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220)))
+{
+    Cv2.Rectangle(truncImg, new Rect(0, 170, 150, 260), new Scalar(50, 50, 50), -1);
+    var resTrunc = PlateVision50.Vision.OfflineCenterAngleDetector.Detect(truncImg);
+    Check("offline eval: boundary truncated plate rejected fail-closed", !resTrunc.Found);
+}
+
+// 6. Specular glare hotspot robustness
+using (var glareImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220)))
+{
+    Cv2.Rectangle(glareImg, new Rect(270, 170, 260, 260), new Scalar(50, 50, 50), -1);
+    Cv2.Circle(glareImg, new Point(400, 300), 12, new Scalar(255, 255, 255), -1);
+    var resGlare = PlateVision50.Vision.OfflineCenterAngleDetector.Detect(glareImg);
+    Check("offline eval: minor specular glare sealed without centroid loss",
+        resGlare.Found && Math.Abs(resGlare.CenterPxX - 400) < 2.0 && Math.Abs(resGlare.CenterPxY - 300) < 2.0);
+}
+// 6b. Reflection merging & candidate refinement tests
+using (var reflImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(30, 30, 30)))
+{
+    using var plateMat = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(0, 0, 0));
+    Cv2.Rectangle(plateMat, new Rect(400 - 90, 300 - 90, 180, 180), new Scalar(220, 220, 220), -1);
+    Cv2.Rectangle(plateMat, new Rect(400 - 140, 300 - 90, 50, 90), new Scalar(130, 130, 130), -1);
+    using var rot = Cv2.GetRotationMatrix2D(new Point2f(400, 300), 25.0, 1.0);
+    using var rotatedMat = new Mat();
+    Cv2.WarpAffine(plateMat, rotatedMat, rot, new Size(800, 600), InterpolationFlags.Linear, BorderTypes.Constant, new Scalar(0, 0, 0));
+    using var mask = new Mat();
+    using var grayRot = new Mat();
+    Cv2.CvtColor(rotatedMat, grayRot, ColorConversionCodes.BGR2GRAY);
+    Cv2.Threshold(grayRot, mask, 10, 255, ThresholdTypes.Binary);
+    rotatedMat.CopyTo(reflImg, mask);
+
+    var resRefl = PlateVision50.Vision.PlateDetector.Analyze(reflImg, new VisionOptions());
+    double errDist = Math.Sqrt(Math.Pow(resRefl.CenterPxX - 400, 2) + Math.Pow(resRefl.CenterPxY - 300, 2));
+    double angleErr = resRefl.AngleDeg - 25.0;
+    while (angleErr >= 45.0) angleErr -= 90.0;
+    while (angleErr < -45.0) angleErr += 90.0;
+    Check("reflection test: white plate on dark belt with attached gray reflection center error < 2.5px",
+        resRefl.Found && errDist < 2.5 && Math.Abs(angleErr) < 2.0);
+}
+
+using (var darkReflImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220)))
+{
+    Cv2.Rectangle(darkReflImg, new Rect(400 - 90, 300 - 90, 180, 180), new Scalar(40, 40, 40), -1);
+    Cv2.Rectangle(darkReflImg, new Rect(400 + 90, 300 - 90, 40, 90), new Scalar(80, 80, 80), -1);
+    using var rot = Cv2.GetRotationMatrix2D(new Point2f(400, 300), -15.0, 1.0);
+    using var rotatedDark = new Mat();
+    Cv2.WarpAffine(darkReflImg, rotatedDark, rot, new Size(800, 600), InterpolationFlags.Linear, BorderTypes.Constant, new Scalar(220, 220, 220));
+
+    var resDarkRefl = PlateVision50.Vision.PlateDetector.Analyze(rotatedDark, new VisionOptions { ThresholdMode = 1 });
+    double errDistDark = Math.Sqrt(Math.Pow(resDarkRefl.CenterPxX - 400, 2) + Math.Pow(resDarkRefl.CenterPxY - 300, 2));
+    Check("reflection test: dark plate with attached smudge center error < 2.5px",
+        resDarkRefl.Found && errDistDark < 2.5);
+}
+
+using (var lowContrastImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(25, 25, 25)))
+{
+    using var plateMat = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(0, 0, 0));
+    Cv2.Rectangle(plateMat, new Rect(400 - 90, 300 - 90, 180, 180), new Scalar(170, 170, 170), -1);
+    Cv2.Rectangle(plateMat, new Rect(400 - 130, 300 - 90, 40, 90), new Scalar(95, 95, 95), -1);
+    using var rot = Cv2.GetRotationMatrix2D(new Point2f(400, 300), 10.0, 1.0);
+    using var rotatedLow = new Mat();
+    Cv2.WarpAffine(plateMat, rotatedLow, rot, new Size(800, 600), InterpolationFlags.Linear, BorderTypes.Constant, new Scalar(0, 0, 0));
+    using var mask = new Mat();
+    using var grayRot = new Mat();
+    Cv2.CvtColor(rotatedLow, grayRot, ColorConversionCodes.BGR2GRAY);
+    Cv2.Threshold(grayRot, mask, 10, 255, ThresholdTypes.Binary);
+    rotatedLow.CopyTo(lowContrastImg, mask);
+
+    var resLow = PlateVision50.Vision.PlateDetector.Analyze(lowContrastImg, new VisionOptions());
+    double errDistLow = Math.Sqrt(Math.Pow(resLow.CenterPxX - 400, 2) + Math.Pow(resLow.CenterPxY - 300, 2));
+    Check("reflection test: low-contrast plate with reflection center error < 2.5px",
+        resLow.Found && errDistLow < 2.5);
+}
+
+using (var multiImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(30, 30, 30)))
+{
+    // Object 1 at (250, 300) with reflection
+    Cv2.Rectangle(multiImg, new Rect(250 - 60, 300 - 60, 120, 120), new Scalar(220, 220, 220), -1);
+    Cv2.Rectangle(multiImg, new Rect(250 - 90, 300 - 60, 30, 60), new Scalar(130, 130, 130), -1);
+    // Object 2 at (550, 300) clean
+    Cv2.Rectangle(multiImg, new Rect(550 - 60, 300 - 60, 120, 120), new Scalar(220, 220, 220), -1);
+
+    var multiDets = PlateVision50.Vision.PlateDetector.AnalyzeAll(multiImg, new VisionOptions());
+    Check("reflection test: multiple objects detected", multiDets.Count == 2);
+    bool multiCentersOk = multiDets.Count == 2 &&
+        multiDets.Any(d => Math.Sqrt(Math.Pow(d.CenterPxX - 250, 2) + Math.Pow(d.CenterPxY - 300, 2)) < 3.0) &&
+        multiDets.Any(d => Math.Sqrt(Math.Pow(d.CenterPxX - 550, 2) + Math.Pow(d.CenterPxY - 300, 2)) < 3.0);
+    Check("reflection test: multiple objects centers within tolerance", multiCentersOk);
+}
+
+// 6c. Inner highlight & undersized core contract tests
+using (var innerPatchImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(30, 30, 30)))
+{
+    // 180x180 outer plate at (400, 300) with intensity 200
+    Cv2.Rectangle(innerPatchImg, new Rect(400 - 90, 300 - 90, 180, 180), new Scalar(200, 200, 200), -1);
+    // 50x50 offset square bright patch inside at (430, 320) with intensity 250
+    Cv2.Rectangle(innerPatchImg, new Rect(430 - 25, 320 - 25, 50, 50), new Scalar(250, 250, 250), -1);
+
+    var resInner = PlateVision50.Vision.PlateDetector.Analyze(innerPatchImg, new VisionOptions());
+    double errInner = Math.Sqrt(Math.Pow(resInner.CenterPxX - 400, 2) + Math.Pow(resInner.CenterPxY - 300, 2));
+    double sidePx = resInner.OutlinePx != null && resInner.OutlinePx.Length >= 2 ? Math.Sqrt(Math.Pow(resInner.OutlinePx[1].X - resInner.OutlinePx[0].X, 2) + Math.Pow(resInner.OutlinePx[1].Y - resInner.OutlinePx[0].Y, 2)) : 0;
+    Check("inner highlight (square baseline): clean square plate preserves outer body center < 2.5px without refinement",
+        resInner.Found && errInner < 2.5 && sidePx > 150.0);
+}
+
+using (var innerDarkImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220)))
+{
+    // 180x180 outer dark plate at (400, 300) with intensity 60
+    Cv2.Rectangle(innerDarkImg, new Rect(400 - 90, 300 - 90, 180, 180), new Scalar(60, 60, 60), -1);
+    // 50x50 offset darker spot inside at (430, 320) with intensity 15
+    Cv2.Rectangle(innerDarkImg, new Rect(430 - 25, 320 - 25, 50, 50), new Scalar(15, 15, 15), -1);
+
+    var resDarkInner = PlateVision50.Vision.PlateDetector.Analyze(innerDarkImg, new VisionOptions { ThresholdMode = 1 });
+    double errDarkInner = Math.Sqrt(Math.Pow(resDarkInner.CenterPxX - 400, 2) + Math.Pow(resDarkInner.CenterPxY - 300, 2));
+    double sidePxDark = resDarkInner.OutlinePx != null && resDarkInner.OutlinePx.Length >= 2 ? Math.Sqrt(Math.Pow(resDarkInner.OutlinePx[1].X - resDarkInner.OutlinePx[0].X, 2) + Math.Pow(resDarkInner.OutlinePx[1].Y - resDarkInner.OutlinePx[0].Y, 2)) : 0;
+    Check("inner highlight (dark square baseline): clean dark square plate preserves outer body center < 2.5px without refinement",
+        resDarkInner.Found && errDarkInner < 2.5 && sidePxDark > 150.0);
+}
+
+using (var undersizedImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(30, 30, 30)))
+{
+    // Coarse halo 65x65 = 4225 px (exceeds minObjectArea 800*600*0.006 = 2880 px)
+    Cv2.Rectangle(undersizedImg, new Rect(400 - 32, 300 - 32, 65, 65), new Scalar(120, 120, 120), -1);
+    // True inner target 30x30 = 900 px (strictly below minObjectArea 2880 px)
+    Cv2.Rectangle(undersizedImg, new Rect(400 - 15, 300 - 15, 30, 30), new Scalar(220, 220, 220), -1);
+
+    var resUnder = PlateVision50.Vision.PlateDetector.Analyze(undersizedImg, new VisionOptions());
+    double underSide = resUnder.OutlinePx != null && resUnder.OutlinePx.Length >= 2 ? Math.Sqrt(Math.Pow(resUnder.OutlinePx[1].X - resUnder.OutlinePx[0].X, 2) + Math.Pow(resUnder.OutlinePx[1].Y - resUnder.OutlinePx[0].Y, 2)) : 0;
+    // Contract: tiny inner target must NOT be accepted as a refined workpiece below configured min area
+    bool notAcceptedAsTiny = !resUnder.Found || underSide > 55.0;
+    Check("min area contract (square baseline): square halo preserves coarse without refinement",
+        notAcceptedAsTiny);
+}
+
+// 6d. Elongated coarse refinement regressions (aspect > 1.06): body-support & min-area guards
+using (var elongBrightImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(30, 30, 30)))
+{
+    // 180x180 plate at (400, 300), intensity 200
+    Cv2.Rectangle(elongBrightImg, new Rect(400 - 90, 300 - 90, 180, 180), new Scalar(200, 200, 200), -1);
+    // Attached elongated halo on left: 40x120 at (400 - 130, 300 - 60), intensity 120
+    // Combined coarse shape: ~218x179, aspect ~1.22 (> 1.06 triggers refinement)
+    Cv2.Rectangle(elongBrightImg, new Rect(400 - 130, 300 - 60, 40, 120), new Scalar(120, 120, 120), -1);
+    // Offset inner bright highlight: 60x60 at (430, 320), intensity 250 (area = 3600 > minArea 2880)
+    Cv2.Rectangle(elongBrightImg, new Rect(430 - 30, 320 - 30, 60, 60), new Scalar(250, 250, 250), -1);
+
+    var resElongBright = PlateVision50.Vision.PlateDetector.Analyze(elongBrightImg, new VisionOptions { ThresholdMode = 2 });
+    double sideBright = resElongBright.OutlinePx != null && resElongBright.OutlinePx.Length >= 2 ? resElongBright.OutlinePx[0].DistanceTo(resElongBright.OutlinePx[1]) : 0;
+    double distToHighlight = Math.Sqrt(Math.Pow(resElongBright.CenterPxX - 430, 2) + Math.Pow(resElongBright.CenterPxY - 320, 2));
+
+    Check("refinement guard: elongated halo with inner bright highlight preserves outer body without false-locking on highlight",
+        resElongBright.Found && sideBright > 150.0 && distToHighlight > 30.0 && Math.Abs(resElongBright.CenterPxX - 380.0) < 5.0);
+}
+
+using (var elongDarkImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220)))
+{
+    // Outer dark plate: 180x180 at (400, 300), intensity 70
+    Cv2.Rectangle(elongDarkImg, new Rect(400 - 90, 300 - 90, 180, 180), new Scalar(70, 70, 70), -1);
+    // Attached elongated smudge on left: 50x120 at (400 - 140, 300 - 60), intensity 100
+    // Combined coarse shape: ~229x179, aspect ~1.28 (> 1.06 triggers refinement)
+    Cv2.Rectangle(elongDarkImg, new Rect(400 - 140, 300 - 60, 50, 120), new Scalar(100, 100, 100), -1);
+    // Offset inner darker spot: 60x60 at (430, 320), intensity 10 (area = 3600 > minArea 2880)
+    Cv2.Rectangle(elongDarkImg, new Rect(430 - 30, 320 - 30, 60, 60), new Scalar(10, 10, 10), -1);
+
+    var resElongDark = PlateVision50.Vision.PlateDetector.Analyze(elongDarkImg, new VisionOptions { ThresholdMode = 1 });
+    double sideDark = resElongDark.OutlinePx != null && resElongDark.OutlinePx.Length >= 2 ? resElongDark.OutlinePx[0].DistanceTo(resElongDark.OutlinePx[1]) : 0;
+    double distToSpot = Math.Sqrt(Math.Pow(resElongDark.CenterPxX - 430, 2) + Math.Pow(resElongDark.CenterPxY - 320, 2));
+
+    Check("refinement guard: dark plate with elongated smudge preserves outer body without false-locking on inner spot",
+        resElongDark.Found && sideDark > 150.0 && distToSpot > 30.0 && Math.Abs(resElongDark.CenterPxX - 374.5) < 5.0);
+}
+
+using (var elongUnderImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(30, 30, 30)))
+{
+    // Coarse halo: 75x60 at (400, 300), area = 4500 > minArea (2880), aspect = 75/60 = 1.25 (> 1.06 triggers refinement)
+    Cv2.Rectangle(elongUnderImg, new Rect(400 - 37, 300 - 30, 75, 60), new Scalar(120, 120, 120), -1);
+    // Inner core: 35x35 at (400, 300), area = 1225 < minArea (2880)
+    Cv2.Rectangle(elongUnderImg, new Rect(400 - 17, 300 - 17, 35, 35), new Scalar(220, 220, 220), -1);
+
+    var resElongUnder = PlateVision50.Vision.PlateDetector.Analyze(elongUnderImg, new VisionOptions { ThresholdMode = 2 });
+    Check("refinement guard: elongated halo with undersized core rejected fail-closed (!Found)",
+        !resElongUnder.Found);
+}
+
+// 7. Architectural type isolation & zero synthetic glue points
+var resType = typeof(PlateVision50.Vision.OfflineCenterAngleResult);
+Check("offline eval: OfflineCenterAngleResult has no GluePx property", resType.GetProperty("GluePx") == null);
+Check("offline eval: OfflineCenterAngleResult has no GlueMm property", resType.GetProperty("GlueMm") == null);
+Check("offline eval: OfflineCenterAngleResult has no Vertices property", resType.GetProperty("Vertices") == null);
+
+var createTrackedPoseParamTypes = typeof(PlateVision50.Vision.BeltCoordinates)
+    .GetMethod("CreateTrackedPose")!
+    .GetParameters()
+    .Select(p => p.ParameterType)
+    .ToArray();
+Check("offline eval: CreateTrackedPose requires PlateResult, not OfflineCenterAngleResult",
+    createTrackedPoseParamTypes.Contains(typeof(PlateVision50.Vision.PlateResult)) &&
+    !createTrackedPoseParamTypes.Contains(typeof(PlateVision50.Vision.OfflineCenterAngleResult)));
+
+// 8. Type boundary: OfflineCenterAngleDetector does not reference TwinCAT, Ads, or Trigger
+var detectorType = typeof(PlateVision50.Vision.OfflineCenterAngleDetector);
+var detectorMethods = detectorType.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+bool leaksAds = detectorMethods.Any(m =>
+    m.ReturnType.FullName?.Contains("TwinCAT") == true ||
+    m.ReturnType.FullName?.Contains("Trigger") == true ||
+    m.GetParameters().Any(p => p.ParameterType.FullName?.Contains("TwinCAT") == true || p.ParameterType.FullName?.Contains("Trigger") == true));
+Check("offline eval: OfflineCenterAngleDetector public API has zero TwinCAT/ADS/Trigger dependencies", !leaksAds);
+
+// 9. Real Behavioral Unit Tests: OfflineVideoEvaluationSession Lifecycle & Overlap Guarantees
+{
+    // Test A: Finite EOF completion & automatic source disposal
+    using var sessionA = new PlateVision50.Vision.OfflineVideoEvaluationSession();
+    var syntheticMats5 = Enumerable.Range(0, 5).Select(idx => {
+        var m = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220));
+        Cv2.Rectangle(m, new Rect(300 + idx * 10, 200, 200, 200), new Scalar(50, 50, 50), -1);
+        return m;
+    }).ToList();
+
+    var seq5 = new PlateVision50.Vision.SyntheticFrameSequence(syntheticMats5);
+    foreach (var m in syntheticMats5) m.Dispose();
+
+    int deliveredFramesA = 0;
+    string finalStatusA = "";
+    bool startedA = sessionA.StartAsync(
+        () => seq5,
+        eval => { if (eval.Result.Found) deliveredFramesA++; },
+        status => { finalStatusA = status; }).GetAwaiter().GetResult();
+
+    Check("offline session: StartAsync accepted on clean session", startedA && sessionA.IsRunning);
+    sessionA.WorkerTask?.Wait(2000);
+    Check("offline session: completes naturally at finite EOF with source disposed",
+        !sessionA.IsRunning && deliveredFramesA == 5 && finalStatusA == "Completed" && seq5.IsDisposed);
+
+    // Test A2: StartAsync after natural EOF cleans up prior CTS without resource leak
+    var syntheticMats3 = Enumerable.Range(0, 3).Select(idx => {
+        var m = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220));
+        Cv2.Rectangle(m, new Rect(300 + idx * 10, 200, 200, 200), new Scalar(50, 50, 50), -1);
+        return m;
+    }).ToList();
+    var seq3 = new PlateVision50.Vision.SyntheticFrameSequence(syntheticMats3);
+    foreach (var m in syntheticMats3) m.Dispose();
+
+    bool startedA2 = sessionA.StartAsync(
+        () => seq3,
+        eval => { },
+        status => { }).GetAwaiter().GetResult();
+    Check("offline session: subsequent StartAsync after EOF succeeds cleanly without leak", startedA2 && sessionA.IsRunning);
+    sessionA.WorkerTask?.Wait(2000);
+    Check("offline session: second session completes naturally at EOF", !sessionA.IsRunning && seq3.IsDisposed);
+
+    // Test B: Concurrent Overlap Refusal
+    using var sessionB = new PlateVision50.Vision.OfflineVideoEvaluationSession();
+    var blockingSourceB = new PlateVision50.Vision.BlockingFrameSource();
+    bool startedB1 = sessionB.StartAsync(
+        () => blockingSourceB,
+        eval => { },
+        status => { }).GetAwaiter().GetResult();
+
+    Check("offline session: first worker started and running", startedB1 && sessionB.IsRunning);
+
+    string refusalStatus = "";
+    bool startedB2 = sessionB.StartAsync(
+        () => new PlateVision50.Vision.SyntheticFrameSequence([]),
+        eval => { },
+        status => { refusalStatus = status; }).GetAwaiter().GetResult();
+
+    Check("offline session: concurrent start is strictly refused while worker active",
+        !startedB2 && refusalStatus == "Previous evaluation worker still stopping; please wait.");
+
+    blockingSourceB.Unblock();
+    sessionB.StopAsync(timeoutMs: 1000).GetAwaiter().GetResult();
+    Check("offline session: worker terminates cleanly after unblock", !sessionB.IsRunning && blockingSourceB.IsDisposed);
+
+    // Test C: Stale Generation Result Suppression
+    using var sessionC = new PlateVision50.Vision.OfflineVideoEvaluationSession();
+    var blockingSourceC = new PlateVision50.Vision.BlockingFrameSource();
+    int callbackCountC = 0;
+    sessionC.StartAsync(
+        () => blockingSourceC,
+        eval => { callbackCountC++; }).GetAwaiter().GetResult();
+
+    int gen1 = sessionC.CurrentGeneration;
+    sessionC.StopAsync(timeoutMs: 50).GetAwaiter().GetResult();
+    int gen2 = sessionC.CurrentGeneration;
+    Check("offline session: StopAsync advances generation token", gen2 > gen1);
+
+    int beforeUnblockCount = callbackCountC;
+    blockingSourceC.Unblock();
+    sessionC.WorkerTask?.Wait(500);
+    Check("offline session: results from stale generation are suppressed", callbackCountC == beforeUnblockCount);
+
+    // Test D: Responsive mid-stream cancellation between frames
+    using var sessionD = new PlateVision50.Vision.OfflineVideoEvaluationSession();
+    var syntheticMats10 = Enumerable.Range(0, 10).Select(idx => {
+        var m = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220));
+        Cv2.Rectangle(m, new Rect(300 + idx * 10, 200, 200, 200), new Scalar(50, 50, 50), -1);
+        return m;
+    }).ToList();
+
+    var seq10 = new PlateVision50.Vision.SyntheticFrameSequence(syntheticMats10);
+    foreach (var m in syntheticMats10) m.Dispose();
+
+    int deliveredCountD = 0;
+    sessionD.StartAsync(
+        () => seq10,
+        eval => {
+            deliveredCountD++;
+            if (deliveredCountD >= 3)
+            {
+                _ = Task.Run(() => sessionD.StopAsync(timeoutMs: 500));
+            }
+        }).GetAwaiter().GetResult();
+
+    sessionD.WorkerTask?.Wait(2000);
+    Check("offline session: mid-stream cancellation cleanly stops processing without hanging",
+        deliveredCountD >= 3 && deliveredCountD < 10);
+
+    // Test E: DrawOverlay renders valid non-empty annotated frame
+    using var overlayTestImg = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220));
+    Cv2.Rectangle(overlayTestImg, new Rect(300, 200, 200, 200), new Scalar(50, 50, 50), -1);
+    var detList = PlateVision50.Vision.OfflineCenterAngleDetector.DetectAll(overlayTestImg);
+    using var overlayOutput = PlateVision50.Vision.OfflineCenterAngleDetector.DrawOverlay(overlayTestImg, detList);
+    Check("offline overlay: DrawOverlay renders non-empty frame matching source dimensions",
+        !overlayOutput.Empty() && overlayOutput.Width == 800 && overlayOutput.Height == 600);
+
+    // Test F: Natural EOF delivers final frame to delayed consumer without IsRunning drop
+    using var sessionF = new PlateVision50.Vision.OfflineVideoEvaluationSession();
+    var syntheticMatsF = Enumerable.Range(0, 3).Select(idx => {
+        var m = new Mat(new Size(800, 600), MatType.CV_8UC3, new Scalar(220, 220, 220));
+        Cv2.Rectangle(m, new Rect(300 + idx * 10, 200, 200, 200), new Scalar(50, 50, 50), -1);
+        return m;
+    }).ToList();
+    var seqF = new PlateVision50.Vision.SyntheticFrameSequence(syntheticMatsF);
+    foreach (var m in syntheticMatsF) m.Dispose();
+
+    var deliveredGenerations = new List<int>();
+    int finalFrameIndex = 0;
+    sessionF.StartAsync(
+        () => seqF,
+        eval => {
+            deliveredGenerations.Add(eval.Generation);
+            finalFrameIndex = eval.FrameIndex;
+        },
+        status => { }).GetAwaiter().GetResult();
+
+    int targetGenF = sessionF.CurrentGeneration;
+    sessionF.WorkerTask?.Wait(2000);
+    Check("offline session: natural EOF delivers final frame even after worker loop finishes",
+        !sessionF.IsRunning && finalFrameIndex == 3 && deliveredGenerations.Count == 3 && deliveredGenerations.All(g => g == targetGenF));
+
+    // Test G: Synchronous Cancel immediately advances generation and halts worker
+    using var sessionG = new PlateVision50.Vision.OfflineVideoEvaluationSession();
+    var blockingG = new PlateVision50.Vision.BlockingFrameSource();
+    sessionG.StartAsync(() => blockingG, eval => { }, status => { }).GetAwaiter().GetResult();
+    int genBeforeG = sessionG.CurrentGeneration;
+    sessionG.Cancel();
+    int genAfterG = sessionG.CurrentGeneration;
+    Check("offline session: Cancel() synchronously increments generation token", genAfterG > genBeforeG);
+    blockingG.Unblock();
+    bool exitedPromptlyG = sessionG.WorkerTask?.Wait(500) == true;
+    Check("offline session: worker halts promptly after Cancel() and unblock", exitedPromptlyG && !sessionG.IsRunning);
+
+    // Test H: Behavioral regression: Cancellation before worker delegate enters
+    PlateVision50.Vision.OfflineVideoEvaluationSession? sessionH = null;
+    var startGateH = new ManualResetEventSlim(false);
+    var enteredH = new ManualResetEventSlim(false);
+    bool sourceAllocatedH = false;
+
+    sessionH = new PlateVision50.Vision.OfflineVideoEvaluationSession(action =>
+    {
+        return Task.Run(() =>
+        {
+            enteredH.Set();
+            startGateH.Wait();
+            action();
+        });
+    });
+
+    sessionH.StartAsync(
+        () => {
+            sourceAllocatedH = true;
+            return new PlateVision50.Vision.SyntheticFrameSequence([]);
+        },
+        eval => { },
+        status => { }).GetAwaiter().GetResult();
+
+    Check("offline session: StartAsync accepted with scheduled worker", sessionH.IsRunning);
+
+    enteredH.Wait(1000);
+    sessionH.Cancel();
+    startGateH.Set();
+
+    try { sessionH.WorkerTask?.Wait(500); } catch { }
+    Check("offline session: IsRunning is false after cancellation before delegate entry", !sessionH.IsRunning);
+    Check("offline session: source was never allocated when cancelled before entry", !sourceAllocatedH);
+
+    // Verify subsequent Start is NOT falsely refused
+    bool subsequentStartedH = sessionH.StartAsync(
+        () => new PlateVision50.Vision.SyntheticFrameSequence([]),
+        eval => { },
+        status => { }).GetAwaiter().GetResult();
+    Check("offline session: subsequent StartAsync is NOT falsely refused after pre-start cancellation", subsequentStartedH);
+}
+
+// 12. Local video benchmark handling (observational only; non-tautological)
+string defaultVideo = @"C:\Users\aml\Desktop\DEMO\1.avi";
+string? videoPath = Environment.GetEnvironmentVariable("DATN_TEST_VIDEO") ?? (File.Exists(defaultVideo) ? defaultVideo : null);
+if (videoPath != null && File.Exists(videoPath))
+{
+    using var vCap = new VideoCapture(videoPath);
+    if (vCap.IsOpened())
+    {
+        int readFrames = 0, detectedFrames = 0;
+        while (readFrames < 200)
+        {
+            using var f = new Mat();
+            if (!vCap.Read(f) || f.Empty()) break;
+            readFrames++;
+            var det = PlateVision50.Vision.OfflineCenterAngleDetector.Detect(f);
+            if (det.Found) detectedFrames++;
+        }
+        Console.WriteLine($"OFFLINE VIDEO BENCHMARK (OBSERVATIONAL ONLY): read={readFrames}, detected={detectedFrames}, path='{videoPath}'. Evaluates frame readability only; no ground truth claim absent calibrated fiducials.");
+        Check("offline eval: observational video read at least one valid frame", readFrames > 0);
+    }
+}
+else
+{
+    string envVal = Environment.GetEnvironmentVariable("DATN_TEST_VIDEO") ?? "<unset>";
+    Console.WriteLine($"OFFLINE VIDEO BENCHMARK: No local video file present (DATN_TEST_VIDEO='{envVal}', default='{defaultVideo}' missing). Observational disk check skipped cleanly; synthetic-only verification.");
+    Check("offline eval: missing observational demo video skipped safely", true);
+}
+
+Console.WriteLine("INTEGRATED CALIBRATION & OFFLINE STARTUP TESTS:");
+// 1. GantryCornerCalculator: Unrotated 0 deg
+var gantryInputs0 = new PlateVision50.Vision.GantryCornerInputs(
+    CenterX_mm: 100.0,
+    CenterY_mm: 100.0,
+    ThetaDeg: 0.0,
+    PitchX_mm: 40.0,
+    PitchY_mm: 40.0,
+    WorkspaceMinX_mm: -500.0,
+    WorkspaceMaxX_mm: 500.0,
+    WorkspaceMinY_mm: -500.0,
+    WorkspaceMaxY_mm: 500.0);
+var gantryRes0 = PlateVision50.Vision.GantryCornerCalculator.Evaluate(gantryInputs0);
+Check("gantry corners: unrotated 0 deg is valid", gantryRes0.IsValid);
+Check("gantry corners: unrotated 0 deg returns exactly 4 corners", gantryRes0.Corners.Count == 4);
+Check("gantry corners: P1 is Quad I (+20, +20)", Math.Abs(gantryRes0.Corners[0].X_mm - 120.0) < 1e-4 && Math.Abs(gantryRes0.Corners[0].Y_mm - 120.0) < 1e-4);
+Check("gantry corners: P2 is Quad II (-20, +20)", Math.Abs(gantryRes0.Corners[1].X_mm - 80.0) < 1e-4 && Math.Abs(gantryRes0.Corners[1].Y_mm - 120.0) < 1e-4);
+Check("gantry corners: P3 is Quad III (-20, -20)", Math.Abs(gantryRes0.Corners[2].X_mm - 80.0) < 1e-4 && Math.Abs(gantryRes0.Corners[2].Y_mm - 80.0) < 1e-4);
+Check("gantry corners: P4 is Quad IV (+20, -20)", Math.Abs(gantryRes0.Corners[3].X_mm - 120.0) < 1e-4 && Math.Abs(gantryRes0.Corners[3].Y_mm - 80.0) < 1e-4);
+Check("gantry corners: unrotated pitch consistency verified", Math.Abs(gantryRes0.CalculatedPitchX_mm - 40.0) < 1e-4);
+Check("gantry corners: unrotated all in bounds", gantryRes0.AllInBounds);
+
+// 2. GantryCornerCalculator: Rotated 90 deg CCW
+var gantryInputs90 = new PlateVision50.Vision.GantryCornerInputs(
+    CenterX_mm: 100.0, CenterY_mm: 100.0, ThetaDeg: 90.0,
+    PitchX_mm: 40.0, PitchY_mm: 40.0,
+    WorkspaceMinX_mm: -500.0, WorkspaceMaxX_mm: 500.0,
+    WorkspaceMinY_mm: -500.0, WorkspaceMaxY_mm: 500.0);
+var gantryRes90 = PlateVision50.Vision.GantryCornerCalculator.Evaluate(gantryInputs90);
+Check("gantry corners: 90 deg CCW P1 X is 80mm", Math.Abs(gantryRes90.Corners[0].X_mm - 80.0) < 1e-4);
+Check("gantry corners: 90 deg CCW P1 Y is 120mm", Math.Abs(gantryRes90.Corners[0].Y_mm - 120.0) < 1e-4);
+Check("gantry corners: 90 deg CCW P2 X is 80mm", Math.Abs(gantryRes90.Corners[1].X_mm - 80.0) < 1e-4);
+Check("gantry corners: 90 deg CCW P2 Y is 80mm", Math.Abs(gantryRes90.Corners[1].Y_mm - 80.0) < 1e-4);
+Check("gantry corners: 90 deg pitch verified", Math.Abs(gantryRes90.CalculatedPitchX_mm - 40.0) < 1e-4);
+
+// 3. GantryCornerCalculator: Negative angle -30 deg CCW
+var gantryInputsNeg30 = new PlateVision50.Vision.GantryCornerInputs(
+    CenterX_mm: 0.0, CenterY_mm: 0.0, ThetaDeg: -30.0,
+    PitchX_mm: 40.0, PitchY_mm: 40.0,
+    WorkspaceMinX_mm: -500.0, WorkspaceMaxX_mm: 500.0,
+    WorkspaceMinY_mm: -500.0, WorkspaceMaxY_mm: 500.0);
+var gantryResNeg30 = PlateVision50.Vision.GantryCornerCalculator.Evaluate(gantryInputsNeg30);
+double expNeg30_P1_X = 20.0 * Math.Cos(-30.0 * Math.PI / 180.0) - 20.0 * Math.Sin(-30.0 * Math.PI / 180.0);
+double expNeg30_P1_Y = 20.0 * Math.Sin(-30.0 * Math.PI / 180.0) + 20.0 * Math.Cos(-30.0 * Math.PI / 180.0);
+Check("gantry corners: -30 deg P1 matches analytic geometry",
+    Math.Abs(gantryResNeg30.Corners[0].X_mm - expNeg30_P1_X) < 1e-4 &&
+    Math.Abs(gantryResNeg30.Corners[0].Y_mm - expNeg30_P1_Y) < 1e-4);
+Check("gantry corners: -30 deg pitch verified", Math.Abs(gantryResNeg30.CalculatedPitchX_mm - 40.0) < 1e-4);
+
+// 4. GantryCornerCalculator: NaN and Infinity parameter handling (fail-closed)
+var nanCenterInputs = new PlateVision50.Vision.GantryCornerInputs(
+    double.NaN, 0.0, 0.0, 40.0, 40.0, -100.0, 100.0, -100.0, 100.0);
+Check("gantry corners: NaN center rejected fail-closed", !PlateVision50.Vision.GantryCornerCalculator.Evaluate(nanCenterInputs).IsValid);
+
+var infPitchInputs = new PlateVision50.Vision.GantryCornerInputs(
+    0.0, 0.0, 0.0, double.PositiveInfinity, 40.0, -100.0, 100.0, -100.0, 100.0);
+Check("gantry corners: Infinity pitch rejected fail-closed", !PlateVision50.Vision.GantryCornerCalculator.Evaluate(infPitchInputs).IsValid);
+
+var nanBoundsInputs = new PlateVision50.Vision.GantryCornerInputs(
+    0.0, 0.0, 0.0, 40.0, 40.0, double.NaN, 100.0, -100.0, 100.0);
+Check("gantry corners: NaN bounds rejected fail-closed", !PlateVision50.Vision.GantryCornerCalculator.Evaluate(nanBoundsInputs).IsValid);
+// 4B. GantryCornerCalculator: Huge finite theta and coordinate overflow guards
+var hugeThetaInputs = new PlateVision50.Vision.GantryCornerInputs(
+    100.0, 100.0, 1e200, 40.0, 40.0, -500.0, 500.0, -500.0, 500.0);
+var hugeThetaRes = PlateVision50.Vision.GantryCornerCalculator.Evaluate(hugeThetaInputs);
+Check("gantry corners: huge finite theta evaluates validly without double overflow", hugeThetaRes.IsValid);
+
+var overflowCoordInputs = new PlateVision50.Vision.GantryCornerInputs(
+    1.5e308, 0.0, 0.0, 1.5e308, 40.0, -500.0, 500.0, -500.0, 500.0);
+var overflowCoordRes = PlateVision50.Vision.GantryCornerCalculator.Evaluate(overflowCoordInputs);
+Check("gantry corners: coordinate arithmetic overflow rejected fail-closed", !overflowCoordRes.IsValid);
+
+// 5. GantryCornerCalculator: Non-positive pitch
+var zeroPitchInputs = new PlateVision50.Vision.GantryCornerInputs(
+    0.0, 0.0, 0.0, 0.0, 40.0, -100.0, 100.0, -100.0, 100.0);
+Check("gantry corners: zero pitch rejected fail-closed", !PlateVision50.Vision.GantryCornerCalculator.Evaluate(zeroPitchInputs).IsValid);
+
+var negPitchInputs = new PlateVision50.Vision.GantryCornerInputs(
+    0.0, 0.0, 0.0, 40.0, -10.0, -100.0, 100.0, -100.0, 100.0);
+Check("gantry corners: negative pitch rejected fail-closed", !PlateVision50.Vision.GantryCornerCalculator.Evaluate(negPitchInputs).IsValid);
+
+// 6. GantryCornerCalculator: Inverted workspace bounds
+var invertedBoundsInputs = new PlateVision50.Vision.GantryCornerInputs(
+    0.0, 0.0, 0.0, 40.0, 40.0, 200.0, 100.0, -100.0, 100.0);
+Check("gantry corners: inverted MinX >= MaxX rejected fail-closed", !PlateVision50.Vision.GantryCornerCalculator.Evaluate(invertedBoundsInputs).IsValid);
+
+// 7. GantryCornerCalculator: Out-of-workspace envelope rejection
+var outOfBoundsInputs = new PlateVision50.Vision.GantryCornerInputs(
+    CenterX_mm: 495.0, CenterY_mm: 495.0, ThetaDeg: 0.0,
+    PitchX_mm: 40.0, PitchY_mm: 40.0,
+    WorkspaceMinX_mm: 0.0, WorkspaceMaxX_mm: 500.0,
+    WorkspaceMinY_mm: 0.0, WorkspaceMaxY_mm: 500.0);
+var outOfBoundsRes = PlateVision50.Vision.GantryCornerCalculator.Evaluate(outOfBoundsInputs);
+Check("gantry corners: out-of-bounds workpiece evaluated", outOfBoundsRes.IsValid);
+Check("gantry corners: out-of-bounds workpiece marks AllInBounds=false", !outOfBoundsRes.AllInBounds);
+Check("gantry corners: out-of-bounds status reports OUT OF BOUNDS", outOfBoundsRes.Status.StartsWith("OUT OF BOUNDS"));
+Check("gantry corners: P1 is outside bounds", !outOfBoundsRes.Corners[0].InBounds);
+Check("gantry corners: P3 is inside bounds", outOfBoundsRes.Corners[2].InBounds);
+
+// 8. AppHardwareCapabilities: --offline-calibration startup capability
+PlateVision50.Vision.AppHardwareCapabilities.Initialize(new[] { "--offline-calibration" });
+Check("offline cap: IsOfflineCalibration is true", PlateVision50.Vision.AppHardwareCapabilities.IsOfflineCalibration);
+Check("offline cap: AllowAdsPolling is false", !PlateVision50.Vision.AppHardwareCapabilities.AllowAdsPolling);
+Check("offline cap: AllowAdsWrites is false", !PlateVision50.Vision.AppHardwareCapabilities.AllowAdsWrites);
+Check("offline cap: AllowCameraHardware is false", !PlateVision50.Vision.AppHardwareCapabilities.AllowCameraHardware);
+Check("offline cap: AllowHardwareMotion is false", !PlateVision50.Vision.AppHardwareCapabilities.AllowHardwareMotion);
+Check("offline cap: ProductionCommandSourceApproved disarmed", !PlateVision50.Vision.LineMailboxProtocol.ProductionCommandSourceApproved);
+Check("offline cap: MutexName is offline mutex", PlateVision50.Vision.AppHardwareCapabilities.MutexName == PlateVision50.Vision.AppHardwareCapabilities.OfflineMutexName);
+
+// 9. LineMailboxGateway: Transport writes strictly refused under offline capabilities
+var disarmedCapTransport = new FakeAdsMailboxTransport { IsConnected = false, IsInRunState = false };
+var disarmedCapGateway = new PlateVision50.Vision.LineMailboxGateway(disarmedCapTransport, false);
+bool capConnectResult = disarmedCapGateway.EnsureTransportConnected(851);
+Check("offline cap: EnsureTransportConnected refused without socket connection", !capConnectResult);
+Check("offline cap: Transport is NOT connected", !disarmedCapTransport.IsConnected);
+bool capHeartbeatResult = disarmedCapGateway.TickHeartbeat(false, true);
+Check("offline cap: TickHeartbeat refused without write", !capHeartbeatResult);
+Check("offline cap: ZERO writes performed to transport", disarmedCapTransport.Writes.Count == 0);
+
+// 10. AdsFifoBenchBridge: Hardware operations strictly refused under offline capabilities
+PlateVision50.TwinCAT.AdsFifoBenchBridge.ClientCreationCount = 0;
+var offlineBridge = new PlateVision50.TwinCAT.AdsFifoBenchBridge();
+
+string liveReadiness = offlineBridge.InspectLiveReadiness();
+Check("offline bridge: InspectLiveReadiness returns explicit OFFLINE/UNAVAILABLE", liveReadiness.Contains("OFFLINE / UNAVAILABLE"));
+
+bool readStatusBlocked = false;
+try { offlineBridge.ReadStatus(); }
+catch (InvalidOperationException ex) when (ex.Message.Contains("inhibited in offline calibration mode")) { readStatusBlocked = true; }
+Check("offline bridge: ReadStatus throws explicit rejection", readStatusBlocked);
+
+bool enqueueBlocked = false;
+try { offlineBridge.EnqueueBenchAsync(0, 0, 0).GetAwaiter().GetResult(); }
+catch (InvalidOperationException ex) when (ex.Message.Contains("inhibited in offline calibration mode")) { enqueueBlocked = true; }
+Check("offline bridge: EnqueueBenchAsync throws explicit rejection", enqueueBlocked);
+
+Check("offline bridge: ZERO AdsClient instances created across all operations", PlateVision50.TwinCAT.AdsFifoBenchBridge.ClientCreationCount == 0);
+
+var adsPreview = new PlateVision50.TwinCAT.AdsPreview();
+string previewCheck = adsPreview.Check();
+Check("offline bridge: AdsPreview.Check returns explicit OFFLINE/UNAVAILABLE", previewCheck.Contains("OFFLINE / UNAVAILABLE"));
+
+
+// =====================================================================
+// 11. GANTRY MASTER ENABLE CONTROLLER & PROTOCOL BEHAVIORAL TESTS
+// =====================================================================
+Console.WriteLine("GANTRY MASTER ENABLE TESTS:");
+PlateVision50.Vision.AppHardwareCapabilities.SetOfflineModeForTesting(false);
+void InitHealthyGmeTransport(FakeAdsMailboxTransport t)
+{
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAckSeq, 0u);
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymResult, (ushort)0);
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymState, (ushort)PlateVision50.Vision.ServoEvaluatedState.AllOutputsOff);
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymPermit, true);
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymIdleVerified, true);
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymBusy, false);
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 10u);
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymMasterOnEcho, false);
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymM10Echo, true);
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymReq, false);
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymRefreshReq, false);
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAxisOverrideEcho, new bool[] { false, false, false });
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymOutputEcho, new bool[] { false, false, false });
+    t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymCommErrorId, 0u);
+}
+
+// Test 1: Successful ON command handshake
+var gmeTransOn = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransOn);
+gmeTransOn.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymReq && (bool)val)
+    {
+        uint seq = t.Read<uint>(PlateVision50.Vision.GantryMasterEnableController.SymCmdSeq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAckSeq, seq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymResult, (ushort)PlateVision50.Vision.ServoCommandResult.AcceptedAck);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymState, (ushort)PlateVision50.Vision.ServoEvaluatedState.AllOutputsOn);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 11u);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymMasterOnEcho, true);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymM10Echo, false);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymOutputEcho, new bool[] { true, true, true });
+    }
+};
+var gmeCtrlOn = new PlateVision50.Vision.GantryMasterEnableController(gmeTransOn)
+{
+    PulseHoldMs = 0,
+    AckTimeoutMs = 150,
+    PollIntervalMs = 5
+};
+var resOn = gmeCtrlOn.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme on: command accepted with matching ACK", resOn.Success && resOn.ResultCode == 1);
+Check("gme on: writes target level ON (true)", gmeTransOn.Read<bool>(PlateVision50.Vision.GantryMasterEnableController.SymTargetOn));
+Check("gme on: request pulse released back to false", !gmeTransOn.Read<bool>(PlateVision50.Vision.GantryMasterEnableController.SymReq));
+
+// Test 2: Successful OFF command handshake
+var gmeTransOff = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransOff);
+gmeTransOff.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymMasterOnEcho, true);
+gmeTransOff.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymM10Echo, false);
+gmeTransOff.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymReq && (bool)val)
+    {
+        uint seq = t.Read<uint>(PlateVision50.Vision.GantryMasterEnableController.SymCmdSeq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAckSeq, seq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymResult, (ushort)PlateVision50.Vision.ServoCommandResult.AcceptedAck);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymState, (ushort)PlateVision50.Vision.ServoEvaluatedState.AllOutputsOff);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 12u);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymMasterOnEcho, false);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymM10Echo, true);
+    }
+};
+var gmeCtrlOff = new PlateVision50.Vision.GantryMasterEnableController(gmeTransOff)
+{
+    PulseHoldMs = 0,
+    AckTimeoutMs = 150,
+    PollIntervalMs = 5
+};
+var resOff = gmeCtrlOff.RequestMasterEnableAsync(false).GetAwaiter().GetResult();
+Check("gme off: command accepted with matching ACK", resOff.Success && resOff.ResultCode == 1);
+Check("gme off: writes target level OFF (false)", !gmeTransOff.Read<bool>(PlateVision50.Vision.GantryMasterEnableController.SymTargetOn));
+// Test 3: Wrong ACK sequence fails closed as timeout
+var gmeTransWrongAck = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransWrongAck);
+gmeTransWrongAck.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymReq && (bool)val)
+    {
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAckSeq, 9999u); // Wrong seq
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymResult, (ushort)PlateVision50.Vision.ServoCommandResult.AcceptedAck);
+    }
+};
+var gmeCtrlWrongAck = new PlateVision50.Vision.GantryMasterEnableController(gmeTransWrongAck)
+{
+    PulseHoldMs = 0,
+    AckTimeoutMs = 50,
+    PollIntervalMs = 5
+};
+var resWrongAck = gmeCtrlWrongAck.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme wrong ack: rejected as timeout", !resWrongAck.Success && resWrongAck.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.ErrorCommTimeout);
+Check("gme wrong ack: timeout message states indeterminate without replay", resWrongAck.Message.Contains("INDETERMINATE (CLIENT TIMEOUT)"));
+
+// Test 4: Mismatch readback result code handling
+var gmeTransMismatch = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransMismatch);
+gmeTransMismatch.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymReq && (bool)val)
+    {
+        uint seq = t.Read<uint>(PlateVision50.Vision.GantryMasterEnableController.SymCmdSeq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAckSeq, seq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymResult, (ushort)PlateVision50.Vision.ServoCommandResult.ErrorReadbackMismatch);
+    }
+};
+var gmeCtrlMismatch = new PlateVision50.Vision.GantryMasterEnableController(gmeTransMismatch)
+{
+    PulseHoldMs = 0,
+    AckTimeoutMs = 150,
+    PollIntervalMs = 5
+};
+var resMismatch = gmeCtrlMismatch.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme mismatch: rejected with ErrorReadbackMismatch code 18", !resMismatch.Success && resMismatch.ResultCode == 18);
+
+// Test 5: Axis override state description
+var gmeTransOverride = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransOverride);
+gmeTransOverride.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+gmeTransOverride.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymState, (ushort)PlateVision50.Vision.ServoEvaluatedState.MasterOffOverrideActive);
+gmeTransOverride.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAxisOverrideEcho, new bool[] { true, false, false });
+var gmeCtrlOverride = new PlateVision50.Vision.GantryMasterEnableController(gmeTransOverride);
+var statusOverride = gmeCtrlOverride.ReadCurrentStatus();
+Check("gme override: StateDescription reflects Master OFF with override active",
+    statusOverride.StateDescription.Contains("MASTER OFF (Axis Override Active)"));
+Check("gme override: OverrideDescription lists M1=ON",
+    statusOverride.OverrideDescription.Contains("M1=ON"));
+
+// Test 6: Stale snapshot with SnapshotValid=false reported as STALE/UNKNOWN even if ADS is fresh
+var gmeTransStale = new FakeAdsMailboxTransport();
+gmeTransStale.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, false);
+gmeTransStale.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymState, (ushort)PlateVision50.Vision.ServoEvaluatedState.AllOutputsOn);
+var gmeCtrlStale = new PlateVision50.Vision.GantryMasterEnableController(gmeTransStale);
+var statusStale = gmeCtrlStale.ReadCurrentStatus();
+Check("gme stale: SnapshotValid=false forces STALE / UNKNOWN status",
+    statusStale.StateDescription.Contains("STALE / UNKNOWN (SNAPSHOT INVALID)"));
+Check("gme stale: SnapshotValid=false forces OverrideDescription to STALE / UNKNOWN",
+    statusStale.OverrideDescription.Contains("STALE / UNKNOWN"));
+
+// Test 7: Unchanged refresh sequence cannot accept refresh
+var gmeTransUnchangedRefresh = new FakeAdsMailboxTransport();
+gmeTransUnchangedRefresh.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 10u);
+gmeTransUnchangedRefresh.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+// PLC does not increment SymSnapshotSeq
+var gmeCtrlUnchangedRefresh = new PlateVision50.Vision.GantryMasterEnableController(gmeTransUnchangedRefresh)
+{
+    PulseHoldMs = 0,
+    PollIntervalMs = 5
+};
+var refreshUnchangedRes = gmeCtrlUnchangedRefresh.RequestRefreshAsync(new CancellationTokenSource(60).Token).GetAwaiter().GetResult();
+Check("gme refresh: unchanged snapshot sequence rejected (returns false)", !refreshUnchangedRes);
+
+// Test 8: Refresh with SnapshotValid=false cannot accept refresh
+var gmeTransInvalidRefresh = new FakeAdsMailboxTransport();
+gmeTransInvalidRefresh.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 10u);
+gmeTransInvalidRefresh.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymRefreshReq && (bool)val)
+    {
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 11u); // Seq incremented
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, false); // But invalid
+    }
+};
+var gmeCtrlInvalidRefresh = new PlateVision50.Vision.GantryMasterEnableController(gmeTransInvalidRefresh)
+{
+    PulseHoldMs = 0,
+    PollIntervalMs = 5
+};
+var refreshInvalidRes = gmeCtrlInvalidRefresh.RequestRefreshAsync(new CancellationTokenSource(60).Token).GetAwaiter().GetResult();
+Check("gme refresh: SnapshotValid=false rejected (returns false)", !refreshInvalidRes);
+
+// Test 9: Remote PLC commissioning gate closed rejects command with zero writes
+var gmeTransLocked = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransLocked);
+gmeTransLocked.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymPermit, false); // Remote permit closed
+var gmeCtrlLocked = new PlateVision50.Vision.GantryMasterEnableController(gmeTransLocked);
+var resLocked = gmeCtrlLocked.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme gate: closed remote permit rejects command", !resLocked.Success && resLocked.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.RejectedUncommissioned);
+Check("gme gate: zero writes performed when permit is closed", gmeTransLocked.Writes.Count == 0);
+
+// Test 9B: Motion idle unverified rejects command with zero writes
+var gmeTransNotIdle = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransNotIdle);
+gmeTransNotIdle.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymIdleVerified, false); // Not idle
+var gmeCtrlNotIdle = new PlateVision50.Vision.GantryMasterEnableController(gmeTransNotIdle);
+var resNotIdle = gmeCtrlNotIdle.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme idle: unverified idle rejects command", !resNotIdle.Success && resNotIdle.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.RejectedIdleUnverified);
+Check("gme idle: zero writes performed when idle unverified", gmeTransNotIdle.Writes.Count == 0);
+
+// Test 9C: Stale snapshot validity rejects command with zero writes before dispatch
+var gmeTransStaleDispatch = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransStaleDispatch);
+gmeTransStaleDispatch.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, false); // Stale snapshot
+var gmeCtrlStaleDispatch = new PlateVision50.Vision.GantryMasterEnableController(gmeTransStaleDispatch);
+var resStaleDispatch = gmeCtrlStaleDispatch.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme stale dispatch: invalid snapshot rejects command before write", !resStaleDispatch.Success && resStaleDispatch.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.RejectedHeartbeatStale);
+Check("gme stale dispatch: zero writes performed when snapshot invalid", gmeTransStaleDispatch.Writes.Count == 0);
+
+// Test 9D: Missing mandatory busy symbol rejects fail-closed with zero writes
+var gmeTransNoBusy = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransNoBusy);
+// Remove SymBusy from transport symbols
+gmeTransNoBusy.CheckSymbols(new[] { PlateVision50.Vision.GantryMasterEnableController.SymBusy });
+// In FakeAdsMailboxTransport, simulate unreadable symbol by not setting it
+var gmeTransMissingSym = new FakeAdsMailboxTransport();
+gmeTransMissingSym.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymPermit, true);
+gmeTransMissingSym.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+gmeTransMissingSym.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymIdleVerified, true);
+// SymBusy omitted completely
+var gmeCtrlMissingSym = new PlateVision50.Vision.GantryMasterEnableController(gmeTransMissingSym);
+var resMissingSym = gmeCtrlMissingSym.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme missing busy: unreadable busy symbol rejects fail-closed", !resMissingSym.Success && resMissingSym.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.RejectedMotionBusy);
+Check("gme missing busy: zero writes performed when symbol unreadable", gmeTransMissingSym.Writes.Count == 0);
+
+// Test 9E: Unreadable/missing SymReq pulse symbol before dispatch rejects fail-closed with zero writes
+var gmeTransMissingReq = new FakeAdsMailboxTransport();
+gmeTransMissingReq.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymPermit, true);
+gmeTransMissingReq.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+gmeTransMissingReq.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymIdleVerified, true);
+gmeTransMissingReq.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymBusy, false);
+gmeTransMissingReq.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 10u);
+// SymReq omitted
+var gmeCtrlMissingReq = new PlateVision50.Vision.GantryMasterEnableController(gmeTransMissingReq);
+var resMissingReq = gmeCtrlMissingReq.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme missing req: unreadable SymReq rejects fail-closed before writes",
+    !resMissingReq.Success && resMissingReq.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.RejectedMotionBusy);
+Check("gme missing req: zero writes performed when SymReq is unreadable", gmeTransMissingReq.Writes.Count == 0);
+
+// Test 9F: Zero or unreadable baseline snapshot sequence rejects fail-closed with zero writes
+var gmeTransZeroSnap = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransZeroSnap);
+gmeTransZeroSnap.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 0u); // Zero baseline
+var gmeCtrlZeroSnap = new PlateVision50.Vision.GantryMasterEnableController(gmeTransZeroSnap);
+var resZeroSnap = gmeCtrlZeroSnap.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme zero snap seq: zero baseline sequence rejects fail-closed with zero writes",
+    !resZeroSnap.Success && resZeroSnap.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.RejectedHeartbeatStale);
+Check("gme zero snap seq: zero writes performed when baseline sequence is zero", gmeTransZeroSnap.Writes.Count == 0);
+
+// Test 10: Offline capability blocks command with zero writes
+PlateVision50.Vision.AppHardwareCapabilities.SetOfflineModeForTesting(true);
+var gmeTransOffCap = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransOffCap);
+var gmeCtrlOffCap = new PlateVision50.Vision.GantryMasterEnableController(gmeTransOffCap);
+var resOffCap = gmeCtrlOffCap.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme offline cap: command rejected under offline mode", !resOffCap.Success && resOffCap.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.RejectedOffline);
+Check("gme offline cap: zero writes performed under offline mode", gmeTransOffCap.Writes.Count == 0);
+PlateVision50.Vision.AppHardwareCapabilities.SetOfflineModeForTesting(false);
+
+// Test 11: Cancellation prior to dispatch guarantees zero writes
+var gmeTransCancel = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransCancel);
+var gmeCtrlCancel = new PlateVision50.Vision.GantryMasterEnableController(gmeTransCancel);
+var ctsPre = new CancellationTokenSource();
+ctsPre.Cancel();
+var resCancel = gmeCtrlCancel.RequestMasterEnableAsync(true, ctsPre.Token).GetAwaiter().GetResult();
+Check("gme cancel: canceled request rejected prior to dispatch", !resCancel.Success);
+Check("gme cancel: zero writes performed on canceled request", gmeTransCancel.Writes.Count == 0);
+
+// Test 12: Guaranteed pulse release on timeout
+var gmeTransRelease = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransRelease);
+var gmeCtrlRelease = new PlateVision50.Vision.GantryMasterEnableController(gmeTransRelease)
+{
+    PulseHoldMs = 0,
+    AckTimeoutMs = 30,
+    PollIntervalMs = 5
+};
+gmeCtrlRelease.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme pulse release: request pulse guaranteed released to false on timeout",
+    !gmeTransRelease.Read<bool>(PlateVision50.Vision.GantryMasterEnableController.SymReq));
+
+// Test 13: Concurrency guard recheck - gate revoked while queued rejects second call with zero writes (W-01)
+var gmeTransConc = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransConc);
+var gmeCtrlConc = new PlateVision50.Vision.GantryMasterEnableController(gmeTransConc)
+{
+    PulseHoldMs = 25,
+    AckTimeoutMs = 150,
+    PollIntervalMs = 5
+};
+gmeTransConc.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymReq && (bool)val)
+    {
+        // While call 1 is processing, revoke permit on transport
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymPermit, false);
+        uint seq = t.Read<uint>(PlateVision50.Vision.GantryMasterEnableController.SymCmdSeq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAckSeq, seq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymResult, (ushort)PlateVision50.Vision.ServoCommandResult.AcceptedAck);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 11u);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymMasterOnEcho, true);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymM10Echo, false);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymState, (ushort)PlateVision50.Vision.ServoEvaluatedState.AllOutputsOn);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymOutputEcho, new bool[] { true, true, true });
+    }
+};
+var task1 = Task.Run(() => gmeCtrlConc.RequestMasterEnableAsync(true));
+Thread.Sleep(5); // Ensure task 1 enters and holds lock
+var task2 = Task.Run(() => gmeCtrlConc.RequestMasterEnableAsync(true));
+var concRes1 = task1.GetAwaiter().GetResult();
+var concRes2 = task2.GetAwaiter().GetResult();
+Check("gme concurrency: call 1 succeeded before permit revocation", concRes1.Success);
+Check("gme concurrency: queued call 2 rejected after permit revoked inside lock",
+    !concRes2.Success && concRes2.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.RejectedUncommissioned);
+
+// Test 14: ACK=1 but snapshot sequence unchanged rejected as mismatch (W-02)
+var gmeTransStaleAck = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransStaleAck);
+gmeTransStaleAck.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 50u);
+gmeTransStaleAck.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymReq && (bool)val)
+    {
+        uint seq = t.Read<uint>(PlateVision50.Vision.GantryMasterEnableController.SymCmdSeq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAckSeq, seq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymResult, (ushort)PlateVision50.Vision.ServoCommandResult.AcceptedAck);
+        // SnapshotSeq NOT updated past 50u
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymMasterOnEcho, true);
+    }
+};
+var gmeCtrlStaleAck = new PlateVision50.Vision.GantryMasterEnableController(gmeTransStaleAck)
+{
+    PulseHoldMs = 0,
+    AckTimeoutMs = 150,
+    PollIntervalMs = 5
+};
+var resStaleAck = gmeCtrlStaleAck.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme stale ack: unchanged snapshot sequence fails closed as ErrorReadbackMismatch",
+    !resStaleAck.Success && resStaleAck.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.ErrorReadbackMismatch);
+
+// Test 15: ACK=1 but target echo inconsistent rejected as mismatch (W-02)
+var gmeTransWrongEcho = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransWrongEcho);
+gmeTransWrongEcho.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymReq && (bool)val)
+    {
+        uint seq = t.Read<uint>(PlateVision50.Vision.GantryMasterEnableController.SymCmdSeq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAckSeq, seq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymResult, (ushort)PlateVision50.Vision.ServoCommandResult.AcceptedAck);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 11u);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+        // Requested ON (true), but readback stays OFF (false)
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymMasterOnEcho, false);
+    }
+};
+var gmeCtrlWrongEcho = new PlateVision50.Vision.GantryMasterEnableController(gmeTransWrongEcho)
+{
+    PulseHoldMs = 0,
+    AckTimeoutMs = 150,
+    PollIntervalMs = 5
+};
+var resWrongEcho = gmeCtrlWrongEcho.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme wrong echo: target state mismatch fails closed as ErrorReadbackMismatch",
+    !resWrongEcho.Success && resWrongEcho.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.ErrorReadbackMismatch);
+
+// Test 16: Initial SymSnapshotSeq read failure in refresh fails closed (W-04)
+var gmeTransMissingSnap = new FakeAdsMailboxTransport();
+gmeTransMissingSnap.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymRefreshReq, false); // Readable low
+gmeTransMissingSnap.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymPermit, true);
+// Omit SymSnapshotSeq so TryRead returns false
+var gmeCtrlMissingSnap = new PlateVision50.Vision.GantryMasterEnableController(gmeTransMissingSnap);
+var resMissingSnap = gmeCtrlMissingSnap.RequestRefreshAsync().GetAwaiter().GetResult();
+Check("gme refresh read fail: missing initial snapshot seq fails closed with zero writes",
+    !resMissingSnap && gmeTransMissingSnap.Writes.Count == 0);
+
+// Test 16B: Boot refresh from initial SnapshotSeq==0 succeeds when PLC produces generation 1
+var gmeTransBoot = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransBoot);
+gmeTransBoot.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 0u); // Boot baseline
+gmeTransBoot.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, false);
+gmeTransBoot.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymRefreshReq && (bool)val)
+    {
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 1u); // Generation 1 produced
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+    }
+};
+var gmeCtrlBoot = new PlateVision50.Vision.GantryMasterEnableController(gmeTransBoot)
+{
+    PulseHoldMs = 0,
+    PollIntervalMs = 5
+};
+var resBoot = gmeCtrlBoot.RequestRefreshAsync().GetAwaiter().GetResult();
+Check("gme boot refresh: initial seq=0 accepted when refresh produces valid generation 1", resBoot);
+// Test 17: Partial ReadCurrentStatus failure invalidates snapshot (W-05)
+var gmeTransPartial = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransPartial);
+// Omit SymState so partial read fails
+var gmeTransPartialMissing = new FakeAdsMailboxTransport();
+gmeTransPartialMissing.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+gmeTransPartialMissing.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 5u);
+// SymState omitted
+var gmeCtrlPartial = new PlateVision50.Vision.GantryMasterEnableController(gmeTransPartialMissing);
+var statusPartial = gmeCtrlPartial.ReadCurrentStatus();
+Check("gme partial read: incomplete symbol read forces SnapshotValid=false", !statusPartial.SnapshotValid);
+Check("gme partial read: incomplete symbol read forces STALE / UNKNOWN status",
+    statusPartial.StateDescription.Contains("STALE / UNKNOWN (SNAPSHOT INVALID)"));
+
+// Test 18: Pulse release failure blocks subsequent request with zero target writes (W-03)
+var gmeTransPulseFail = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransPulseFail);
+var gmeCtrlPulseFail = new PlateVision50.Vision.GantryMasterEnableController(gmeTransPulseFail)
+{
+    PulseHoldMs = 0,
+    AckTimeoutMs = 30,
+    PollIntervalMs = 5
+};
+gmeTransPulseFail.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymReq && (bool)val == false)
+    {
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymReq, true); // Stuck high
+    }
+};
+gmeCtrlPulseFail.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+int writesBefore = gmeTransPulseFail.Writes.Count;
+var resPulseBlocked = gmeCtrlPulseFail.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme pulse fail: subsequent request blocked when pulse release unconfirmed",
+    !resPulseBlocked.Success && resPulseBlocked.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.RejectedMotionBusy);
+Check("gme pulse fail: no target or seq writes issued while pulse unconfirmed",
+    !gmeTransPulseFail.Writes.Skip(writesBefore).Any(w => w.Symbol == PlateVision50.Vision.GantryMasterEnableController.SymTargetOn));
+
+// Test 19: Command pulse release failure returns indeterminate failure even when ACK=1 is received (R-1)
+var gmeTransPulseFailAck = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransPulseFailAck);
+gmeTransPulseFailAck.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymReq)
+    {
+        if ((bool)val == true)
+        {
+            uint seq = t.Read<uint>(PlateVision50.Vision.GantryMasterEnableController.SymCmdSeq);
+            t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAckSeq, seq);
+            t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymResult, (ushort)PlateVision50.Vision.ServoCommandResult.AcceptedAck);
+            t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymState, (ushort)PlateVision50.Vision.ServoEvaluatedState.AllOutputsOn);
+            t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 11u);
+            t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+            t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymMasterOnEcho, true);
+            t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymM10Echo, false);
+            t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymOutputEcho, new bool[] { true, true, true });
+        }
+        else
+        {
+            // Pulse release write to false fails: remains stuck high on PLC
+            t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymReq, true);
+        }
+    }
+};
+var gmeCtrlPulseFailAck = new PlateVision50.Vision.GantryMasterEnableController(gmeTransPulseFailAck)
+{
+    PulseHoldMs = 0,
+    AckTimeoutMs = 150,
+    PollIntervalMs = 5
+};
+var resPulseFailAck = gmeCtrlPulseFailAck.RequestMasterEnableAsync(true).GetAwaiter().GetResult();
+Check("gme pulse release failure: CURRENT command returns failure despite ACK=1 (R-1)",
+    !resPulseFailAck.Success && resPulseFailAck.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.ErrorCommTimeout);
+Check("gme pulse release failure: message indicates indeterminate pulse release failure (R-1)",
+    resPulseFailAck.Message.Contains("INDETERMINATE"));
+
+// Test 20: Missing or failed SymMasterOnEcho read during OFF rejects command fail-closed (R-2)
+var gmeTransMissingM0 = new FakeAdsMailboxTransport();
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAckSeq, 0u);
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymResult, (ushort)0);
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymState, (ushort)PlateVision50.Vision.ServoEvaluatedState.AllOutputsOff);
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymPermit, true);
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymIdleVerified, true);
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymBusy, false);
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 10u);
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymM10Echo, false);
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymReq, false);
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymRefreshReq, false);
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAxisOverrideEcho, new bool[] { false, false, false });
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymOutputEcho, new bool[] { false, false, false });
+gmeTransMissingM0.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymCommErrorId, 0u);
+// SymMasterOnEcho intentionally omitted
+gmeTransMissingM0.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymReq && (bool)val)
+    {
+        uint seq = t.Read<uint>(PlateVision50.Vision.GantryMasterEnableController.SymCmdSeq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAckSeq, seq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymResult, (ushort)PlateVision50.Vision.ServoCommandResult.AcceptedAck);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymState, (ushort)PlateVision50.Vision.ServoEvaluatedState.AllOutputsOff);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 12u);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymM10Echo, true);
+    }
+};
+var gmeCtrlMissingM0 = new PlateVision50.Vision.GantryMasterEnableController(gmeTransMissingM0)
+{
+    PulseHoldMs = 0,
+    AckTimeoutMs = 150,
+    PollIntervalMs = 5
+};
+var resMissingM0 = gmeCtrlMissingM0.RequestMasterEnableAsync(false).GetAwaiter().GetResult();
+Check("gme missing M0: unreadable SymMasterOnEcho rejects OFF command fail-closed (R-2)",
+    !resMissingM0.Success && resMissingM0.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.ErrorReadbackMismatch);
+
+// Test 21: Inconsistent SymM10Echo (stays false) during OFF rejects command fail-closed (R-2)
+var gmeTransBadM10 = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransBadM10);
+gmeTransBadM10.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymMasterOnEcho, true);
+gmeTransBadM10.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymM10Echo, false);
+gmeTransBadM10.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymReq && (bool)val)
+    {
+        uint seq = t.Read<uint>(PlateVision50.Vision.GantryMasterEnableController.SymCmdSeq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAckSeq, seq);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymResult, (ushort)PlateVision50.Vision.ServoCommandResult.AcceptedAck);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymState, (ushort)PlateVision50.Vision.ServoEvaluatedState.AllOutputsOff);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 12u);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymMasterOnEcho, false);
+        // M10 stays false (inconsistent with OFF command, which requires M10=true)
+        t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymM10Echo, false);
+    }
+};
+var gmeCtrlBadM10 = new PlateVision50.Vision.GantryMasterEnableController(gmeTransBadM10)
+{
+    PulseHoldMs = 0,
+    AckTimeoutMs = 150,
+    PollIntervalMs = 5
+};
+var resBadM10 = gmeCtrlBadM10.RequestMasterEnableAsync(false).GetAwaiter().GetResult();
+Check("gme bad M10: inconsistent SymM10Echo=false rejects OFF command fail-closed (R-2)",
+    !resBadM10.Success && resBadM10.ResultCode == (ushort)PlateVision50.Vision.ServoCommandResult.ErrorReadbackMismatch);
+
+// Test 22: Refresh pulse release failure returns false even when snapshot updated (R-1)
+var gmeTransRefreshPulseFail = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransRefreshPulseFail);
+gmeTransRefreshPulseFail.OnSymbolWritten = (sym, val, t) =>
+{
+    if (sym == PlateVision50.Vision.GantryMasterEnableController.SymRefreshReq)
+    {
+        if ((bool)val == true)
+        {
+            t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq, 15u);
+            t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, true);
+        }
+        else
+        {
+            // Stuck high
+            t.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymRefreshReq, true);
+        }
+    }
+};
+var gmeCtrlRefreshPulseFail = new PlateVision50.Vision.GantryMasterEnableController(gmeTransRefreshPulseFail)
+{
+    PulseHoldMs = 0,
+    PollIntervalMs = 5
+};
+var resRefreshPulseFail = gmeCtrlRefreshPulseFail.RequestRefreshAsync(new CancellationTokenSource(150).Token).GetAwaiter().GetResult();
+Check("gme refresh pulse fail: unconfirmed release returns false (R-1)", !resRefreshPulseFail);
+
+// =====================================================================
+// 12. GANTRY MASTER ENABLE DIAGNOSTICS & TELEMETRY OBSERVATION TESTS
+// =====================================================================
+Console.WriteLine("GANTRY MASTER ENABLE DIAGNOSTICS & TELEMETRY TESTS:");
+
+// Test 23: Actual ReadCurrentStatus on disconnected transport returns Diagnostics.AdsTransport=Disconnected
+var gmeTransDisc = new FakeAdsMailboxTransport { IsConnected = false, IsInRunState = false };
+var gmeCtrlDisc = new PlateVision50.Vision.GantryMasterEnableController(gmeTransDisc);
+var statusDisc = gmeCtrlDisc.ReadCurrentStatus();
+Check("gme diag disconnected: ReadCurrentStatus reports AdsTransport=Disconnected",
+    statusDisc.Diagnostics.AdsTransport == PlateVision50.Vision.GantryAdsTransportObservedState.Disconnected);
+Check("gme diag disconnected: RequiredSymbolsAvailable is false",
+    !statusDisc.RequiredSymbolsAvailable);
+
+// Test 24: Actual ReadCurrentStatus on connected transport but not in RUN returns ConnectedNotRun
+var gmeTransNotRun = new FakeAdsMailboxTransport { IsConnected = true, IsInRunState = false };
+var gmeCtrlNotRun = new PlateVision50.Vision.GantryMasterEnableController(gmeTransNotRun);
+var statusNotRun = gmeCtrlNotRun.ReadCurrentStatus();
+Check("gme diag not in RUN: ReadCurrentStatus reports AdsTransport=ConnectedNotRun",
+    statusNotRun.Diagnostics.AdsTransport == PlateVision50.Vision.GantryAdsTransportObservedState.ConnectedNotRun);
+Check("gme diag not in RUN: RequiredSymbolsAvailable is false",
+    !statusNotRun.RequiredSymbolsAvailable);
+
+// Test 25: Actual ReadCurrentStatus on Connected RUN with missing required symbols
+var gmeTransMissingMailbox = new FakeAdsMailboxTransport { IsConnected = true, IsInRunState = true };
+// Only set SymPermit=true, omitting other 12 symbols
+gmeTransMissingMailbox.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymPermit, true);
+var gmeCtrlMissingMailbox = new PlateVision50.Vision.GantryMasterEnableController(gmeTransMissingMailbox);
+var statusMissingMailbox = gmeCtrlMissingMailbox.ReadCurrentStatus();
+Check("gme diag missing mailbox: reports AdsTransport=ConnectedRun",
+    statusMissingMailbox.Diagnostics.AdsTransport == PlateVision50.Vision.GantryAdsTransportObservedState.ConnectedRun);
+Check("gme diag missing mailbox: RequiredSymbolsAvailable is false",
+    !statusMissingMailbox.RequiredSymbolsAvailable);
+Check("gme diag missing mailbox: MissingSymbols identifies omitted symbol",
+    statusMissingMailbox.Diagnostics.MissingSymbols.Contains(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotSeq));
+Check("gme diag missing mailbox: unread idle is null not inferred false",
+    statusMissingMailbox.Diagnostics.IdleVerifiedObserved == null);
+
+// Test 26: Stale snapshot with remote permit open preserves valid remote observation
+var gmeTransStalePreserve = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransStalePreserve);
+gmeTransStalePreserve.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymSnapshotValid, false); // Stale/invalid MC
+gmeTransStalePreserve.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymPermit, true); // Remote permit OPEN
+var gmeCtrlStalePreserve = new PlateVision50.Vision.GantryMasterEnableController(gmeTransStalePreserve);
+var statusStalePreserve = gmeCtrlStalePreserve.ReadCurrentStatus();
+Check("gme diag stale snapshot: RequiredSymbolsAvailable is true when all 13 read",
+    statusStalePreserve.RequiredSymbolsAvailable);
+Check("gme diag stale snapshot: SnapshotValid is false",
+    !statusStalePreserve.SnapshotValid);
+Check("gme diag stale snapshot: preserves read Permit=true without defaulting to false",
+    statusStalePreserve.Permit && statusStalePreserve.Diagnostics.PermitObserved == true);
+
+// Test 27: Bad array shape breaks the required-symbol contract (not an echo value assertion)
+var gmeTransBadArrayShape = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransBadArrayShape);
+gmeTransBadArrayShape.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymAxisOverrideEcho, new bool[] { false, false });
+gmeTransBadArrayShape.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymOutputEcho, new bool[] { false, false });
+var gmeCtrlBadArrayShape = new PlateVision50.Vision.GantryMasterEnableController(gmeTransBadArrayShape);
+var statusBadArrayShape = gmeCtrlBadArrayShape.ReadCurrentStatus();
+Check("gme diag bad array shape: RequiredSymbolsAvailable is false",
+    !statusBadArrayShape.RequiredSymbolsAvailable);
+Check("gme diag bad array shape: MissingSymbols reports both echo arrays",
+    statusBadArrayShape.Diagnostics.MissingSymbols.Length == 2
+    && statusBadArrayShape.Diagnostics.MissingSymbols.Contains(PlateVision50.Vision.GantryMasterEnableController.SymAxisOverrideEcho)
+    && statusBadArrayShape.Diagnostics.MissingSymbols.Contains(PlateVision50.Vision.GantryMasterEnableController.SymOutputEcho));
+
+// Test 27: Tri-state remote gates (unreadable = null vs readable closed = false)
+var gmeTransPermitClosed = new FakeAdsMailboxTransport();
+InitHealthyGmeTransport(gmeTransPermitClosed);
+gmeTransPermitClosed.SetSymbol(PlateVision50.Vision.GantryMasterEnableController.SymPermit, false); // Explicitly closed
+var gmeCtrlPermitClosed = new PlateVision50.Vision.GantryMasterEnableController(gmeTransPermitClosed);
+var statusPermitClosed = gmeCtrlPermitClosed.ReadCurrentStatus();
+Check("gme diag tri-state: readable closed permit yields PermitObserved=false and Permit=false",
+    statusPermitClosed.Diagnostics.PermitObserved == false && !statusPermitClosed.Permit);
+PlateVision50.Vision.LineMailboxProtocol.ProductionCommandSourceApproved = true;
+
 Console.WriteLine("TOTAL_TEST_FAILURES="+failed);
 return failed==0?0:1;

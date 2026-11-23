@@ -55,9 +55,6 @@
     <Compile Include="POUs\FB_InovanceMD200Conveyor.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\FB_EziServoControl.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\FB_MelsecEchoVerify.TcPOU" />
     <Compile Include="POUs\FB_MelsecDebugXY4Pt.TcPOU">
       <SubType>Code</SubType>
@@ -83,6 +80,9 @@
     <Compile Include="POUs\FB_QD75CommandPublisher.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\FB_ServoMasterEnable.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\MAIN.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -94,10 +94,6 @@
     <Folder Include="POUs" />
   </ItemGroup>
   <ItemGroup>
-    <PlaceholderReference Include="Tc2_MC2">
-      <DefaultResolution>Tc2_MC2, * (Beckhoff Automation GmbH)</DefaultResolution>
-      <Namespace>Tc2_MC2</Namespace>
-    </PlaceholderReference>
     <PlaceholderReference Include="Tc2_Standard">
       <DefaultResolution>Tc2_Standard, * (Beckhoff Automation GmbH)</DefaultResolution>
       <Namespace>Tc2_Standard</Namespace>

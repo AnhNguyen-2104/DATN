@@ -47,9 +47,6 @@ public partial class MainWindow
         Edge("PLC-Q MC Error",old.PlcQError,now.PlcQError);
         Edge("Gantry Stop Confirmed",old.StopCommandConfirmed,now.StopCommandConfirmed);
         Edge("MD200 RUN DO",old.BeltRun,now.BeltRun);
-        bool wasServo = old.SymbolPresence.TryGetValue("MAIN.bServo_Ready",out var oldOk) && oldOk;
-        bool isServo = now.SymbolPresence.TryGetValue("MAIN.bServo_Ready",out var newOk) && newOk;
-        if (wasServo && isServo) Edge("Servo Ready",old.ServoReady,now.ServoReady);
     }
 
 
@@ -113,7 +110,6 @@ public partial class MainWindow
         if (status is null)
         {
             Pin(OverviewIoEstop,"ST-1228 DI0 AUX",null);
-            Pin(OverviewIoServo,"SERVO READY",null);
             Pin(OverviewIoPlcQ,"PLC-Q LINK",null);
             Pin(OverviewIoGantryBusy,"GANTRY BUSY",null);
             Pin(OverviewIoGantryAlarm,"GANTRY ALARM",null);
@@ -129,7 +125,6 @@ public partial class MainWindow
         bool? Encoder = status.SymbolPresence.TryGetValue("MAIN.rConveyorSpeed",out var okSpeed)
             && okSpeed ? Math.Abs(status.BeltSpeed)>0.01 : null;
         Pin(OverviewIoEstop,"ST-1228 DI0 AUX",status.EstopOk,"ON","OFF",criticalOff:true);
-        Pin(OverviewIoServo,"SERVO READY",Optional("MAIN.bServo_Ready",status.ServoReady));
         Pin(OverviewIoPlcQ,"PLC-Q LINK",Optional("MAIN.bPlcQConnected",status.PlcQConnected),"CONNECTED","DISCONNECTED",criticalOff:true);
         Pin(OverviewIoGantryBusy,"GANTRY BUSY",Optional("MAIN.bGlueCycleBusy",status.GantryBusy));
         Pin(OverviewIoGantryAlarm,"GANTRY ALARM",Optional("MAIN.bGlueCycleError",status.GantryError),alarmOn:true);
@@ -154,11 +149,9 @@ public partial class MainWindow
             return;
         }
         string BoolState(bool v) => v ? "ON" : "OFF";
-        string Quality(string tag) => LineMailboxProtocol.ClassifyQuality(tag, status.SymbolPresence.TryGetValue(tag, out var q) && q);
-        string servo = Quality("MAIN.bServo_Ready") != "LIVE" ? Quality("MAIN.bServo_Ready") : BoolState(status.ServoReady);
         OverviewSensors.Text =
             $"E-STOP AUX DI0: {BoolState(status.EstopOk)}  |  TwinCAT STOP REQUEST: {BoolState(status.GlobalStop)}  |  " +
-            $"SERVO READY: {servo}  |  MD200 RUN DO: {BoolState(status.BeltRun)}  |  ENCODER: {status.BeltSpeed:F2} mm/s";
+            $"MD200 RUN DO: {BoolState(status.BeltRun)}  |  ENCODER: {status.BeltSpeed:F2} mm/s";
         string plcQDesc = status.PlcQError ? $"MC ERROR ({status.PlcQErrorId})" : (status.PlcQConnected ? "CONNECTED" : "DISCONNECTED");
         OverviewGantrySensors.Text =
             $"PLC-Q TCP: {plcQDesc}  |  " +
@@ -196,12 +189,260 @@ public partial class MainWindow
     }
 
     // Explicit mode selection controls visibility, never machine authority.
-    // Any mode transition revokes the legacy conveyor arm; commissioning remains separate.
-    private bool _operatorManualMode;
+    // Any mode transition revokes the conveyor arm for fail-closed safety.
+    private bool _conveyorCalibrationMode;
 
-    private void OperatorManualModeChanged(object sender, RoutedEventArgs e)
+    public bool IsConveyorCalibrationMode => _conveyorCalibrationMode;
+
+    private void LineMode_Changed(object sender, SelectionChangedEventArgs e)
     {
+        if (!IsLoaded) return;
+        bool isCalibration = LineModeSelector.SelectedIndex == 1;
+        if (isCalibration == _conveyorCalibrationMode) return;
+        SetConveyorCalibrationMode(isCalibration);
     }
+    private void CalibrationArm_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        bool armed = OvCalibrationArm.IsChecked == true;
+        if (DashControlArm.IsChecked != armed)
+            DashControlArm.IsChecked = armed;
+    }
+
+    public async void SetConveyorCalibrationMode(bool calibrationMode)
+    {
+        bool wasCalibration = _conveyorCalibrationMode;
+
+        // Mode transition fail-closed: if belt is running when leaving calibration, stop it first before completing mode transition
+        bool adsOnline = _dashStatus is not null && LineMailboxProtocol.IsTelemetryFresh(_dashStatus.ReceivedUtc, DateTime.UtcNow, TimeSpan.FromSeconds(3));
+
+        // 1. Guarded stop when leaving calibration mode while motion is active
+        bool calibMotionActive = _dashStatus?.BeltRun == true || LineMailboxGateway.Instance.ManualBeltActive;
+        if (wasCalibration && !calibrationMode && calibMotionActive)
+        {
+            SensorHistory("MODE TRANSITION: Conveyor running in calibration. Issuing immediate guarded manual stop before exiting to production mode.");
+            string transitionMsg = "STOPPING CONVEYOR · MODE TRANSITION PENDING · IN DANGER USE PHYSICAL E-STOP";
+            ControlSafetyBanner.Text = transitionMsg;
+            if (OvStartReason != null)
+            {
+                OvStartReason.Text = "MODE TRANSITION PENDING: Stopping conveyor before leaving calibration mode. Controlled stop; in danger use PHYSICAL E-STOP.";
+                OvStartReason.Foreground = DashBrush("#FF6E70");
+            }
+            if (DashControlNote != null) DashControlNote.Text = transitionMsg;
+            if (StatusText != null) StatusText.Text = transitionMsg;
+
+            // Disable start buttons, keep stop buttons enabled while stop is in flight
+            if (SysStartButton != null) SysStartButton.IsEnabled = false;
+            if (DashStartButton != null) DashStartButton.IsEnabled = false;
+            if (SysStopButton != null) SysStopButton.IsEnabled = true;
+            if (DashStopButton != null) DashStopButton.IsEnabled = true;
+
+            CommandDispatchResult stopResult = new(false, 12, "Stop not executed");
+            try
+            {
+                stopResult = await LineMailboxGateway.Instance.RequestManualBeltStopAsync(false, adsOnline);
+            }
+            catch (Exception ex)
+            {
+                stopResult = new(false, 12, ex.Message);
+            }
+
+            if (!stopResult.Success)
+            {
+                string failMsg = $"MODE TRANSITION STOP FAILED: {stopResult.Message}. Conveyor may still be running. In danger use PHYSICAL E-STOP.";
+                SensorHistory(failMsg);
+                if (OvStartReason != null)
+                {
+                    OvStartReason.Text = failMsg;
+                    OvStartReason.Foreground = DashBrush("#FF6E70");
+                }
+                if (DashControlNote != null) DashControlNote.Text = failMsg;
+                if (StatusText != null) StatusText.Text = failMsg;
+                if (LineModeSelector != null) LineModeSelector.SelectedIndex = 1;
+                UpdateControlSafetyBanner();
+                RefreshInterlockUi();
+                return;
+            }
+
+            await RefreshDashboardAsync();
+            if (_dashStatus?.BeltRun == true || LineMailboxGateway.Instance.ManualBeltActive)
+            {
+                string failMsg = "MODE TRANSITION STOP INCOMPLETE: Belt motion still detected active on PLC. In danger use PHYSICAL E-STOP.";
+                SensorHistory(failMsg);
+                if (OvStartReason != null) { OvStartReason.Text = failMsg; OvStartReason.Foreground = DashBrush("#FF6E70"); }
+                if (LineModeSelector != null) LineModeSelector.SelectedIndex = 1;
+                UpdateControlSafetyBanner();
+                RefreshInterlockUi();
+                return;
+            }
+        }
+
+        // 2. Guarded stop when leaving production AUTO mode while motion is active
+        bool autoMotionActive = _dashStatus?.BeltRun == true || LineMailboxGateway.Instance.ManualBeltActive
+            || _dashStatus?.GantryBusy == true || _lineInterlock.State is InterlockState.StartRequested or InterlockState.RunningAcknowledged
+            || _dashStatus?.LineAutoAccepted == true;
+        if (!wasCalibration && calibrationMode && autoMotionActive)
+        {
+            SensorHistory("MODE TRANSITION: Production line motion active. Issuing immediate guarded line stop before switching to subsystem calibration.");
+            string transitionMsg = "STOPPING PRODUCTION LINE · MODE TRANSITION PENDING · IN DANGER USE PHYSICAL E-STOP";
+            ControlSafetyBanner.Text = transitionMsg;
+            if (OvStartReason != null)
+            {
+                OvStartReason.Text = "MODE TRANSITION PENDING: Stopping production line before switching to subsystem calibration. Controlled stop; in danger use PHYSICAL E-STOP.";
+                OvStartReason.Foreground = DashBrush("#FF6E70");
+            }
+            if (DashControlNote != null) DashControlNote.Text = transitionMsg;
+            if (StatusText != null) StatusText.Text = transitionMsg;
+
+            if (SysStartButton != null) SysStartButton.IsEnabled = false;
+            if (DashStartButton != null) DashStartButton.IsEnabled = false;
+            if (SysStopButton != null) SysStopButton.IsEnabled = true;
+            if (DashStopButton != null) DashStopButton.IsEnabled = true;
+
+            _lineInterlock.RequestStop(BuildInterlockInputs());
+            if (_trackingEnabled) StopTrackingForSourceChange();
+
+            CommandDispatchResult stopResult = new(false, 12, "Line stop not executed");
+            try
+            {
+                stopResult = await LineMailboxGateway.Instance.RequestLineStopAsync(false, adsOnline);
+            }
+            catch (Exception ex)
+            {
+                stopResult = new(false, 12, ex.Message);
+            }
+
+            if (!stopResult.Success)
+            {
+                string failMsg = $"MODE TRANSITION STOP FAILED: {stopResult.Message}. Production line may still be running. In danger use PHYSICAL E-STOP.";
+                SensorHistory(failMsg);
+                if (OvStartReason != null)
+                {
+                    OvStartReason.Text = failMsg;
+                    OvStartReason.Foreground = DashBrush("#FF6E70");
+                }
+                if (DashControlNote != null) DashControlNote.Text = failMsg;
+                if (StatusText != null) StatusText.Text = failMsg;
+                if (LineModeSelector != null) LineModeSelector.SelectedIndex = 0;
+                UpdateControlSafetyBanner();
+                RefreshInterlockUi();
+                return;
+            }
+
+            await RefreshDashboardAsync();
+            if (_dashStatus?.BeltRun == true || LineMailboxGateway.Instance.ManualBeltActive || _dashStatus?.GantryBusy == true || _dashStatus?.LineAutoAccepted == true)
+            {
+                string failMsg = "MODE TRANSITION STOP INCOMPLETE: Line motion or gantry cycle still detected active on PLC. In danger use PHYSICAL E-STOP.";
+                SensorHistory(failMsg);
+                if (OvStartReason != null) { OvStartReason.Text = failMsg; OvStartReason.Foreground = DashBrush("#FF6E70"); }
+                if (LineModeSelector != null) LineModeSelector.SelectedIndex = 0;
+                UpdateControlSafetyBanner();
+                RefreshInterlockUi();
+                return;
+            }
+        }
+
+        // 3. Fail-closed guard: never commit mode change while running
+        if (_dashStatus?.BeltRun == true || LineMailboxGateway.Instance.ManualBeltActive || _dashStatus?.GantryBusy == true)
+        {
+            string stillRunningMsg = "MODE TRANSITION BLOCKED: Motion active. Never commit mode change while machine is moving. In danger use PHYSICAL E-STOP.";
+            SensorHistory(stillRunningMsg);
+            if (OvStartReason != null) { OvStartReason.Text = stillRunningMsg; OvStartReason.Foreground = DashBrush("#FF6E70"); }
+            if (LineModeSelector != null) LineModeSelector.SelectedIndex = wasCalibration ? 1 : 0;
+            UpdateControlSafetyBanner();
+            RefreshInterlockUi();
+            return;
+        }
+
+        _conveyorCalibrationMode = calibrationMode;
+
+        // Mode transition revokes conveyor arm for fail-closed safety
+        _dashControlArmed = false;
+        if (DashControlArm != null)
+        {
+            DashControlArm.IsChecked = false;
+            DashControlArm.IsEnabled = calibrationMode;
+        }
+        if (OvCalibrationArm != null)
+            OvCalibrationArm.IsChecked = false;
+        if (ConveyorManualControlPanel != null)
+            ConveyorManualControlPanel.IsEnabled = calibrationMode;
+
+        if (CalibrationBadge != null)
+            CalibrationBadge.Visibility = calibrationMode ? Visibility.Visible : Visibility.Collapsed;
+        if (OvCalibrationArm != null)
+            OvCalibrationArm.Visibility = calibrationMode ? Visibility.Visible : Visibility.Collapsed;
+        if (OvContractStatus != null)
+        {
+            OvContractStatus.Text = calibrationMode ? "SUBSYSTEM CALIBRATION" : "CONTRACT PENDING";
+            OvContractStatus.Foreground = DashBrush(calibrationMode ? "#27C9EC" : "#F4BB45");
+        }
+        if (OvCommandCommissionStatus != null)
+        {
+            OvCommandCommissionStatus.Text = calibrationMode
+                ? "CALIBRATION MAILBOX LIVE · ISOLATED (NO ROBOT/GLUE)"
+                : "PRODUCTION AUTO · COMMISSIONING PENDING";
+            OvCommandCommissionStatus.Foreground = DashBrush(calibrationMode ? "#27C9EC" : "#F4BB45");
+        }
+
+        if (SysStartButton != null)
+        {
+            SysStartButton.Content = calibrationMode ? "CALIB START" : "START";
+            SysStartButton.ToolTip = calibrationMode
+                ? "Start conveyor for subsystem calibration (1..150 mm/s). Camera is NOT required. Gantry, SCARA, and glue are inhibited."
+                : "Production AUTO START: Synchronizes conveyor, vision tracking, FIFO, and robot dispensing. Requires fully commissioned line contract.";
+        }
+        if (SysStopButton != null)
+        {
+            SysStopButton.Content = calibrationMode ? "CALIB STOP" : "STOP";
+            SysStopButton.ToolTip = calibrationMode
+                ? "Stop conveyor subsystem calibration run. Controlled stop; NOT certified emergency stop. In danger use PHYSICAL E-STOP."
+                : "Requests the normal coordinated stop (tracking + conveyor request). NOT a certified emergency stop. In danger use PHYSICAL E-STOP.";
+        }
+
+        UpdateControlSafetyBanner();
+        RefreshInterlockUi();
+    }
+
+    public void RevokeConveyorCalibrationArm()
+    {
+        _dashControlArmed = false;
+        if (DashControlArm != null) DashControlArm.IsChecked = false;
+        if (OvCalibrationArm != null) OvCalibrationArm.IsChecked = false;
+        if (DashStartButton != null) DashStartButton.IsEnabled = false;
+        if (SysStartButton != null && _conveyorCalibrationMode) SysStartButton.IsEnabled = false;
+        UpdateControlSafetyBanner();
+        DisarmPendingGantryMasterRequests();
+        RefreshInterlockUi();
+    }
+
+    private void MainNavigation_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!ReferenceEquals(e.Source, MainNavigation)) return;
+        if (MainNavigation == null || CalibrationWorkspaceTab == null) return;
+        if (ReferenceEquals(MainNavigation.SelectedItem, CalibrationWorkspaceTab))
+            RevokeConveyorCalibrationArm();
+    }
+
+    public void NavigateToCalibrationWorkspace()
+    {
+        RevokeConveyorCalibrationArm();
+        if (CalibrationWorkspaceTab != null && MainNavigation != null && !ReferenceEquals(MainNavigation.SelectedItem, CalibrationWorkspaceTab))
+            MainNavigation.SelectedItem = CalibrationWorkspaceTab;
+    }
+
+    public void NavigateToAutoProduction()
+    {
+        if (DashboardTab != null)
+            MainNavigation.SelectedItem = DashboardTab;
+        DisarmPendingGantryMasterRequests();
+    }
+
+    private void OpenCalibrationWorkspace_Click(object sender, RoutedEventArgs e) =>
+        NavigateToCalibrationWorkspace();
+
+    private void ReturnToAuto_Click(object sender, RoutedEventArgs e) =>
+        NavigateToAutoProduction();
 
     private void DashOpenGantry_Click(object sender, RoutedEventArgs e) =>
         MainNavigation.SelectedItem = GantryDetailTab;

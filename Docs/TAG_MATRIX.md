@@ -7,7 +7,6 @@ Legend: R = read-only on Dashboard; W = operator action only; RESERVED = planned
 | MAIN.bSystemStopRequested | R | Global normal PLC software stop request |
 | GVL_MD200_IO.bEStopFeedback | R | ST-1228 slot 6 DI0 (input bit0) |
 | MAIN.bPlcQConnected | R | PLC-Q Mitsubishi Ethernet MC socket |
-| MAIN.bServo_Ready | R/Future | EziServo NC servo ready output |
 
 ## 2. BANG TAI CHUNG / ENC0
 | MAIN.rConveyorSpeed | R | mm/s from ST-5114 encoder |
@@ -47,10 +46,31 @@ Legend: R = read-only on Dashboard; W = operator action only; RESERVED = planned
 | MAIN.bStartGlueCycle | no HMI writing | QD75 motion; commissioning required |
 | MAIN.bCameraTrigger / MAIN.rCameraCenterX,Y / MAIN.rCameraAngleDeg | vision bridge | Camera pose and trigger stage |
 
+### 3.1 GANTRY SERVO MASTER ENABLE (FROZEN 2026-11-06)
+| Symbol PLC | Direction | Type | Purpose |
+|---|---|---|---|
+| `MAIN.bHmiServoMasterReq` | W (Pulse) | BOOL | Operator pulse to dispatch Master Enable command |
+| `MAIN.bHmiServoMasterOn` | W (Level) | BOOL | Requested target: TRUE=ON (M10=0), FALSE=OFF (M10=1) |
+| `MAIN.udiHmiServoCmdSeq` | W (Seq) | UDINT | Monotonic sequence counter (> 0) |
+| `MAIN.bHmiServoRefreshReq` | W (Pulse) | BOOL | Read-only refresh pulse of M0..3, M10, Y20..22 echoes |
+| `MAIN.udiServoLastAckSeq` | R (Ack) | UDINT | Handled command sequence number (matches udiHmiServoCmdSeq on ACK) |
+| `MAIN.nServoCommandResult` | R (Code) | UINT | Result code (1=AcceptedAck, 10..18=Rejections/Faults) |
+| `MAIN.nServoState` | R (Enum) | UINT | Evaluated state (0=Unknown, 10=ON, 20=OFF, 21=MasterOffOverride, 40=Mismatch, 90=Fault) |
+| `MAIN.bServoBusy` | R | BOOL | TRUE while transaction/readback in progress |
+| `MAIN.bServoCmdM10Echo` | R (Echo) | BOOL | Direct readback of relay M10 (FALSE=ON commanded, TRUE=OFF commanded) |
+| `MAIN.bServoMasterOnEcho` | R (Echo) | BOOL | Direct readback of relay M0 (TRUE=Master enable active in ladder) |
+| `MAIN.bServoAxisOverrideEcho` | R (Echo) | ARRAY[1..3] OF BOOL | Readback of M1 (Ax1), M2 (Ax2), M3 (Ax3) manual overrides |
+| `MAIN.bServoOutputEcho` | R (Echo) | ARRAY[1..3] OF BOOL | Readback of physical command coils Y20, Y21, Y22 |
+| `MAIN.udiServoSnapshotSeq` | R (Gen) | UDINT | Snapshot generation counter (increments on coherent read) |
+| `MAIN.bServoSnapshotValid` | R (Flag) | BOOL | TRUE only when snapshot is coherent and watchdog fresh (2.5s) |
+| `MAIN.bServoPermit` | R (Gate) | BOOL | Remote PLC commissioning gate (cServoMasterCommissioned) |
+| `MAIN.bServoIdleVerified` | R (Gate) | BOOL | Motion-idle verification gate (bMachineStoppedVerified) |
+| `MAIN.nServoCommErrorID` | R (Diag) | UDINT | Raw MC socket error ID or Mitsubishi EndCode |
+
 ### Gantry Telemetry Limitations & Unmapped Signals:
 - **Actual Tool Center Point (TCP X, Y, Z, Rz)**: NOT available in TwinCAT PLC image. Mitsubishi QD75 buffer memory Md.20 (actual current feed value) is not streamed over MC protocol. Displayed in WPF as `--` / `UNAVAILABLE`. Do NOT invent or estimate actual live TCP.
 - **Homed Status**: NOT available in TwinCAT. Homing is controlled in Mitsubishi ladder `MAIN` via `M100/M101` and is unmapped to TwinCAT ADS.
-- **Drive Ready**: `MAIN.bServo_Ready` belongs to the EziServo rotary axis (Degree), NOT the Gantry QD75 robot ready status. Actual QD75 drive ready is `X0` internal to PLC-Q.
+- **Drive Ready**: QD75 drive ready is `X0` internal to PLC-Q and is NOT mapped to TwinCAT ADS. No separate rotary-servo ready tag exists in the current TwinCAT/Gantry contract.
 - Contract on Mitsubishi: D100..D114; M1000 START held till M1001 ACK; M105 software cancel only.
 - Safety: ST-1228 DI0 is auxiliary feedback, not certified E-stop. Software cancel (M105) does not replace physical hardwired E-stop chains.
 

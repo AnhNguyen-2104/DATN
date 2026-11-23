@@ -90,7 +90,6 @@ public static class LineMailboxProtocol
         "GVL_MD200_IO.bRUN_DO",
         "MAIN.bSystemEStopOK",
         "MAIN.bSystemStopRequested",
-        "MAIN.bServo_Ready",
         "MAIN.bPlcQConnected",
         "MAIN.bGlueCycleBusy",
         "MAIN.bGlueCycleDone",
@@ -211,6 +210,8 @@ public interface IAdsMailboxTransport : IDisposable
     void Disconnect();
 
     bool TryRead<T>(string symbolName, out T value);
+
+    bool TryReadArray<TElement>(string symbolName, int[] dimensions, out TElement[] value);
     T Read<T>(string symbolName);
 
     bool TryWrite<T>(string symbolName, T value, out string? error);
@@ -308,6 +309,34 @@ public sealed class TwinCatAdsMailboxTransport : IAdsMailboxTransport
             }
             catch
             {
+                return false;
+            }
+        }
+    }
+
+    public bool TryReadArray<TElement>(string symbolName, int[] dimensions, out TElement[] value)
+    {
+        value = Array.Empty<TElement>();
+        if (dimensions is null || dimensions.Length != 1 || dimensions[0] <= 0) return false;
+        lock (_lock)
+        {
+            if (_client is null || !_client.IsConnected) return false;
+            try
+            {
+                uint handle = _client.CreateVariableHandle(symbolName);
+                try
+                {
+                    value = (TElement[])_client.ReadAny(handle, typeof(TElement[]), dimensions);
+                    return true;
+                }
+                finally
+                {
+                    _client.DeleteVariableHandle(handle);
+                }
+            }
+            catch
+            {
+                value = Array.Empty<TElement>();
                 return false;
             }
         }
@@ -467,6 +496,25 @@ public sealed class FakeAdsMailboxTransport : IAdsMailboxTransport
         }
     }
 
+    public bool TryReadArray<TElement>(string symbolName, int[] dimensions, out TElement[] value)
+    {
+        value = Array.Empty<TElement>();
+        if (dimensions is null || dimensions.Length != 1 || dimensions[0] <= 0) return false;
+        lock (_lock)
+        {
+            if (!IsConnected || !IsInRunState) return false;
+            if (!_symbols.TryGetValue(symbolName, out var raw)) return false;
+            if (raw is not Array array || array.Rank != 1) return false;
+            if (array.Length != dimensions[0]) return false;
+            if (raw is TElement[] typed)
+            {
+                value = typed;
+                return true;
+            }
+            return false;
+        }
+    }
+
     public T Read<T>(string symbolName)
     {
         if (TryRead<T>(symbolName, out var v)) return v;
@@ -556,6 +604,8 @@ public sealed class LineMailboxGateway : IDisposable
     {
         lock (_gate)
         {
+            if (!AppHardwareCapabilities.AllowAdsWrites)
+                return false;
             if (_transport.IsConnected && _transport.IsInRunState)
                 return true;
             return _transport.TryConnect(port);
@@ -644,7 +694,7 @@ public sealed class LineMailboxGateway : IDisposable
         lock (_gate)
         {
             bool nextBit = NextHeartbeatBit();
-            if (isMockMode || !adsOnline || !IsArmed)
+            if (isMockMode || !adsOnline || !IsArmed || !AppHardwareCapabilities.AllowAdsWrites)
             {
                 // Alternates locally; strictly NO ADS WRITE while disarmed or in mock mode.
                 return false;

@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Windows;
+using PlateVision50.Vision;
 
 namespace PlateVision50;
 
@@ -10,11 +11,12 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        AppHardwareCapabilities.Initialize(e.Args);
         try {
-            _singleInstance=new Mutex(true, @"Local\DATN_AML_LINE_CONTROL_UI", out bool isNew);
+            _singleInstance=new Mutex(true, AppHardwareCapabilities.MutexName, out bool isNew);
             if(!isNew)
             {
-                Console.WriteLine("[App] Mutex Local\\DATN_AML_LINE_CONTROL_UI is already held by another process; shutting down.");
+                Console.WriteLine($"[App] Mutex {AppHardwareCapabilities.MutexName} is already held by another process; shutting down.");
                 Shutdown();
                 return;
             }

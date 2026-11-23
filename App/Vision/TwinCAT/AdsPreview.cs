@@ -6,6 +6,10 @@ public sealed class AdsPreview
     // Does NOT trigger camera exposure, tracking, M1000, gantry or glue valve.
     public string Check()
     {
+        if (!PlateVision50.Vision.AppHardwareCapabilities.AllowAdsPolling)
+        {
+            return "ADS port 851: OFFLINE / UNAVAILABLE in offline calibration mode.";
+        }
         using var ads=new AdsClient();
         ads.Connect(851);
         var state=ads.ReadState();

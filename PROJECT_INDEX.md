@@ -9,7 +9,7 @@
 | Công việc | Mở ở đâu |
 | --- | --- |
 | Chạy giao diện DATN | START_DATN.cmd |
-| Source C# Hikrobot/Basler/Vision | App\Vision\PlateVision50.csproj |
+| Source C# Station 01 Basler / Station 02 Hikrobot Vision | App\Vision\PlateVision50.csproj |
 | Thư viện/bộ điều khiển camera | Dependencies\ |
 | Dự án TwinCAT 3 tích hợp gần nhất (bản sao) | PLC\TwinCAT\DATN.sln |
 | Mã PLC TwinCAT | PLC\TwinCAT\DATN\PLC1\ |
@@ -70,3 +70,20 @@
   2. Đo đạc hiệu chuẩn vật lý bằng laser/thước cặp cho cự ly camera - bàn gantry ($200.0\text{ mm}$) và độ lệch ngang ($85.0\text{ mm}$).
   3. Đối chiếu chương trình thang PLC Mitsubishi trong GX Works2: kiểm tra đơn quyền điều khiển ngõ ra Y20 (Servo enable/phanh) vs Y25 (kích van bơm keo), kiểm tra handshake M1000/M1001.
   4. Nghiệm thu mạch E-stop phần cứng và giới hạn hành trình trục trước khi kích hoạt chuyển động thật.
+
+## 8. CẬP NHẬT 2026-11-01 — CHẾ ĐỘ HIỆU CHUẨN PHÂN HỆ BĂNG TẢI ĐỘC LẬP (CONVEYOR SUBSYSTEM CALIBRATION)
+- Đặc tả kỹ thuật & Hướng dẫn vận hành: `Docs/CONVEYOR_CALIBRATION_MODE_20261101.md`.
+- Định nghĩa ngữ nghĩa chế độ chuẩn xác:
+  1. **PRODUCTION AUTO (LINE) · COMMISSIONING PENDING**: Là **chế độ sản xuất tự động thực tế duy nhất** của toàn dây chuyền (tích hợp Camera Station 01 Basler USB qua pylon SDK scan / Station 02 Hikrobot GigE qua MVS direct IP, thị giác máy tính bám phôi, hàng đợi FIFO TwinCAT, cầu MC PLC Mitsubishi Q, robot Gantry bơm keo ngõ ra Y25, biến tần MD200 và encoder ST-5114). Trạng thái hiện tại: Đang chờ nghiệm thu hiện trường (homography, cự ly `rCameraToWorkStart_mm`, handshake MC).
+  2. **CONVEYOR SUBSYSTEM CALIBRATION · ISOLATED**: Là chế độ bảo trì, đo đạc và hiệu chuẩn kỹ thuật **độc lập cho phân hệ truyền động băng tải** (Inovance MD200 VFD + ST-5114 encoder). **Không phải chế độ sản xuất** và **không phải hiệu chuẩn camera hay robot gantry**. Không yêu cầu camera.
+- Loại bỏ và làm rõ các nhãn gây hiểu lầm:
+  * Thay thế nhãn `AUTO (BYPASS)` bằng `AUTO INHIBITED`: Khẳng định rõ điều phối tự động bị khóa, không hề bypass bất kỳ cổng an toàn sản xuất nào.
+  * Thay thế nhãn chung chung `CALIBRATION ONLY` bằng `CONVEYOR SUBSYSTEM CALIBRATION · ISOLATED BELT RUN (NO ROBOT/GLUE)`.
+  * Thay thế `NO MOTION` tĩnh bằng nhãn phản ánh đúng quyền vận hành: `PRODUCTION AUTO: DISARMED · COMMISSIONING PENDING`.
+  * Interlock camera trong chế độ hiệu chuẩn: `● CAM (NOT REQUIRED)` (chẩn đoán phân hệ độc lập không dùng dữ liệu hình ảnh).
+- Khóa chuyển đổi chế độ an toàn có giám sát theo CẢ 2 CHIỀU:
+  * Rời hiệu chuẩn khi băng tải đang chạy -> Kích hoạt dừng băng tải có bảo vệ (`RequestManualBeltStopAsync`).
+  * Rời AUTO khi tuyến hoặc bám đuổi đang chạy -> Kích hoạt dừng toàn tuyến có bảo vệ (`RequestLineStopAsync`) và ngắt tracking.
+  * Nếu lệnh dừng thất bại hoặc phản hồi PLC còn chuyển động -> Hoàn tác bộ chọn ComboBox về chế độ cũ, báo động, tuyệt đối không commit chuyển đổi chế độ khi máy đang chuyển động.
+- Không thêm bất kỳ lệnh ghi PLC/ADS mới nào: Tái sử dụng hộp thư băng tải thủ công đã nghiệm thu an toàn ngày 2026-10-24 (`MAIN.bHmiBeltSetReq`, `MAIN.bHmiBeltStartReq`, `MAIN.bHmiBeltStopReq`).
+- Ranh giới an toàn: Khóa cứng chuyển động Gantry/SCARA, bơm keo, auto FIFO; giám sát phản hồi phụ ST-1228 DI0 (bSystemEStopOK - lưu ý đây là tiếp điểm phụ phi an toàn, không thay thế chuỗi dừng khẩn cấp phần cứng có chứng chỉ) và watchdog heartbeat (bHmiLinkFresh).

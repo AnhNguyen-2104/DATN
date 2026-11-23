@@ -337,3 +337,61 @@ public sealed class LineInterlockModel
         }
     }
 }
+
+public sealed record ConveyorCalibrationResetInputs(
+    bool AdsFresh,
+    bool AuxEstopOk,
+    bool GlobalStop,
+    bool NormalStopLatched,
+    bool BeltRunning,
+    bool GlueActive,
+    bool AutoActive);
+
+public sealed record ConveyorCalibrationResetEvaluation(
+    bool CanReset,
+    string Reason);
+
+public static class ConveyorCalibrationInterlock
+{
+    public static ConveyorCalibrationResetEvaluation EvaluateReset(ConveyorCalibrationResetInputs inputs)
+    {
+        if (!inputs.AdsFresh)
+        {
+            return new ConveyorCalibrationResetEvaluation(false, "RESET BLOCKED: ADS 851 offline or stale telemetry. In danger use PHYSICAL E-STOP.");
+        }
+
+        if (!inputs.AuxEstopOk)
+        {
+            return new ConveyorCalibrationResetEvaluation(false, "RESET BLOCKED: Emergency stop auxiliary contact (ST-1228 DI0) not healthy. In danger use PHYSICAL E-STOP.");
+        }
+
+        if (inputs.BeltRunning)
+        {
+            return new ConveyorCalibrationResetEvaluation(false, "RESET BLOCKED: Conveyor motion active. Stop conveyor before resetting normal stop latch.");
+        }
+
+        if (inputs.GlueActive)
+        {
+            return new ConveyorCalibrationResetEvaluation(false, "RESET BLOCKED: Gantry glue cycle active or errored.");
+        }
+
+        if (inputs.AutoActive)
+        {
+            return new ConveyorCalibrationResetEvaluation(false, "RESET BLOCKED: Production AUTO sequence active.");
+        }
+
+        // PLC derives bSystemStopRequested := NOT bSystemEStopOK OR bLineNormalStopLatched.
+        // If GlobalStop is true without NormalStopLatched, an external E-stop or safety stop is present.
+        if (inputs.GlobalStop && !inputs.NormalStopLatched)
+        {
+            return new ConveyorCalibrationResetEvaluation(false, "RESET BLOCKED: Global stop active without normal stop latch. In danger use PHYSICAL E-STOP.");
+        }
+
+        if (!inputs.NormalStopLatched)
+        {
+            return new ConveyorCalibrationResetEvaluation(false, "RESET NOT REQUIRED: Normal stop latch is not active in PLC.");
+        }
+
+        return new ConveyorCalibrationResetEvaluation(true, "Normal stop latched in PLC; reset permitted.");
+    }
+}

@@ -21,6 +21,21 @@ public sealed class AdsFifoBenchBridge
 {
     private readonly SemaphoreSlim _lock=new(1,1);
     private static readonly string Prefix="MAIN.";
+
+    internal static Func<AdsClient>? ClientFactory { get; set; }
+    private static int _clientCreations;
+    internal static int ClientCreationCount
+    {
+        get => _clientCreations;
+        set => _clientCreations = value;
+    }
+
+    private static AdsClient CreateClient()
+    {
+        Interlocked.Increment(ref _clientCreations);
+        return ClientFactory != null ? ClientFactory() : new AdsClient();
+    }
+
     private static T Read<T>(AdsClient ads,string name)
     {
         var h=ads.CreateVariableHandle(Prefix+name);
@@ -47,8 +62,12 @@ public sealed class AdsFifoBenchBridge
     }
     public string InspectLiveReadiness()
     {
+        if (!PlateVision50.Vision.AppHardwareCapabilities.AllowAdsPolling)
+        {
+            return "ADS OFFLINE / UNAVAILABLE: Hardware ADS connection is inhibited in offline calibration mode.";
+        }
         // READ ONLY. Never writes bVisionFeedVerified, calibration or motion flags.
-        using var ads=new AdsClient();
+        using var ads=CreateClient();
         ads.Connect(851);
         if(ads.ReadState().AdsState!=AdsState.Run)
             return "NOT READY: PLC port 851 is not in RUN state.";
@@ -70,7 +89,11 @@ public sealed class AdsFifoBenchBridge
 
     public FifoSnapshot ReadStatus()
     {
-        using var ads=new AdsClient();
+        if (!PlateVision50.Vision.AppHardwareCapabilities.AllowAdsPolling)
+        {
+            throw new InvalidOperationException("ADS status read is inhibited in offline calibration mode (zero ADS sockets allowed).");
+        }
+        using var ads=CreateClient();
         ads.Connect(851);
         return new(
             Read<short>(ads,"nQueueCount"),
@@ -95,6 +118,10 @@ public sealed class AdsFifoBenchBridge
     public async Task<string> EnqueueBenchAsync(double centerXmm,double centerYmm,double thetaDeg,
         CancellationToken cancellationToken=default)
     {
+        if (!PlateVision50.Vision.AppHardwareCapabilities.AllowAdsWrites)
+        {
+            throw new InvalidOperationException("ADS bench enqueue is inhibited in offline calibration mode (zero ADS writes allowed).");
+        }
         if(!double.IsFinite(centerXmm)||!double.IsFinite(centerYmm)||!double.IsFinite(thetaDeg))
             throw new ArgumentException("Invalid image coordinates");
         if(Math.Abs(centerXmm)>1000||Math.Abs(centerYmm)>1000||Math.Abs(thetaDeg)>45)
@@ -105,7 +132,7 @@ public sealed class AdsFifoBenchBridge
             // Keep the sequence short and ordered. One frame pending at a time (no hardware FrameID).
             return await Task.Run(async ()=>
             {
-                using var ads=new AdsClient();
+                using var ads=CreateClient();
                 ads.Connect(851);
                 if(ads.ReadState().AdsState!=AdsState.Run)throw new InvalidOperationException("TwinCAT PLC not RUN");
                 if(!SafetyCheck(ads))throw new InvalidOperationException("PLC must be BENCH SIM and all robot dispatch permits OFF");
