@@ -1,0 +1,1315 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<Root>
+	<Application name="MELSOFT MR Configurator2" version="1.165X">
+		<fileType>USERDATA</fileType>
+		<dataType>PARAMETER</dataType>
+		<lang>en</lang>
+		<connection>USB</connection>
+		<Controller>
+			<connection/>
+			<type/>
+		</Controller>
+	</Application>
+	<Axes>
+		<Axis no="1" nameNo="1" unificationConnection="-1" unificationType="0">
+			<ampType>MR-J4-A</ampType>
+			<ampBaseType>17</ampBaseType>
+			<ampSoftwareNo>BCD-B46W100 (factory setting)</ampSoftwareNo>
+			<ampOptionUnitType>No Connection</ampOptionUnitType>
+		</Axis>
+	</Axes>
+	<PARAMETER>
+		<AmpType>MR-J4-A</AmpType>
+		<AmpTypeName>MR-J4-A (-RJ) Standard</AmpTypeName>
+		<ValidSafetyAccessType/>
+		<OptionUnitType/>
+		<BuildinSafetyType/>
+		<WritTime>
+			<UnitSerialID/>
+		</WritTime>
+		<Types>
+			<Type Number="PA01" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA02" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA03" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA04" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA05" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="8"/>
+			<Type Number="PA06" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="8"/>
+			<Type Number="PA07" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="8"/>
+			<Type Number="PA08" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA09" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA10" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA11" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA12" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA13" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA14" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA15" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="8"/>
+			<Type Number="PA16" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="8"/>
+			<Type Number="PA17" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA18" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA19" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA20" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA21" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA22" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA23" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA24" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA25" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA26" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA27" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA28" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA29" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA30" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA31" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PA32" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB01" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB02" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB03" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB04" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB05" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB06" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB07" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB08" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB09" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB10" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB11" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB12" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB13" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB14" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB15" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB16" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB17" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB18" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB19" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB20" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB21" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB22" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB23" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB24" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB25" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB26" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB27" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB28" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB29" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB30" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB31" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB32" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB33" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB34" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB35" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB36" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB37" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB38" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB39" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB40" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB41" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB42" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB43" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB44" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB45" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB46" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB47" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB48" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB49" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB50" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB51" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB52" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB53" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB54" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB55" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB56" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB57" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB58" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB59" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB60" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB61" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB62" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB63" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PB64" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC01" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC02" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC03" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC04" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC05" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC06" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC07" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC08" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC09" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC10" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC11" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC12" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC13" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC14" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC15" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC16" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC17" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC18" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC19" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC20" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC21" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC22" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC23" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC24" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC25" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC26" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC27" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC28" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC29" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC30" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC31" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC32" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="8"/>
+			<Type Number="PC33" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="8"/>
+			<Type Number="PC34" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="8"/>
+			<Type Number="PC35" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC36" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC37" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PC38" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PC39" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PC40" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PC41" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="8"/>
+			<Type Number="PC42" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="8"/>
+			<Type Number="PC43" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC44" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC45" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC46" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC47" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC48" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC49" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC50" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC51" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC52" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC53" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC54" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PC55" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC56" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC57" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC58" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC59" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC60" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC61" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC62" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC63" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC64" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC65" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC66" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PC67" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PC68" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PC69" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PC70" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC71" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC72" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC73" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC74" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC75" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC76" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC77" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC78" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC79" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PC80" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD01" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD02" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD03" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD04" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD05" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD06" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD07" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD08" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD09" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD10" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD11" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD12" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD13" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD14" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD15" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD16" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD17" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD18" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD19" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD20" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD21" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD22" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD23" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD24" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD25" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD26" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD27" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD28" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD29" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD30" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD31" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD32" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD33" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD34" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD35" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD36" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD37" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD38" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD39" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD40" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD41" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD42" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD43" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD44" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD45" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD46" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD47" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PD48" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE01" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE02" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE03" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE04" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE05" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE06" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE07" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE08" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE09" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE10" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE11" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE12" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE13" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE14" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE15" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE16" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE17" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE18" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE19" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE20" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE21" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE22" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE23" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE24" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE25" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE26" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE27" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE28" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE29" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE30" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE31" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE32" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE33" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE34" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE35" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE36" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE37" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE38" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE39" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE40" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE41" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE42" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE43" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE44" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE45" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE46" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE47" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PE48" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE49" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE50" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE51" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE52" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE53" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE54" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE55" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE56" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE57" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE58" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE59" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE60" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE61" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE62" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE63" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PE64" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF01" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF02" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF03" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF04" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF05" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF06" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF07" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="8"/>
+			<Type Number="PF08" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="8"/>
+			<Type Number="PF09" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF10" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF11" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF12" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF13" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF14" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF15" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF16" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF17" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF18" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF19" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF20" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF21" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PF22" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF23" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF24" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF25" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF26" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF27" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF28" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PF29" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF30" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF31" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF32" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF33" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF34" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF35" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF36" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF37" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF38" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF39" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF40" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF41" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF42" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF43" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF44" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF45" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF46" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF47" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PF48" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG01" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG02" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG03" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG04" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG05" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG06" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG07" Type="Dec" DecimalPoint="3" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG08" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG09" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG10" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG11" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG12" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG13" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG14" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG15" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG16" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG17" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG18" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG19" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG20" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG21" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG22" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG23" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG24" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG25" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG26" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG27" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG28" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG29" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG30" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG31" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG32" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG33" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG34" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG35" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG36" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG37" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG38" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG39" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG40" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG41" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG42" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG43" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG44" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG45" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG46" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG47" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG48" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG49" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG50" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG51" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG52" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG53" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG54" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG55" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG56" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG57" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG58" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG59" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG60" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG61" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG62" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG63" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG64" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG65" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PG66" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG67" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG68" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG69" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG70" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG71" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG72" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG73" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG74" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG75" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG76" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG77" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG78" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG79" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PG80" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH01" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH02" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH03" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH04" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH05" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH06" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH07" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH08" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH09" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH10" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH11" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH12" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH13" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH14" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH15" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH16" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH17" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH18" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH19" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH20" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH21" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH22" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH23" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH24" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH25" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH26" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH27" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH28" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH29" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH30" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH31" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PH32" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ01" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ02" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ03" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ04" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ05" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ06" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ07" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ08" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ09" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ10" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ11" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ12" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ13" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ14" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ15" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ16" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ17" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ18" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PJ19" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ20" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ21" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ22" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ23" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ24" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ25" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ26" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ27" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ28" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ29" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ30" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ31" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PJ32" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL01" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL02" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL03" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL04" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL05" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL06" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL07" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL08" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL09" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL10" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL11" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL12" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL13" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL14" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL15" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL16" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL17" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL18" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL19" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL20" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL21" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL22" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL23" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL24" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL25" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL26" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL27" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL28" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL29" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL30" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL31" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL32" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL33" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL34" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL35" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL36" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL37" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL38" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL39" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL40" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL41" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL42" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL43" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL44" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL45" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL46" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL47" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PL48" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO01" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO02" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO03" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO04" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO05" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO06" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO07" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO08" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO09" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO10" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO11" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO12" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO13" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO14" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO15" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PO16" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PO17" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PO18" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PO19" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PO20" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PO21" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PO22" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PO23" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO24" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO25" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO26" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO27" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO28" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO29" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO30" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO31" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PO32" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS01" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS02" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS03" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS04" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS05" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS06" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS07" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS08" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS09" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS10" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS11" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS12" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS13" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS14" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS15" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS16" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS17" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS18" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS19" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS20" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS21" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS22" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS23" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS24" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS25" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS26" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS27" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS28" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS29" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS30" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS31" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PS32" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT01" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT02" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT03" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT04" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT05" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT06" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT07" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT08" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PT09" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT10" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT11" Type="Dec" DecimalPoint="2" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT12" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT13" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT14" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT15" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PT16" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PT17" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PT18" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PT19" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PT20" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PT21" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PT22" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PT23" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT24" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT25" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT26" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT27" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT28" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT29" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT30" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT31" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT32" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT33" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT34" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT35" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT36" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT37" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT38" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT39" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT40" Type="Dec" DecimalPoint="0" Signed="true" HexRangeLength="4"/>
+			<Type Number="PT41" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT42" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT43" Type="Dec" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT44" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT45" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT46" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT47" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+			<Type Number="PT48" Type="Hex" DecimalPoint="0" Signed="false" HexRangeLength="4"/>
+		</Types>
+		<Parameters>
+PA01,*STY,Operation mode,1000,,1000-1268
+PA02,*REG,Regenerative option,0000,,0000-73FF
+PA03,*ABS,Absolute position detection system,0002,,0000-0002
+PA04,*AOP1,Function selection A-1,2000,,0000-2000
+PA05,*FBP,Number of command input pulses per revolution,10000,,1000-1000000
+PA06,CMX,Elec. gear numerator (Cmd. pls. mult. factor num.),1,,1-16777215
+PA07,CDV,Elec. gear denominator (Cmd. pls. mult. factor den.),1,,1-16777215
+PA08,ATU,Auto tuning mode,0001,,0000-0004
+PA09,RSP,Auto tuning response,16,,1-40
+PA10,INP,In-position range,100,,0-65535
+PA11,TLP,Forward rotation torque limit,100.0,%,0.0-100.0
+PA12,TLN,Reverse rotation torque limit,100.0,%,0.0-100.0
+PA13,*PLSS,Command pulse input status,0000,,0000-0412
+PA14,*POL,Rotation direction selection,0,,0-1
+PA15,*ENR,Encoder output pulse,10000,pulse/rev,1-4194304
+PA16,*ENR2,Encoder output pulse 2,1,,1-4194304
+PA17,*MSR,Servo motor series setting,0000,,0000-FFFF
+PA18,*MTY,Servo motor type setting,0000,,0000-FFFF
+PA19,*BLK,Parameter block,00AA,,0000-FFFF
+PA20,*TDS,Tough drive setting,0000,,0000-1110
+PA21,*AOP3,Function selection A-3,1001,,0000-3001
+PA22,*PCS,Position control structure selection,0000,,0000-0020
+PA23,DRAT,Drive recorder arbitrary alarm trigger setting,0000,,0000-FFFF
+PA24,AOP4,Function selection A-4,0000,,0000-0002
+PA25,OTHOV,One-touch tuning - Overshoot permissible level,0,%,0-100
+PA26,*AOP5,Function selection A-5,0000,,0000-00A1
+PA27,,For manufacturer setting,0000,,0000-0000
+PA28,*AOP6,For manufacturer setting,0000,,0000-0000
+PA29,,For manufacturer setting,0000,,0000-0000
+PA30,,For manufacturer setting,0000,,0000-0000
+PA31,,For manufacturer setting,0000,,0000-0000
+PA32,,For manufacturer setting,0000,,0000-0000
+PB01,FILT,Adaptive tuning mode (Adaptive filter II),0000,,0000-1002
+PB02,VRFT,Vib. supp. ctrl. tuning mode (Adv. vib. supp. ctrl. II),0000,,0000-0022
+PB03,PST,Pos. cmd. accel./decel. time const. (Pos. smoothing),0,ms,0-65535
+PB04,FFC,Feed forward gain,0,%,0-100
+PB05,FFCF,For manufacturer setting,500,,10-4500
+PB06,GD2,Load inertia moment ratio,10.80,times,0.00-300.00
+PB07,PG1,Model loop gain,14.0,rad/s,1.0-2000.0
+PB08,PG2,Position loop gain,35.0,rad/s,1.0-2000.0
+PB09,VG2,Speed loop gain,1123,rad/s,20-65535
+PB10,VIC,Speed integral compensation,35.7,ms,0.1-1000.0
+PB11,VDC,Speed differential compensation,980,,0-1000
+PB12,OVA,Overshoot amount compensation,0,%,0-100
+PB13,NH1,Machine resonance suppression filter 1,4500,Hz,10-4500
+PB14,NHQ1,Notch shape selection 1,0000,,0000-0330
+PB15,NH2,Machine resonance suppression filter 2,4500,Hz,10-4500
+PB16,NHQ2,Notch shape selection 2,0000,,0000-0331
+PB17,NHF,Shaft resonance suppression filter,0102,,0000-031F
+PB18,LPF,Low-pass filter setting,3141,rad/s,100-18000
+PB19,VRF11,Vib. supp. ctrl. 1 - Vibration frequency,100.0,Hz,0.1-300.0
+PB20,VRF12,Vib. supp. ctrl. 1 - Resonance frequency,100.0,Hz,0.1-300.0
+PB21,VRF13,Vib. supp. ctrl. 1 - Vibration frequency damping,0.00,,0.00-0.30
+PB22,VRF14,Vib. supp. ctrl. 1 - Resonance frequency damping,0.00,,0.00-0.30
+PB23,VFBF,Low-pass filter selection,0000,,0000-1022
+PB24,*MVS,Slight vibration suppression control,0000,,0000-0031
+PB25,*BOP1,Function selection B-1,0000,,0000-1F12
+PB26,*CDP,Gain changing function,0000,,0000-0214
+PB27,CDL,Gain changing condition,10,,0-9999
+PB28,CDT,Gain changing time constant,1,ms,0-100
+PB29,GD2B,Gain changing - Load inertia moment ratio,7.00,times,0.00-300.00
+PB30,PG2B,Gain changing position loop gain,0.0,rad/s,0.0-2000.0
+PB31,VG2B,Gain changing speed loop gain,0,rad/s,0-65535
+PB32,VICB,Gain changing speed integral compensation,0.0,ms,0.0-5000.0
+PB33,VRF1B,Vib. supp. ctrl. 1 - Vib. frq. after gain chng,0.0,Hz,0.0-300.0
+PB34,VRF2B,Vib. supp. ctrl. 1 - Res. frq. after gain chng,0.0,Hz,0.0-300.0
+PB35,VRF3B,Vib. supp. ctrl. 1 - Vib. frq. damping after gain chng,0.00,,0.00-0.30
+PB36,VRF4B,Vib. supp. ctrl. 1 - Res. frq. damping after gain chng,0.00,,0.00-0.30
+PB37,VPI,For manufacturer setting,1600,,0-65535
+PB38,*TGW1,For manufacturer setting,0.00,,0.00-50.00
+PB39,*TGW2,For manufacturer setting,0.00,,0.00-50.00
+PB40,*TGW3,For manufacturer setting,0.00,,0.00-50.00
+PB41,VRFF1,For manufacturer setting,0000,,0000-0000
+PB42,VRFF2,For manufacturer setting,0000,,0000-0000
+PB43,*VRFQ,For manufacturer setting,0000,,0000-0200
+PB44,JM2,For manufacturer setting,0.00,,0.00-0.00
+PB45,CNHF,Command notch filter,0000,,0000-0F5F
+PB46,NH3,Machine resonance suppression filter 3,4500,Hz,10-4500
+PB47,NHQ3,Notch shape selection 3,0000,,0000-0331
+PB48,NH4,Machine resonance suppression filter 4,4500,Hz,10-4500
+PB49,NHQ4,Notch shape selection 4,0000,,0000-0331
+PB50,NH5,Machine resonance suppression filter 5,4500,Hz,10-4500
+PB51,NHQ5,Notch shape selection 5,0000,,0000-0331
+PB52,VRF21,Vib. supp. ctrl. 2 - Vibration frequency,100.0,Hz,0.1-300.0
+PB53,VRF22,Vib. supp. ctrl. 2 - Resonance frequency,100.0,Hz,0.1-300.0
+PB54,VRF23,Vib. supp. ctrl. 2 - Vibration frequency damping,0.00,,0.00-0.30
+PB55,VRF24,Vib. supp. ctrl. 2 - Resonance frequency damping,0.00,,0.00-0.30
+PB56,VRF21B,Vib. supp. ctrl. 2 - Vib. frq. after gain chng,0.0,Hz,0.0-300.0
+PB57,VRF22B,Vib. supp. ctrl. 2 - Res. frq. after gain chng,0.0,Hz,0.0-300.0
+PB58,VRF23B,Vib. supp. ctrl. 2 - Vib. frq. damping after gain chng,0.00,,0.00-0.30
+PB59,VRF24B,Vib. supp. ctrl. 2 - Res. frq. damping after gain chng,0.00,,0.00-0.30
+PB60,PG1B,Gain changing model loop gain,0.0,rad/s,0.0-2000.0
+PB61,TFF,For manufacturer setting,0.0,,0.0-100.0
+PB62,,For manufacturer setting,0000,,0000-0000
+PB63,,For manufacturer setting,0000,,0000-0000
+PB64,,For manufacturer setting,0000,,0000-0000
+PC01,STA,Accel. time constant,0,ms,0-50000
+PC02,STB,Decel. time constant,0,ms,0-50000
+PC03,STC,S-pattern accel./decel. time const.,0,ms,0-5000
+PC04,TQC,Torque command time constant,0,ms,0-50000
+PC05,SC1,Internal spd. cmd. 1/limit 1/Auto operation spd. 1,100,r/min,0-65535
+PC06,SC2,Internal spd. cmd. 2/limit 2/Auto operation spd. 2,500,r/min,0-65535
+PC07,SC3,Internal spd. cmd. 3/limit 3/Manual operation spd. 1,1000,r/min,0-65535
+PC08,SC4,Internal speed command 4/Internal speed limit 4,200,r/min,0-65535
+PC09,SC5,Internal speed command 5/Internal speed limit 5,300,r/min,0-65535
+PC10,SC6,Internal speed command 6/Internal speed limit 6,500,r/min,0-65535
+PC11,SC7,Internal speed command 7/Internal speed limit 7,800,r/min,0-65535
+PC12,VCM,Analog speed command maximum speed,0,r/min,0-50000
+PC13,TLC,Analog torque command maximum output,100.0,%,0.0-1000.0
+PC14,MOD1,Analog monitor 1 output,0000,,0000-001F
+PC15,MOD2,Analog monitor 2 output,0001,,0000-001F
+PC16,MBR,Electromagnetic brake sequence output,0,ms,0-1000
+PC17,ZSP,Zero speed,50,r/min,0-10000
+PC18,*BPS,Alarm history clear,0000,,0000-0001
+PC19,*ENRS,Encoder output pulse selection,0000,,0000-0151
+PC20,*SNO,Station number setting,0,station,0-31
+PC21,*SOP,RS-422 Communication function selection,0010,,0000-0160
+PC22,*COP1,Function selection C-1,0000,,0000-1241
+PC23,*COP2,Function selection C-2,0000,,0000-1521
+PC24,*COP3,Function selection C-3,0000,,0000-3061
+PC25,*COP4,For manufacturer setting,0000,,0000-0130
+PC26,*COP5,Function selection C-5,0000,,0000-0111
+PC27,*COP6,Function selection C-6,0000,,0000-1112
+PC28,*COP7,For manufacturer setting,0000,,0000-1000
+PC29,*COP8,Function selection C-8,0000,,0000-0010
+PC30,STA2,Acceleration time constant 2,0,ms,0-50000
+PC31,STB2,Deceleration time constant 2,0,ms,0-50000
+PC32,CMX2,Command input pulse multiplication numerator 2,1,,1-16777215
+PC33,CMX3,Command input pulse multiplication numerator 3,1,,1-16777215
+PC34,CMX4,Command input pulse multiplication numerator 4,1,,1-16777215
+PC35,TL2,Internal torque limit 2,100.0,%,0.0-100.0
+PC36,*DMD,Status display selection,0000,,0000-012F
+PC37,VCO,Analog speed command offset,0,mV,-9999-9999
+PC38,TPO,Analog torque command offset,0,mV,-9999-9999
+PC39,MO1,Analog monitor 1 offset,0,mV,-9999-9999
+PC40,MO2,Analog monitor 2 offset,0,mV,-9999-9999
+PC41,MOSDL,For manufacturer setting,0,,0-0
+PC42,MOSDH,For manufacturer setting,0,,0-0
+PC43,ERZ,Error excessive alarm detection level,0,rev,0-1000
+PC44,*COP9,Function selection C-9,0000,,0000-1242
+PC45,*COPA,For manufacturer setting,0000,,0000-0311
+PC46,TLFT,For manufacturer setting,0,,0-50000
+PC47,MVFB,For manufacturer setting,0,,0-0
+PC48,FAL,For manufacturer setting,0,,0-32767
+PC49,FWN,For manufacturer setting,0,,0-0
+PC50,*COPB,For manufacturer setting,0000,,0000-0000
+PC51,RSBR,Forced stop deceleration time constant,100,ms,0-20000
+PC52,RSBS,For manufacturer setting,0,,0-1000
+PC53,RBRX,For manufacturer setting,0,,0-20000
+PC54,RSUP1,Vertical ax.freefall prevention compensation amount,0,0.0001rev,-25000-25000
+PC55,RSUP2,For manufacturer setting,0,,0-0
+PC56,RSUP3,For manufacturer setting,100,,100-100
+PC57,*ENRS2,For manufacturer setting,0000,,0000-0000
+PC58,OSL,For manufacturer setting,0,,0-20000
+PC59,COPC,For manufacturer setting,0000,,0000-0000
+PC60,*COPD,Function selection C-D,0000,,0000-1011
+PC61,*COPE,For manufacturer setting,0000,,0000-0011
+PC62,*DMD2,For manufacturer setting,0000,,0000-002F
+PC63,PDO1,For manufacturer setting,0000,,0000-0000
+PC64,PDOL,For manufacturer setting,0000,,0000-0000
+PC65,PDOH,For manufacturer setting,0000,,0000-0000
+PC66,LPSPL,Mark detection range+,0,,-999-999
+PC67,LPSPH,Mark detection range+,0,,-999-999
+PC68,LPSNL,Mark detection range-,0,,-999-999
+PC69,LPSNH,Mark detection range-,0,,-999-999
+PC70,*SNOM,Modbus-RTU Communication station number setting,0,,0-247
+PC71,*COPF,Function selection C-F selection,0000,,0000-2261
+PC72,*COPG,Function selection C-G selection,0000,,0000-0011
+PC73,ERW,Error excessive warning level,0,rev,0-1000
+PC74,*COPH,For manufacturer setting,0000,,0000-0000
+PC75,,For manufacturer setting,0000,,0000-0000
+PC76,,For manufacturer setting,0000,,0000-0000
+PC77,,For manufacturer setting,0000,,0000-0000
+PC78,ERZ3,For manufacturer setting,0,,0-0
+PC79,,For manufacturer setting,0000,,0000-0000
+PC80,,For manufacturer setting,0000,,0000-0000
+PD01,*DIA1,Input signal automatic on selection 1,0000,,0000-FFFF
+PD02,*DIA2,For manufacturer setting,0000,,0000-0000
+PD03,*DI1L,Input device selection 1L,0202,,0000-3F3F
+PD04,*DI1H,Input device selection 1H,0202,,0000-3F3F
+PD05,*DI2L,Input device selection 2L,2100,,0000-3F3F
+PD06,*DI2H,Input device selection 2H,2021,,0000-3F3F
+PD07,*DI3L,Input device selection 3L,0704,,0000-3F3F
+PD08,*DI3H,Input device selection 3H,0707,,0000-3F3F
+PD09,*DI4L,Input device selection 4L,0805,,0000-3F3F
+PD10,*DI4H,Input device selection 4H,0808,,0000-3F3F
+PD11,*DI5L,Input device selection 5L,0303,,0000-3F3F
+PD12,*DI5H,Input device selection 5H,3803,,0000-3F3F
+PD13,*DI6L,Input device selection 6L,2006,,0000-3F3F
+PD14,*DI6H,Input device selection 6H,3920,,0000-3F3F
+PD15,*DI7L,For manufacturer setting,0000,,0000-0000
+PD16,*DI7H,For manufacturer setting,0000,,0000-0000
+PD17,*DI8L,Input device selection 8L,0A0A,,0000-3F3F
+PD18,*DI8H,Input device selection 8H,0A00,,0000-3F3F
+PD19,*DI9L,Input device selection 9L,0B0B,,0000-3F3F
+PD20,*DI9H,Input device selection 9H,0B00,,0000-3F3F
+PD21,*DI10L,Input device selection 10L,2323,,0000-3F3F
+PD22,*DI10H,Input device selection 10H,2B23,,0000-3F3F
+PD23,*DO1,Output device selection 1,0004,,0000-003F
+PD24,*DO2,Output device selection 2,000C,,0000-003F
+PD25,*DO3,Output device selection 3,0004,,0000-003F
+PD26,*DO4,Output device selection 4,0007,,0000-003F
+PD27,*DO5,For manufacturer setting,0003,,0000-003F
+PD28,*DO6,Output device selection 6,0002,,0000-003F
+PD29,*DIF,Input filter setting,0004,,0000-0116
+PD30,*DOP1,Function selection D-1,0000,,0000-4313
+PD31,*DOP2,Function selection D-2,0000,,0000-F100
+PD32,*DOP3,Function selection D-3,0000,,0000-1012
+PD33,*DOP4,Function selection D-4,0000,,0000-0200
+PD34,*DOP5,Function selection D-5,0000,,0000-1011
+PD35,*ORV1,For manufacturer setting,0000,,0000-0FFF
+PD36,,For manufacturer setting,0000,,0000-0000
+PD37,*MSMD1,For manufacturer setting,0000,,0000-0000
+PD38,TLS,For manufacturer setting,0,,0-0
+PD39,VLC,For manufacturer setting,0,,0-0
+PD40,VLL,For manufacturer setting,0,,0-0
+PD41,*DIA3,Input signal automatic on selection 3,0000,,0000-FFFF
+PD42,*DIA4,Input signal automatic on selection 4,0000,,0000-FF0F
+PD43,*DI11L,Input device selection 11L,0000,,0000-3F00
+PD44,*DI11H,Input device selection 11H,0000,,0000-3F3F
+PD45,*DI12L,Input device selection 12L,0000,,0000-3F00
+PD46,*DI12H,Input device selection 12H,0000,,0000-3F3F
+PD47,*DO7,Output device selection 7,0000,,0000-3F3F
+PD48,,For manufacturer setting,0000,,0000-0000
+PE01,*FCT1,For manufacturer setting,0000,,0000-F001
+PE02,,For manufacturer setting,0000,,0000-0000
+PE03,*FCT2,For manufacturer setting,0003,,0000-1023
+PE04,*FBN,For manufacturer setting,1,,1-65535
+PE05,*FBD,For manufacturer setting,1,,1-65535
+PE06,BC1,For manufacturer setting,400,,1-50000
+PE07,BC2,For manufacturer setting,100,,1-20000
+PE08,DUF,For manufacturer setting,10,,1-4500
+PE09,OLLV6,Level for Thermal overload warning 6 during operation,0,%,0-100
+PE10,FCT3,For manufacturer setting,0000,,0000-0010
+PE11,,For manufacturer setting,0000,,0000-0000
+PE12,,For manufacturer setting,0000,,0000-0000
+PE13,,For manufacturer setting,0000,,0000-0000
+PE14,MV1,For manufacturer setting,0111,,0000-3333
+PE15,MV2,For manufacturer setting,20,,0-1000
+PE16,*EOP1,For manufacturer setting,0000,,0000-0021
+PE17,*EOP2,For manufacturer setting,0000,,0000-0111
+PE18,IIRC11,For manufacturer setting,0000,,0000-FFFF
+PE19,IIRC12,For manufacturer setting,0000,,0000-FFFF
+PE20,IIRC13,For manufacturer setting,0000,,0000-FFFF
+PE21,IIRC14,For manufacturer setting,0000,,0000-FFFF
+PE22,IIRC15,For manufacturer setting,0000,,0000-FFFF
+PE23,IIRC16,For manufacturer setting,0000,,0000-FFFF
+PE24,IIRC17,For manufacturer setting,0000,,0000-FFFF
+PE25,IIRC18,For manufacturer setting,0000,,0000-FFFF
+PE26,IIRC21,For manufacturer setting,0000,,0000-FFFF
+PE27,IIRC22,For manufacturer setting,0000,,0000-FFFF
+PE28,IIRC23,For manufacturer setting,0000,,0000-FFFF
+PE29,IIRC24,For manufacturer setting,0000,,0000-FFFF
+PE30,IIRC25,For manufacturer setting,0000,,0000-FFFF
+PE31,IIRC26,For manufacturer setting,0000,,0000-FFFF
+PE32,IIRC27,For manufacturer setting,0000,,0000-FFFF
+PE33,IIRC28,For manufacturer setting,0000,,0000-FFFF
+PE34,*FBN2,For manufacturer setting,1,,1-65535
+PE35,*FBD2,For manufacturer setting,1,,1-65535
+PE36,AWZN,For manufacturer setting,0.0,,0.0-100.0
+PE37,AKZ,For manufacturer setting,0.00,,0.00-1.00
+PE38,ADZ,For manufacturer setting,0.00,,0.00-1.00
+PE39,BT1,For manufacturer setting,20,,20-32767
+PE40,TRCG,For manufacturer setting,0000,,0000-0000
+PE41,EOP3,Function selection E-3,0000,,0000-0001
+PE42,RBF1,For manufacturer setting,0,,0-10000
+PE43,RBF2,For manufacturer setting,0.0,,0.0-10.0
+PE44,LMCP,Lost motion positive side compen. value sel.,0,0.01%,0-30000
+PE45,LMCN,Lost motion negative side compen. value sel.,0,0.01%,0-30000
+PE46,LMFLT,Lost motion filter setting,0,0.1ms,0-30000
+PE47,TOF,Torque offset,0,0.01%,-10000-10000
+PE48,*LMOP,Lost motion compensation function selection,0000,,0000-0011
+PE49,LMCD,Lost motion compensation timing,0,0.1ms,0-30000
+PE50,LMCT,Lost motion compensation dead zone,0,,0-65535
+PE51,,For manufacturer setting,0000,,0000-0000
+PE52,,For manufacturer setting,0000,,0000-0000
+PE53,,For manufacturer setting,0000,,0000-0000
+PE54,,For manufacturer setting,0000,,0000-0000
+PE55,,For manufacturer setting,0000,,0000-0000
+PE56,,For manufacturer setting,0000,,0000-0000
+PE57,,For manufacturer setting,0000,,0000-0000
+PE58,,For manufacturer setting,0000,,0000-0000
+PE59,,For manufacturer setting,0000,,0000-0000
+PE60,,For manufacturer setting,0000,,0000-0000
+PE61,*TGW4,For manufacturer setting,0.00,,0.00-50.00
+PE62,*TGW5,For manufacturer setting,0.00,,0.00-50.00
+PE63,*TGW6,For manufacturer setting,0.00,,0.00-50.00
+PE64,*TGW7,For manufacturer setting,0.00,,0.00-50.00
+PF01,*FOP1,For manufacturer setting,0000,,0000-0112
+PF02,*FOP2,For manufacturer setting,0000,,0000-0000
+PF03,*FOP3,For manufacturer setting,0000,,0000-1110
+PF04,SIC,For manufacturer setting,0,,0-60
+PF05,UIC,For manufacturer setting,0,,0-60
+PF06,*FOP4,For manufacturer setting,0000,,0000-0000
+PF07,ABCMX,For manufacturer setting,1,,1-1
+PF08,ABCDV,For manufacturer setting,1,,1-1
+PF09,*FOP5,Function selection F-5,0000,,0000-0003
+PF10,*FOP6,For manufacturer setting,0000,,0000-0002
+PF11,*FOP7,For manufacturer setting,0000,,0000-1100
+PF12,VLI,For manufacturer setting,10000,,10000-10000
+PF13,SRT,For manufacturer setting,100,,100-100
+PF14,TRT,For manufacturer setting,100,,100-100
+PF15,DBT,Electronic dynamic brake operating time,2000,ms,0-10000
+PF16,*FOP8,For manufacturer setting,0000,,0000-11A0
+PF17,ZAT,For manufacturer setting,10,,1-100
+PF18,*STOD,STO diagnostic error detection time,0,s,0-60
+PF19,,For manufacturer setting,0000,,0000-0000
+PF20,*ORV2,For manufacturer setting,0000,,0000-FFFF
+PF21,DRT,Drive recorder switching time setting,0,s,-1-32767
+PF22,ALDT,For manufacturer setting,200,,200-200
+PF23,OSCL1,Vibration tough drive - Oscillation detection level,50,%,0-100
+PF24,*OSCL2,Vibration tough drive function selection,0000,,0000-0002
+PF25,CVAT,SEMI-F47 Func. - Inst power failure detection time,200,ms,30-500
+PF26,OLLV,For manufacturer setting,0,,0-100
+PF27,THWL,For manufacturer setting,0,,0-0
+PF28,*OVAL,For manufacturer setting,0,,-100-0
+PF29,*FOP9,For manufacturer setting,0000,,0000-0001
+PF30,RTL,For manufacturer setting,0,,0-0
+PF31,FRIC,Machine diagnosis func. - Friction judgement speed,0,r/min,0-65535
+PF32,*VIBT,For manufacturer setting,50,,1-50
+PF33,*FOP10,For manufacturer setting,0000,,0000-0001
+PF34,*SOP3,RS422 Communication function selection 3,0000,,0000-1000
+PF35,OTOP1,For manufacturer setting,0000,,0000-1111
+PF36,OTOP2,For manufacturer setting,0000,,0000-1000
+PF37,*FOP11,For manufacturer setting,0000,,0000-4020
+PF38,IPFSV,For manufacturer setting,0000,,0000-FFFF
+PF39,IPFRV,For manufacturer setting,0000,,0000-FFFF
+PF40,IPFSP,For manufacturer setting,0,,0-20000
+PF41,IPFSTB1,For manufacturer setting,0,,0-10000
+PF42,IPFSTB2,For manufacturer setting,0,,0-0
+PF43,*IPFSTC,For manufacturer setting,0,,0-0
+PF44,ORLV,For manufacturer setting,0,,0-100
+PF45,*FOP12,Function selection F-12,0000,,0000-0002
+PF46,MIC,Modbus-RTU comm. - Communication time-out time,0,s,0-60
+PF47,,For manufacturer setting,0000,,0000-0000
+PF48,,For manufacturer setting,0000,,0000-0000
+PG01,*POLE,For manufacturer setting,----,,0-60
+PG02,*INA,For manufacturer setting,----,,0-65535
+PG03,*STQ,For manufacturer setting,----,,0-32767
+PG04,*MTQ,For manufacturer setting,----,,0-1000
+PG05,*AMR,For manufacturer setting,----,,0-32767
+PG06,*MAMR,For manufacturer setting,----,,0-1000
+PG07,*LDQ,For manufacturer setting,----,,0.00-655.35
+PG08,*RDQ,For manufacturer setting,----,,0-65535
+PG09,*VDQ,For manufacturer setting,----,,0-65535
+PG10,*BAS,For manufacturer setting,----,,0-20000
+PG11,*TOP,For manufacturer setting,----,,0-20000
+PG12,*MAG,For manufacturer setting,----,,0-5
+PG13,*OLN,For manufacturer setting,----,,0-200
+PG14,*OCL,For manufacturer setting,----,,0-200
+PG15,*TDG,For manufacturer setting,----,,0-9999
+PG16,*IQGN,For manufacturer setting,----,,-32768-32767
+PG17,*IDGN,For manufacturer setting,----,,-32768-32767
+PG18,*IQIC,For manufacturer setting,----,,-32768-32767
+PG19,*IDIC,For manufacturer setting,----,,-32768-32767
+PG20,*OHL,For manufacturer setting,----,,0-65535
+PG21,*MSPT,For manufacturer setting,----,,0-65535
+PG22,*FBA,For manufacturer setting,----,,0-16
+PG23,*TWPK,For manufacturer setting,----,,0-65535
+PG24,*KTC1,For manufacturer setting,----,,0-65535
+PG25,*KTC2,For manufacturer setting,----,,0000-FFFF
+PG26,*KTC3,For manufacturer setting,----,,0-65535
+PG27,*KTC4,For manufacturer setting,----,,0000-FFFF
+PG28,*KTC5,For manufacturer setting,----,,0-65535
+PG29,*KTC6,For manufacturer setting,----,,0000-FFFF
+PG30,*VLF,For manufacturer setting,----,,0000-10F2
+PG31,*VLA,For manufacturer setting,----,,-100-100
+PG32,*VLB1,For manufacturer setting,----,,-90-90
+PG33,*RTC,For manufacturer setting,----,,-500-500
+PG34,*VDQG,For manufacturer setting,----,,-1000-1000
+PG35,*VDDG,For manufacturer setting,----,,-1000-1000
+PG36,*MRO,For manufacturer setting,----,,0-65535
+PG37,*AMO,For manufacturer setting,----,,0000-FFFF
+PG38,*CARR,For manufacturer setting,----,,0000-0256
+PG39,*ORT,For manufacturer setting,----,,0-32767
+PG40,*ORL,For manufacturer setting,----,,0-32767
+PG41,*OLT1,For manufacturer setting,----,,0-32767
+PG42,*OLL1,For manufacturer setting,----,,0-32767
+PG43,*OLT2,For manufacturer setting,----,,0-32767
+PG44,*OLL2,For manufacturer setting,----,,0-32767
+PG45,*OLT3,For manufacturer setting,----,,0-32767
+PG46,*OLL3,For manufacturer setting,----,,0-32767
+PG47,*OLT4,For manufacturer setting,----,,0-32767
+PG48,*OLL4,For manufacturer setting,----,,0-32767
+PG49,*PITCH,For manufacturer setting,----,,0-32767
+PG50,*IMAX,For manufacturer setting,----,,0-65535
+PG51,*MID1,For manufacturer setting,----,,0000-FFFF
+PG52,*MID2,For manufacturer setting,----,,0000-FFFF
+PG53,*MID3,For manufacturer setting,----,,0000-FFFF
+PG54,*EID1,For manufacturer setting,----,,0000-FFFF
+PG55,*EID2,For manufacturer setting,----,,0000-FFFF
+PG56,*KTC7,For manufacturer setting,----,,0000-FFFF
+PG57,*KTC8,For manufacturer setting,----,,0000-FFFF
+PG58,*KTC9,For manufacturer setting,----,,0000-FFFF
+PG59,*PMLDIFF,For manufacturer setting,----,,-32768-32767
+PG60,*PMH1,For manufacturer setting,----,,-32768-32767
+PG61,*PMC1,For manufacturer setting,----,,-32768-32767
+PG62,*PMC2,For manufacturer setting,----,,-32768-32767
+PG63,*PMC3,For manufacturer setting,----,,-32768-32767
+PG64,*PMK1,For manufacturer setting,----,,-32768-32767
+PG65,*PMT1,For manufacturer setting,----,,-32768-32767
+PG66,*IRSP,For manufacturer setting,----,,0-65535
+PG67,*CGN1,For manufacturer setting,----,,0000-FFFF
+PG68,*CGN2,For manufacturer setting,----,,0000-FFFF
+PG69,,For manufacturer setting,----,,0000-FFFF
+PG70,,For manufacturer setting,----,,0000-FFFF
+PG71,,For manufacturer setting,----,,0000-FFFF
+PG72,,For manufacturer setting,----,,0000-FFFF
+PG73,,For manufacturer setting,----,,0000-FFFF
+PG74,,For manufacturer setting,----,,0000-FFFF
+PG75,,For manufacturer setting,----,,0000-FFFF
+PG76,,For manufacturer setting,----,,0000-FFFF
+PG77,,For manufacturer setting,----,,0000-FFFF
+PG78,,For manufacturer setting,----,,0000-FFFF
+PG79,,For manufacturer setting,----,,0000-FFFF
+PG80,,For manufacturer setting,----,,0000-FFFF
+PH01,PN1,Bus volt. calibration data 1,----,,0-1000
+PH02,PN2,Bus volt. calibration data 2,----,,0-1000
+PH03,UIO1,U phase current calibration data 1,----,,0000-FFFF
+PH04,VIO1,V phase current calibration data 1,----,,0000-FFFF
+PH05,UIO2,U phase current calibration data 2,----,,0000-FFFF
+PH06,VIO2,V phase current calibration data 2,----,,0000-FFFF
+PH07,VCO1,VC volt. calibration data 1,----,,0000-FFFF
+PH08,VCO2,VC volt. calibration data 2,----,,0000-FFFF
+PH09,*HOP1,Function selection H-1,----,,0000-0004
+PH10,P5V,Control circuit board volt proof data,----,,0-0
+PH11,TINF1,Tester information 1,----,,0000-FFFF
+PH12,TINF2,Tester information 2,----,,0000-FFFF
+PH13,TINF3,Tester information 3,----,,0000-FFFF
+PH14,TINF4,Tester information 4,----,,0000-FFFF
+PH15,*AMP,Servo amplifier capacity,----,,0000-FFFF
+PH16,*ATP,Input power type,----,,0-1
+PH17,*DEF,Parameter default,----,,0000-FFFF
+PH18,*TST,Design evaluation test mode,----,,0000-1001
+PH19,HIS,Servo amplifier maintenance history,----,,0000-FFFF
+PH20,*MSR2,For manufacturer setting,----,,0000-FFFF
+PH21,*MTY2,For manufacturer setting,----,,0000-FFFF
+PH22,*DRS,Drive recorder operation selection,----,,9000-9000
+PH23,*DRA1,Drive recorder Analog data 1 and 2 selection,----,,0000-0000
+PH24,*DRA2,Drive recorder Analog data 3 and 4 selection,----,,0000-0000
+PH25,*DRA3,Drive recorder Analog data 5 and 6 selection,----,,0000-0000
+PH26,*DRA4,Drive recorder Analog data 7 and 8 selection,----,,0000-0000
+PH27,*DRD1,Drive recorder Digital data 1 and 2 selection,----,,0000-0000
+PH28,*DRD2,Drive recorder Digital data 3 and 4 selection,----,,0000-0000
+PH29,*DRD3,Drive recorder Digital data 5 and 6 selection,----,,0000-0000
+PH30,*DRD4,Drive recorder Digital data 7 and 8 selection,----,,0000-0000
+PH31,,For manufacturer setting,----,,0000-0000
+PH32,,For manufacturer setting,----,,0000-0000
+PJ01,NAMEL,Servo amplifier axis name Low,----,,0000-FFFF
+PJ02,NAMEH,Servo amplifier axis name High,----,,0000-FFFF
+PJ03,PONL,Power supply ON time Low,----,,0000-FFFF
+PJ04,PONH,Power supply ON time High,----,,0000-FFFF
+PJ05,CONL,Contactor ON count (L),----,,0000-FFFF
+PJ06,CONH,Contactor ON count (H),----,,0000-FFFF
+PJ07,OLR,Overload and excessive regen. power OFF data,----,,0000-01FF
+PJ08,ALME,Alarm information save,----,,0000-FFFF
+PJ09,*JTIM,Peak/effective load ratio hold time,----,s,10-100
+PJ10,*JOP1,Function selection J-1,----,,0000-0021
+PJ11,*JOP2,Function selection J-2,----,,0000-0001
+PJ12,*PNAL,Insufficient bus voltage alarm level,----,%,50-100
+PJ13,*CVAT1,Control power instant. stop alarm detect time,----,ms,0-2000
+PJ14,,For manufacturer setting,----,,0000-0000
+PJ15,*JOP3,Function selection J-3,----,,0000-000F
+PJ16,*LSFH,Linear motor magnetic pole position High,----,,0000-FFFF
+PJ17,*LSFL,Linear motor magnetic pole position Low,----,,0000-FFFF
+PJ18,*ENAL,Encoder failure alarm level,----,times,-8-8
+PJ19,*ENWT,Encoder initial communication standby time,----,ms,100-9999
+PJ20,ZRT,Home position setting information,----,,0000-000F
+PJ21,CYC0L,Home-pos. one-rev. pos. (L),----,,0000-FFFF
+PJ22,CYC0H,Home-pos. one-rev. pos. (H),----,,0000-FFFF
+PJ23,LSM0,Home-pos. multi rev. pos.,----,,0000-FFFF
+PJ24,PCOLL,Power cycle overload warning counter history Low,----,,0000-FFFF
+PJ25,PCOLH,Power cycle overload warning counter history High,----,,0000-00FF
+PJ26,ALEC,The number of tough drive,----,,0-65535
+PJ27,,For manufacturer setting,----,,0000-0000
+PJ28,,For manufacturer setting,----,,0000-0000
+PJ29,,For manufacturer setting,----,,0000-0000
+PJ30,LSMM,Home position multi rev. pos. memo,----,,0000-FFFF
+PJ31,BCDL,Backlash compensation direction setting Low,----,,0000-FFFF
+PJ32,BCDH,Backlash compensation direction setting High,----,,0000-FFFF
+PO01,*OCD,For manufacturer setting,----,,0000-FFFF
+PO02,*ODI1,MR-D01 input device selection 1,----,,0000-3F3F
+PO03,*ODI2,MR-D01 input device selection 2,----,,0000-3F3F
+PO04,*ODI3,MR-D01 input device selection 3,----,,0000-3F3F
+PO05,*ODI4,MR-D01 input device selection 4,----,,0000-3F3F
+PO06,*ODI5,MR-D01 input device selection 5,----,,0000-3F3F
+PO07,*ODI6,MR-D01 input device selection 6,----,,0000-3F3F
+PO08,*ODO1,MR-D01 output device selection 1,----,,0000-3F3F
+PO09,*ODO2,MR-D01 output device selection 2,----,,0000-3F3F
+PO10,*OOP1,Function selection O-1,----,,0000-6102
+PO11,*OOP2,Function selection O-2,----,,0000-0111
+PO12,*OOP3,Function selection O-3,----,,0000-0011
+PO13,OMOD1,MR-D01 analog monitor 1 output selection,----,,0000-001F
+PO14,OMOD2,MR-D01 analog monitor 2 output selection,----,,0000-001F
+PO15,OMO1,MR-D01 analog monitor 1 offset,----,mV,-9999-9999
+PO16,OMO2,MR-D01 analog monitor 2 offset,----,mV,-9999-9999
+PO17,OMODS1L,For manufacturer setting,----,,-999-999
+PO18,OMODS1H,For manufacturer setting,----,,-999-999
+PO19,OMODS2L,For manufacturer setting,----,,-999-999
+PO20,OMODS2H,For manufacturer setting,----,,-999-999
+PO21,OVCO,MR-D01 override offset,----,mV,-9999-9999
+PO22,OTLO,MR-D01 analog torque limit offset,----,mV,-9999-9999
+PO23,,For manufacturer setting,----,,0000-0000
+PO24,,For manufacturer setting,----,,0000-0000
+PO25,,For manufacturer setting,----,,0000-0000
+PO26,,For manufacturer setting,----,,0000-0000
+PO27,*ODI7,MR-D01 input device selection 7,----,,0000-3F3F
+PO28,*ODI8,MR-D01 input device selection 8,----,,0000-003F
+PO29,,For manufacturer setting,----,,0000-0000
+PO30,,For manufacturer setting,----,,0000-0000
+PO31,,For manufacturer setting,----,,0000-0000
+PO32,,For manufacturer setting,----,,0000-0000
+PS01,,For manufacturer setting,----,,0000-0000
+PS02,,For manufacturer setting,----,,0000-0000
+PS03,,For manufacturer setting,----,,0000-0000
+PS04,,For manufacturer setting,----,,0000-0000
+PS05,,For manufacturer setting,----,,0000-0000
+PS06,,For manufacturer setting,----,,0000-0000
+PS07,,For manufacturer setting,----,,0000-0000
+PS08,,For manufacturer setting,----,,0000-0000
+PS09,,For manufacturer setting,----,,0000-0000
+PS10,,For manufacturer setting,----,,0000-0000
+PS11,,For manufacturer setting,----,,0000-0000
+PS12,,For manufacturer setting,----,,0000-0000
+PS13,,For manufacturer setting,----,,0000-0000
+PS14,,For manufacturer setting,----,,0000-0000
+PS15,,For manufacturer setting,----,,0000-0000
+PS16,,For manufacturer setting,----,,0000-0000
+PS17,,For manufacturer setting,----,,0000-0000
+PS18,,For manufacturer setting,----,,0000-0000
+PS19,,For manufacturer setting,----,,0000-0000
+PS20,,For manufacturer setting,----,,0000-0000
+PS21,,For manufacturer setting,----,,0000-0000
+PS22,,For manufacturer setting,----,,0000-0000
+PS23,,For manufacturer setting,----,,0000-0000
+PS24,,For manufacturer setting,----,,0000-0000
+PS25,,For manufacturer setting,----,,0000-0000
+PS26,,For manufacturer setting,----,,0000-0000
+PS27,,For manufacturer setting,----,,0000-0000
+PS28,,For manufacturer setting,----,,0000-0000
+PS29,,For manufacturer setting,----,,0000-0000
+PS30,,For manufacturer setting,----,,0000-0000
+PS31,,For manufacturer setting,----,,0000-0000
+PS32,,For manufacturer setting,----,,0000-0000
+PL01,*LIT1,For manufacturer setting,----,,0000-0655
+PL02,*LIM,For manufacturer setting,----,,1-65535
+PL03,*LID,For manufacturer setting,----,,1-65535
+PL04,*LIT2,For manufacturer setting,----,,0000-1007
+PL05,LB1,For manufacturer setting,----,,0-1000
+PL06,LB2,For manufacturer setting,----,,0-5000
+PL07,LB3,For manufacturer setting,----,,0-1000
+PL08,*LIT3,For manufacturer setting,----,,0000-1144
+PL09,LPWM,For manufacturer setting,----,,0-100
+PL10,LFH,For manufacturer setting,----,,0-50
+PL11,LIDH,For manufacturer setting,----,,50-100
+PL12,LKDTH,For manufacturer setting,----,,10-1000
+PL13,*LIT4,For manufacturer setting,----,,0000-0000
+PL14,,For manufacturer setting,----,,0000-0000
+PL15,P1ERR,For manufacturer setting,----,,0-300
+PL16,P2ERR,For manufacturer setting,----,,0-300
+PL17,LTSTS,For manufacturer setting,----,,0000-1FFF
+PL18,IDLV,For manufacturer setting,----,,0-100
+PL19,LTPG,For manufacturer setting,----,,0-1000
+PL20,LTVG,For manufacturer setting,----,,0-50000
+PL21,LTVIC,For manufacturer setting,----,,0-10000
+PL22,LTLPF,For manufacturer setting,----,,0-4500
+PL23,*LIT5,For manufacturer setting,----,,0000-0000
+PL24,LPF2,For manufacturer setting,----,,0-0
+PL25,*EDVL,For manufacturer setting,----,,0000-FFFF
+PL26,*EDVH,For manufacturer setting,----,,0000-FFFF
+PL27,,For manufacturer setting,----,,0000-0000
+PL28,,For manufacturer setting,----,,0000-0000
+PL29,,For manufacturer setting,----,,0000-0000
+PL30,,For manufacturer setting,----,,0000-0000
+PL31,,For manufacturer setting,----,,0000-0000
+PL32,,For manufacturer setting,----,,0000-0000
+PL33,,For manufacturer setting,----,,0000-0000
+PL34,,For manufacturer setting,----,,0000-0000
+PL35,,For manufacturer setting,----,,0000-0000
+PL36,,For manufacturer setting,----,,0000-0000
+PL37,,For manufacturer setting,----,,0000-0000
+PL38,,For manufacturer setting,----,,0000-0000
+PL39,,For manufacturer setting,----,,0000-0000
+PL40,,For manufacturer setting,----,,0000-0000
+PL41,,For manufacturer setting,----,,0000-0000
+PL42,,For manufacturer setting,----,,0000-0000
+PL43,,For manufacturer setting,----,,0000-0000
+PL44,,For manufacturer setting,----,,0000-0000
+PL45,,For manufacturer setting,----,,0000-0000
+PL46,,For manufacturer setting,----,,0000-0000
+PL47,,For manufacturer setting,----,,0000-0000
+PL48,,For manufacturer setting,----,,0000-0000
+PT01,*CTY,Command mode selection,----,,0000-4301
+PT02,*TOP1,Function selection T-1,----,,0000-1101
+PT03,*FTY,Feed function selection,----,,0000-0123
+PT04,*ZTY,Home position return type,----,,0000-03FA
+PT05,ZRF,Home position return speed,----,r/min,0-65535
+PT06,CRF,Creep speed,----,r/min,0-65535
+PT07,ZST,Home position shift distance,----,,0-65535
+PT08,*ZPS,Home position return position data,----,,-32768-32767
+PT09,DCT,Moving distance after proximity dog,----,,0-65535
+PT10,ZTM,Stopper type home position return stopper time,----,ms,0-1000
+PT11,ZTT,Stopper type home position return torque limit value,----,%,0.0-100.0
+PT12,CRP,Rough match output range,----,,0-65535
+PT13,JOG,JOG speed,----,r/min,0-65535
+PT14,*BKC,Backlash compensation,----,pulse,0-65535
+PT15,LMPL,Software limit+,----,,-999-999
+PT16,LMPH,Software limit+,----,,-999-999
+PT17,LMNL,Software limit-,----,,-999-999
+PT18,LMNH,Software limit-,----,,-999-999
+PT19,*LPPL,Position range output address+,----,,-999-999
+PT20,*LPPH,Position range output address+,----,,-999-999
+PT21,*LNPL,Position range output address-,----,,-999-999
+PT22,*LNPH,Position range output address-,----,,-999-999
+PT23,OUT1,OUT1 output setting time,----,ms,0-20000
+PT24,OUT2,OUT2 output setting time,----,ms,0-20000
+PT25,OUT3,OUT3 output setting time,----,ms,0-20000
+PT26,*TOP2,Function selection T-2,----,,0000-1164
+PT27,*ODM,Operation mode selection,----,,0000-1021
+PT28,*STN,Number of stations/rotation,----,Split,0-255
+PT29,*TOP3,Function selection T-3,----,,0000-007F
+PT30,MSTL,Mark sensor stop movement amount,----,,0-999
+PT31,MSTH,Mark sensor stop movement amount,----,,0-999
+PT32,*TOP4,For manufacturer setting,----,,0000-1121
+PT33,*PBLK,For manufacturer setting,----,,0000-007F
+PT34,*PDEF,Point table/Program default,----,,0000-5011
+PT35,*TOP5,Function selection T-5,----,,0000-1111
+PT36,*TOP6,For manufacturer setting,----,,0000-0111
+PT37,MSTP,For manufacturer setting,----,,0-100
+PT38,*TOP7,Function selection T-7,----,,0000-1110
+PT39,INT,Torque limit delay time,----,ms,0-1000
+PT40,*SZS,Station home position shift distance,----,pulse,-32000-32000
+PT41,ORP,Home position return inhibit function selection,----,,0000-1101
+PT42,*OVM,Digital override minimum multiplication,----,%,0-100
+PT43,*OVS,Digital override pitch width,----,%,0-20
+PT44,*TOP8,For manufacturer setting,----,,0000-0001
+PT45,*CZTY,Home position return type 2,----,,0000-00FF
+PT46,,For manufacturer setting,----,,0000-0000
+PT47,,For manufacturer setting,----,,0000-0000
+PT48,,For manufacturer setting,----,,0000-0000
+</Parameters>
+	</PARAMETER>
+</Root>
