@@ -69,6 +69,8 @@ Các bit lỗi (`X8`/`X9`/`XA`/`XB`) và busy (`XC`/`XD`/`XE`/`XF`) chỉ tham g
 | 906 | Timeout verify hoặc Md.20 đọc lại khác giá trị yêu cầu |
 | 908 | Frame, độ dài, ký tự hex hoặc checksum phản hồi không hợp lệ |
 
+`ErrorCode` là mã chẩn đoán nội bộ của engine RS-422 trong lúc đang đọc. Khi engine idle (`bReadEnable=FALSE`, gồm `SyncState=50`), chương trình giữ `ErrorCode=0`; lỗi nghiệm thu chu kỳ chỉ đọc qua `AbsError`, `SyncState` và `M121`. Trạng thái PASS là `SyncState=50`, `AbsError=0`, `M120=1`, `M121=0`.
+
 Fault cleanup: trong state 40, sau khi bước 1 đã chụp `wPrevStart` và ghi `9003`, mọi lỗi ở bước 2/3 (901, 905, 906) đều tắt `M111..M114`, ghi lại `Cd.3 := wPrevStart` bằng `TO` với `wBfm`, rồi mới sang state 90. Lỗi trước bước 1 (chưa ghi 9003) không restore.
 
 ## 4. Local label được dùng

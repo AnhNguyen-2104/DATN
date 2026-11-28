@@ -321,8 +321,11 @@ IF State = 30 THEN WaitPreset := T#300ms; END_IF;
 WaitTimer(IN := (State = PreviousState) AND ((State = 10) OR (State = 11) OR (State = 20) OR (State = 30) OR (State = 40) OR (State = 50)), PT := WaitPreset, Q := TimerExpired, ET := Elapsed);
 PreviousState := State;
 RetryTimer(IN := (State = 12) OR (State = 60), PT := T#100ms, Q := RetryExpired, ET := RetryElapsed);
+(* Idle: the engine is disabled outside SyncState 20, so ErrorCode stays 0.
+   AbsError, not ErrorCode, reports cycle failures; a nonzero ErrorCode here
+   only mirrored a disabled engine and was misread as a fault in Watch. *)
 IF NOT bReadEnable THEN
-    Busy := FALSE; AbsValid := FALSE; AbsFresh := FALSE; ErrorCode := 1; State := 0;
+    Busy := FALSE; AbsValid := FALSE; AbsFresh := FALSE; ErrorCode := 0; State := 0;
 ELSE
     IF StartEdge AND NOT Busy THEN
         IF NOT StartupReady THEN
